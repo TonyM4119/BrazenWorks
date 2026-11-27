@@ -723,6 +723,9 @@ protected:
   // Fork: the hover highlight fades in and out (framework/Motion.hpp).
   void enterEvent(QEnterEvent* event) override;
   void leaveEvent(QEvent* event) override;
+  // Fork: the command's card on hover (name, shortcut and what it does), as
+  // SolidCraft's and Fusion's toolbars, instead of the one-line tooltip.
+  bool event(QEvent* event) override;
 
 private:
   // The arrow part's width: a split button's or a menu button's.

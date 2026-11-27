@@ -186,31 +186,33 @@ Paint monoPaint(IconRole role, bool dark, bool stroke, QRgb source) {
 // the light theme; on the dark theme the faces are deeper and the lines
 // lighter, so that both read on their surface.
 Paint colourPaint(IconRole role, bool dark, bool stroke, QRgb source) {
-  const QRgb outline = dark ? 0xcbd7e8 : 0x3a4a5e;
-  const QRgb amber = dark ? 0xe2b45e : 0xc98a1c;
+  // Fork: Fusion's tones: near-black line work, cool grey bodies, one blue
+  // for the sketch, the dimensions and the actions, amber construction.
+  const QRgb outline = dark ? 0xdce2e8 : 0x2b3036;
+  const QRgb amber = dark ? 0xe8b45e : 0xd98a1c;
   switch (role) {
   case IconRole::Outline:
     return {outline, 1.0};
   case IconRole::TopFace:
-    return {dark ? 0xa9c7eeu : 0xdce9f8u, 1.0};
+    return {dark ? 0xb9c4cfu : 0xe6ecf2u, 1.0};
   case IconRole::SideFace:
-    return {dark ? 0x7099cfu : 0xa3c2e8u, 1.0};
+    return {dark ? 0x8a98a7u : 0xbfcbd8u, 1.0};
   case IconRole::FarSide:
-    return {dark ? 0x4b72a8u : 0x6f97ccu, 1.0};
+    return {dark ? 0x627180u : 0x93a4b6u, 1.0};
   case IconRole::PaleSurface:
-    return dark ? Paint{0xbcd0ee, 0.20} : Paint{0xe4edf8, 1.0};
+    return dark ? Paint{0xc8d2dc, 0.20} : Paint{0xeef2f6, 1.0};
   case IconRole::Hollow:
-    return dark ? Paint{0xf0f6ff, 0.14} : Paint{0xffffff, 1.0};
+    return dark ? Paint{0xf0f4f8, 0.14} : Paint{0xffffff, 1.0};
   case IconRole::ConstructionNear:
-    return stroke ? Paint{amber, 1.0} : dark ? Paint{amber, 0.42} : Paint{0xf5c46e, 0.78};
+    return stroke ? Paint{amber, 1.0} : dark ? Paint{amber, 0.42} : Paint{0xf6c06a, 0.75};
   case IconRole::ConstructionFar:
-    return stroke ? Paint{amber, 1.0} : dark ? Paint{amber, 0.22} : Paint{0xf7d9a6, 0.62};
+    return stroke ? Paint{amber, 1.0} : dark ? Paint{amber, 0.22} : Paint{0xf8d9a8, 0.60};
   case IconRole::ConstructionLine:
     return {amber, 1.0};
   case IconRole::Action:
-    return {dark ? 0xff9a3cu : 0xef7d16u, 1.0};
+    return {dark ? 0x5ea3f5u : 0x1769d1u, 1.0};
   case IconRole::Sketch:
-    return {dark ? 0x6ea8ffu : 0x1f6bd6u, 1.0};
+    return {dark ? 0x6aaaf5u : 0x1769d1u, 1.0};
   case IconRole::Pencil:
     return stroke ? Paint{outline, 1.0} : Paint{dark ? 0xf2c14eu : 0xf6c445u, 1.0};
   case IconRole::Muted:
