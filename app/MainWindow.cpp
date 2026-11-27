@@ -9516,9 +9516,10 @@ bool MainWindow::installDocument(const QString& label, const QString& path, cons
       // that a component the user worked in stays active and its first
       // sketch on a face asks nothing (mitcad#960); a component it can no
       // longer be (linked since) gives way to the root. An import opens
-      // with its root active (mitcad#426). A new design keeps its
-      // Component1 active, as the untitled design at the start does: one of
-      // a project (mitcad#844) and an empty one (mitcad#898). None is an
+      // with its root active (mitcad#426). A new design keeps the
+      // component it was made with active (its root, fork: no Component1),
+      // as the untitled design at the start does: one of a project
+      // (mitcad#844) and an empty one (mitcad#898). None is an
       // undo step or a new revision, so the document is not modified.
       const auto activateOnOpening = [&document](const QString& component) {
         return parseObject(document->command(rustStr(
@@ -9755,9 +9756,9 @@ void MainWindow::persistResults(const QString& label) {
 bool MainWindow::installEmptyDocument(const QString& name, QString* error) {
   QString reason;
   // A new, empty design (New, Close, an empty project, the open design
-  // deleted) starts with its Component1 active, as the untitled design at
-  // the start does (mitcad#898), not with the root as an import
-  // (mitcad#426).
+  // deleted) starts as the untitled design at the start does (mitcad#898):
+  // fork: the root alone and active, everything in the main component
+  // until the user makes one.
   const bool wasOpeningNewDesign = m_openingNewDesign;
   m_openingNewDesign = true;
   // In the default units for new designs (Preferences > General,

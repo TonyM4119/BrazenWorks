@@ -20,7 +20,7 @@ use mitcad_model_tests_support::test_library::*;
 /// A new design as File › New makes it (the root and an active Component1,
 /// both Hybrid since mitcad#421), with the test library.
 fn hybrid_design() -> Document<MockKernel> {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     doc.set_link_resolver(Some(TestLibrary::new()));
     doc
 }

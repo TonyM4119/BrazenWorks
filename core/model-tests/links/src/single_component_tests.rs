@@ -54,7 +54,7 @@ fn block(doc: &mut Document<MockKernel>) {
 /// A new design (the root and Component1, active) with a block in
 /// Component1, which the root places at (0, 0, 10).
 fn one_component() -> Document<MockKernel> {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     block(&mut doc);
     let only = doc
         .assembly()
@@ -161,7 +161,7 @@ fn a_new_design_inserted_comes_in_as_its_one_component() {
 /// (0, 0, 10), each with a block, and Joint1 of Component1 sliding the Key
 /// along x on the Base.
 fn one_component_with_parts() -> Document<MockKernel> {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     let top = doc.assembly().active;
     let (_, base_part) = doc
         .create_component(Some("Base"), Transform::IDENTITY, true)
@@ -221,12 +221,12 @@ fn the_components_and_joints_of_the_one_component_come_one_level_up() {
 #[test]
 fn a_design_with_root_content_or_two_components_keeps_its_root() {
     // A body in the root beside Component1.
-    let mut root_content = Document::new_design(MockKernel::default());
+    let mut root_content = Document::new_design_with_component1(MockKernel::default());
     block(&mut root_content);
     root_content.activate_component(ComponentUid::ROOT).unwrap();
     block(&mut root_content);
     // A second component beside Component1.
-    let mut two = Document::new_design(MockKernel::default());
+    let mut two = Document::new_design_with_component1(MockKernel::default());
     block(&mut two);
     two.activate_component(ComponentUid::ROOT).unwrap();
     two.create_component(Some("Second"), Transform::IDENTITY, true)
@@ -329,7 +329,7 @@ fn a_linked_one_component_design_edited_into_two_comes_in_whole_on_update() {
 /// a block of its own and Key:1 at (0, 0, 10) with a block; its
 /// components take attachments from others.
 fn one_component_with_key() -> Document<MockKernel> {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     let top = doc.assembly().active;
     block(&mut doc);
     doc.create_component(Some("Key"), Transform::translation([0.0, 0.0, 10.0]), true)

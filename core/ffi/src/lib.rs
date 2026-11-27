@@ -1014,9 +1014,8 @@ fn new_document() -> Box<Document> {
     Box::new(Document(mitcad_model::Document::new(OcctKernel)))
 }
 
-/// A new, empty design as File > New makes it (mitcad#220): the root and an
-/// empty component Component1, active, both with the general defaults
-/// (mitcad#421).
+/// A new, empty design as File > New makes it (mitcad#220): the root alone,
+/// active, with the general defaults (mitcad#421). Fork: no Component1.
 fn new_design_document() -> Box<Document> {
     Box::new(Document(mitcad_model::Document::new_design(OcctKernel)))
 }

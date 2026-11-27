@@ -44,13 +44,24 @@ pub struct PolicyReport {
 }
 
 impl DocState {
-    /// The state of a new, empty design: the root and an empty component
-    /// Component1, active, so that the first sketch or feature goes into
-    /// Component1. Both have the general defaults (the Hybrid preset,
-    /// everything allowed, mitcad#421): Component1 takes components too.
+    /// The state of a new, empty design: the root alone, active, with the
+    /// general defaults (the Hybrid preset, everything allowed, mitcad#421).
+    /// Fork: no Component1 until the user makes a component; the first
+    /// sketch or feature goes into the root (the main component).
     pub(crate) fn new_design() -> Self {
         let mut state = Self::default();
         state.assembly.root_policy = Policy::GENERAL;
+        state.assembly.active = ComponentUid::ROOT;
+        state
+    }
+
+    /// A design shaped as MitCad's new designs were before the fork's
+    /// root-only ones (a file saved then): the root and an empty component
+    /// Component1, active, both with the general defaults. Tests of such
+    /// designs start from it.
+    #[cfg(any(test, feature = "testing"))]
+    pub(crate) fn new_design_with_component1() -> Self {
+        let mut state = Self::new_design();
         let component = state.assembly.create(Some(NEW_DESIGN_COMPONENT), None);
         state.assembly.set_policy(component, Policy::GENERAL);
         state
@@ -189,6 +200,16 @@ impl<K: Kernel> Document<K> {
         document
     }
 
+    /// A design with the root and an empty active Component1, as MitCad
+    /// made new designs before the fork
+    /// ([`DocState::new_design_with_component1`]); not modified.
+    #[cfg(any(test, feature = "testing"))]
+    pub fn new_design_with_component1(kernel: K) -> Self {
+        let mut document = Self::from_state(kernel, DocState::new_design_with_component1());
+        document.mark_saved();
+        document
+    }
+
     /// A new, empty design in the length unit `length` (mitcad#1036,
     /// [`DocState::new_design_in`]): no undo step, and it is not modified,
     /// as [`Document::new_design`].
@@ -198,8 +219,9 @@ impl<K: Kernel> Document<K> {
         document
     }
 
-    /// Whether the assembly is still a new design's
-    /// ([`DocState::new_design`]): its one component Component1, placed
+    /// Whether the assembly is still a new design's as MitCad made it
+    /// before the fork's root-only designs (a file saved then): its one
+    /// component Component1, placed
     /// once in the root at the identity, and nothing else; with no feature,
     /// the design is as empty as a new one (an import into it asks nothing,
     /// mitcad#1629).
