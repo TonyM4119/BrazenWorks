@@ -422,6 +422,9 @@ void TitleBar::setFloatingRow(bool floating) {
   }
   m_floatingRow = floating;
   setObjectName(floating ? QStringLiteral("titleRow") : QStringLiteral("titleBar"));
+  // Fork: the Floating row's command buttons in one colour, as Fusion's top
+  // bar (commandButtonIcon).
+  setProperty(kMonochromeIconsProperty, floating);
   setFixedHeight(floating ? uiRoomSize(kFloatingRowHeight) : rowHeight());
   // One flat bar across the view's top (mitcad#1990): its controls 8 px in
   // from the window's edges, 6 apart; no traffic lights to leave room for.

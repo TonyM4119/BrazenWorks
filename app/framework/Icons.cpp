@@ -240,10 +240,10 @@ Paint disabledPaint(IconRole role, bool dark, bool stroke, QRgb source) {
 // device pixel ratio it is asked for.
 class SvgIconEngine : public QIconEngine {
 public:
-  SvgIconEngine(QByteArray svg, IconBackdrop backdrop, double outlineWeight)
-      : m_svg(std::move(svg)), m_backdrop(backdrop), m_outlineWeight(outlineWeight) {}
+  SvgIconEngine(QByteArray svg, IconBackdrop backdrop, double outlineWeight, bool mono = false)
+      : m_svg(std::move(svg)), m_backdrop(backdrop), m_outlineWeight(outlineWeight), m_mono(mono) {}
 
-  QIconEngine* clone() const override { return new SvgIconEngine(m_svg, m_backdrop, m_outlineWeight); }
+  QIconEngine* clone() const override { return new SvgIconEngine(m_svg, m_backdrop, m_outlineWeight, m_mono); }
 
   QString key() const override { return QStringLiteral("mitcad-svg"); }
 
@@ -276,9 +276,12 @@ public:
     if (cached != m_cache.cend()) {
       return cached.value();
     }
-    QByteArray& themed = m_themed[(dark ? 2 : 0) + (disabled ? 1 : 0)];
+    // Fork: a one-colour icon (monochromeIcon) in the disabled colours at
+    // full opacity.
+    const bool oneColour = disabled || m_mono;
+    QByteArray& themed = m_themed[(dark ? 2 : 0) + (oneColour ? 1 : 0)];
     if (themed.isEmpty()) {
-      themed = themedIconSvg(m_svg, dark, disabled, m_outlineWeight);
+      themed = themedIconSvg(m_svg, dark, oneColour, m_outlineWeight);
     }
     QSvgRenderer renderer(themed);
     renderer.setAspectRatioMode(Qt::KeepAspectRatio);
@@ -326,6 +329,7 @@ private:
   std::array<QByteArray, 4> m_themed;
   IconBackdrop m_backdrop;
   double m_outlineWeight;
+  bool m_mono = false; // Fork: monochromeIcon
   QHash<QString, QPixmap> m_cache;
 };
 
@@ -504,6 +508,26 @@ QIcon withOutlineWeight(const QIcon& icon, double outlineWeight) {
     return icon;
   }
   return themeIcon(origin->name, origin->backdrop, outlineWeight);
+}
+
+QIcon monochromeIcon(const QIcon& icon) {
+  const auto origin = iconOrigins().constFind(icon.cacheKey());
+  if (icon.isNull() || origin == iconOrigins().cend()) {
+    return icon;
+  }
+  static QHash<QString, QIcon> cache;
+  const QString key = QStringLiteral("%1:%2").arg(int(origin->backdrop)).arg(origin->name);
+  const auto cached = cache.constFind(key);
+  if (cached != cache.cend()) {
+    return cached.value();
+  }
+  QFile file(QStringLiteral(":/icons/%1.svg").arg(origin->name));
+  QIcon mono = icon;
+  if (file.open(QIODevice::ReadOnly)) {
+    mono = QIcon(new SvgIconEngine(file.readAll(), origin->backdrop, 1.0, true));
+  }
+  cache.insert(key, mono);
+  return mono;
 }
 
 QIcon swatchIcon(const QColor& color) {

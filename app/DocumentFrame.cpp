@@ -208,8 +208,12 @@ protected:
   }
   int closeRoom(int index) const {
     const QWidget* close = tabButton(index, QTabBar::RightSide);
-    return close != nullptr ? close->sizeHint().width() + 6 : 0;
+    // Fork: with the design's icon before the name (iconRoom), in every
+    // width of the tab.
+    return (close != nullptr ? close->sizeHint().width() + 6 : 0) + iconRoom();
   }
+  // Fork: the design's icon before its name, as Fusion's tabs.
+  int iconRoom() const { return m_rowStyle ? uiIconSize(16) + 6 : 0; }
   int squeezedWidth(int index) const {
     return std::min(std::min(nameRoom(index), 240) + closeRoom(index), 64 + closeRoom(index));
   }
@@ -254,6 +258,10 @@ protected:
         painter.setBrush(themeColor(ColorRole::HoverFill, pal));
         painter.drawRoundedRect(block, kControlRadius, kControlRadius);
       }
+      // Fork: the design's icon before its name.
+      const int side = uiIconSize(16);
+      const QPixmap icon = themeIcon(QStringLiteral("component")).pixmap(QSize(side, side), devicePixelRatioF());
+      painter.drawPixmap(QPointF(tab.left() + 12, tab.top() + (tab.height() - side) / 2.0 + 1), icon);
       // The name left of the close button, elided in the middle.
       const QRect name = nameRect(i);
       painter.setFont(nameFont(selected));
@@ -290,7 +298,8 @@ protected:
     const QRect tab = tabRect(index);
     const QWidget* close = tabButton(index, QTabBar::RightSide);
     const int right = close != nullptr && !close->isHidden() ? close->geometry().left() - 4 : tab.right() - 10;
-    return QRect(tab.left() + 12, tab.top(), std::max(0, right - tab.left() - 12), tab.height());
+    const int left = tab.left() + 12 + iconRoom();
+    return QRect(left, tab.top(), std::max(0, right - left), tab.height());
   }
   // A tab inserted in the row gets the row's × too; also once the tab bar
   // is done with it, should it add the style's button after this.

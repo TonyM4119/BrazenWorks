@@ -223,11 +223,11 @@ int panelTabHeight(const QFont& font) { return std::max(26, QFontMetrics(font).h
 // Fork: the toolbar panel's tab names and group captions in capitals, as
 // Fusion's (docs/ui-conventions.md "The toolbar panel"): a little smaller
 // than the text, DemiBold, spaced a little apart.
-QFont capitalsFont(const QFont& base, qreal scale) {
+QFont capitalsFont(const QFont& base, qreal scale, QFont::Weight weight = QFont::DemiBold) {
   QFont font = base;
   font.setPointSizeF(font.pointSizeF() * scale);
-  font.setWeight(QFont::DemiBold);
-  font.setLetterSpacing(QFont::AbsoluteSpacing, 0.3);
+  font.setWeight(weight);
+  font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
   return font;
 }
 // The toolbar panel (Ribbon::setPanel, mitcad#1990): the room around its
@@ -294,6 +294,22 @@ QColor textTint(const QPalette& palette, int alpha) {
 }
 
 // A small chevron pointing down, centred on `center`.
+// Fork: Fusion's small filled ▾ (the toolbar panel's group captions and
+// the workspace block), centred on `center`.
+void drawDropTriangle(QPainter& painter, const QPointF& center, const QColor& color) {
+  painter.save();
+  painter.setRenderHint(QPainter::Antialiasing);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(color);
+  QPainterPath path;
+  path.moveTo(center.x() - 3.5, center.y() - 1.8);
+  path.lineTo(center.x() + 3.5, center.y() - 1.8);
+  path.lineTo(center.x(), center.y() + 2.2);
+  path.closeSubpath();
+  painter.drawPath(path);
+  painter.restore();
+}
+
 void drawChevron(QPainter& painter, const QPointF& center, const QColor& color) {
   painter.save();
   painter.setRenderHint(QPainter::Antialiasing);
@@ -354,7 +370,7 @@ public:
 
   // The caption's font (docs/ui-conventions.md §10). Fork: in capitals,
   // 0.85 DemiBold, as Fusion's group names (capitalsFont).
-  static QFont captionFont(const QFont& base) { return capitalsFont(base, 0.85); }
+  static QFont captionFont(const QFont& base) { return capitalsFont(base, 0.85, QFont::Normal); }
 
   QSize sizeHint() const override {
     const QFontMetrics metrics(captionFont(font()));
@@ -386,7 +402,7 @@ protected:
     const int total = textWidth + 5 + 8;
     const int left = (width() - total) / 2;
     painter.drawText(QRect(left, 0, textWidth, height()), Qt::AlignVCenter | Qt::AlignLeft, shown);
-    drawChevron(painter, QPointF(left + textWidth + 5 + 4, height() / 2.0 + 0.5), color);
+    drawDropTriangle(painter, QPointF(left + textWidth + 5 + 4, height() / 2.0 + 0.5), color);
   }
 
 private:
@@ -581,7 +597,7 @@ protected:
     // before the seven model tabs, mitcad#1975): the title row holds the
     // seven tabs and the + of their menu in a window of about 1000 px. The
     // panel's: 11 px, a workspace's few tabs (mitcad#1990).
-    return m_panelStyle ? QSize(QFontMetrics(capitalsFont(font(), 0.92)).horizontalAdvance(tabText(index).toUpper()) +
+    return m_panelStyle ? QSize(QFontMetrics(capitalsFont(font(), 0.9, QFont::Normal)).horizontalAdvance(tabText(index).toUpper()) +
                                     24 + arrowRoom(index),
                                 panelTabHeight(font()))
                         : QSize(fontMetrics().horizontalAdvance(tabText(index)) + 16, tabHeight(font()));
@@ -693,8 +709,8 @@ private:
         painter.setBrush(bright);
         painter.drawRect(QRectF(tab.left() + 8, tab.bottom() + 1 - 3, tab.width() - 16, 3));
       }
-      painter.setFont(capitalsFont(font(), 0.92));
-      QColor text = textTint(pal, 190);
+      painter.setFont(capitalsFont(font(), 0.9, QFont::Normal));
+      QColor text = textTint(pal, 200);
       if (selected || mode) {
         text = bright;
       } else if (i == hovered && isEnabled()) {
@@ -1145,7 +1161,7 @@ protected:
     painter.setFont(title);
     painter.setPen(text);
     painter.drawText(QRect(left, 0, nameWidth, height()), Qt::AlignVCenter | Qt::AlignLeft, name);
-    drawChevron(painter, QPointF(left + nameWidth + 6 + 4, height() / 2.0 + 0.5), text);
+    drawDropTriangle(painter, QPointF(left + nameWidth + 6 + 4, height() / 2.0 + 0.5), text);
   }
 
 private:
@@ -2164,6 +2180,13 @@ QString displayName(const QString& key) {
 }
 
 QIcon commandButtonIcon(const QToolButton* button) {
+  // Fork: in the top bar (kMonochromeIconsProperty on an ancestor) the
+  // icons in one colour, as Fusion's.
+  for (const QWidget* up = button->parentWidget(); up != nullptr; up = up->parentWidget()) {
+    if (up->property(kMonochromeIconsProperty).toBool()) {
+      return monochromeIcon(button->icon());
+    }
+  }
   return button->property(kThinOutlineProperty).toBool() ? withOutlineWeight(button->icon(), kThinOutlineWeight)
                                                          : button->icon();
 }

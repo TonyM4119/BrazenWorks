@@ -1377,7 +1377,10 @@ left group, the tabs, the right end), with one change: the shown design's
 tab is a tab of the toolbar panel's surface, rounded at the top and open
 at its foot, from 4 px under the bar's top to its bottom, where the
 toolbar panel goes on under it; its name and × in the text colour. The
-other tabs stay flat. This replaces the accent block described below.
+other tabs stay flat. This replaces the accent block described below. Every design tab shows the design's icon (16 px) before its name. The
+bar's command buttons draw their icons in one colour, the outline's
+(`monochromeIcon`), as Fusion's quiet top bar; the toolbar and the menus
+keep the colours.
 
 One flat bar across the window, 36 px high (`kFloatingRowHeight`),
 controls 30 px high, 12 px between its groups and at its ends. Nothing is
@@ -1457,14 +1460,14 @@ surface colour with a line at its foot; no cards. Its parts:
 - **The workspace block**: the workspace's name in capitals with a ˅
   ("DESIGN ˅"), at least 96 px wide, as high as the panel, a line right of
   it; no icon and no "Workspace" line.
-- **The tabs**: names in capitals (0.92 of the text, DemiBold, 0.3 px
+- **The tabs**: names in capitals (0.9 of the text, Regular, 0.5 px
   apart); the shown one in the accent over a 3 px bar of it at the tab
   row's foot, on the line under the row; a hovered one in the full text
   colour; no filled block.
 - **The groups**: 32 px icons with 3 px around them, **icons only** by
   default (Preferences › Display › Toolbar labels still offers labels;
   the UI tests keep labels), each group's caption in capitals (0.85,
-  DemiBold) with its ˅, thin lines between the groups.
+  Regular) with a small filled ▾ (the workspace block's too), thin lines between the groups.
 
 - **The workspace list** (a click on the block): "WORKSPACE" in capitals,
   then an entry per workspace, at least 440 px wide: a bar at its left and
