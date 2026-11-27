@@ -335,7 +335,7 @@
             {"command": "sheet.flat_pattern", "button": true},
             "sheet.show_flat",
             "-",
-            {"command": {"command": "sheet.export_dxf", "button": true}, "repeat": true},
+            {"command": "sheet.export_dxf", "repeat": true, "button": true},
             "sheet.flat_pattern_drawing",
             {"command": "sheet.export_bend_table", "repeat": true}
           ]
