@@ -736,6 +736,14 @@ MainWindow::MainWindow(bool demo, QWidget* parent, bool nativeUi)
   connect(m_viewer, &OcctViewer::glFailed, this, &MainWindow::showError);
   // Picks arrive while the view is painting; react afterwards.
   connect(m_viewer, &OcctViewer::picked, this, &MainWindow::onPicked, Qt::QueuedConnection);
+  // Fork: while Create Sketch waits for a plane, the origin plane under the
+  // mouse shows its grid and numbered ticks (OcctViewer::setPlaneRuler).
+  connect(m_viewer, &OcctViewer::hovered, this, [this](const SelectionItem& item) {
+    const bool origin = m_mode == Mode::PickPlane && item.kind == SelectKind::Plane && item.occurrence.isEmpty() &&
+                        (item.owner == QLatin1String("xy") || item.owner == QLatin1String("xz") ||
+                         item.owner == QLatin1String("yz"));
+    m_viewer->setPlaneRuler(origin ? item.owner : QString());
+  });
   // The pick list's rows in words (mitcad#1703): the Browser's names.
   m_viewer->setPickListNames([this](const SelectionItem& item) { return pickListText(item, m_snapshot); });
   // The pick places of the active input again once the cards over the view
@@ -8325,6 +8333,9 @@ void MainWindow::createSketch(const QJsonObject& fields) {
 }
 
 void MainWindow::createSketchOnPick(SelectionItem item) {
+  // Fork: the plane ruler gone, the layout grid back where it was, before
+  // the sketch puts the grid on its own plane.
+  m_viewer->setPlaneRuler(QString());
   // A tutorial's guide step on another plane holds the pick back
   // (mitcad#2440): the plane can still be picked.
   if (!guideAllowsPlane(item)) {

@@ -1727,6 +1727,25 @@ red pixel, an edge the band reaches or a square corner.
   **Anti-aliasing** (Off, 2x, 4x, 8x; 4x by default) set how smooth the 3D
   view draws curves and edges (`view/ViewQualityPreference.hpp`).
 
+## 18b. Plane ruler (fork)
+
+While Create Sketch waits for a plane, the root origin plane under the
+mouse (XY, XZ or YZ) gets a ruler, as in Fusion: **the layout grid moves
+onto that plane**, so that it shows the plane the sketch would be drawn
+on; no second grid is drawn. Over it:
+
+- the plane's two axes across the view, in their axis colours;
+- numbered ticks along each axis's positive half, on the grid's major
+  lines: their spacing times 1, 2, 5, 10 … so that the numbers are at
+  least 80 logical pixels apart; in the design's length unit without the
+  unit's name; beside a tick in the axis colour, turned along the axis
+  (never upside down), in a quiet grey with a halo of the background. An
+  axis seen end on gets no numbers.
+
+When the mouse leaves the plane or the pick ends, the axes and numbers go
+and the grid goes back to the plane it was on (a sketch opened on the
+picked plane then puts it on its own plane, as before).
+
 ## 19. What not to do
 
 - Two texts for one control by default (a label beside a button that

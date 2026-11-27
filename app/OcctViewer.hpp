@@ -56,6 +56,7 @@
 #include <gp_Vec.hxx>
 
 #include "LayoutGrid.hpp"
+#include "view/PlaneRulerAxes.hpp"
 #include "framework/Appearances.hpp"
 #include "framework/Selection.hpp"
 #include "framework/SelectionScope.hpp"
@@ -417,6 +418,15 @@ public:
   // show only where they leave it, round the surface through the body.
   // The grid's setting and its spacing (what sketch points snap to) stay.
   void setGridOnCurvedFace(bool curved);
+  // Fork: the plane ruler (view/PlaneRuler.hpp) on the root's origin plane
+  // `originPlane` ("xy", "xz" or "yz"): the layout grid moves onto that
+  // plane (setGridPlane), with the plane's two axes in their colours and
+  // numbered ticks along them in the design's unit (setGridUnit) on the
+  // grid's major lines, following the zoom. Empty: none, and the grid back
+  // on the plane it was on, unless something else moved it meanwhile (a
+  // sketch opened on the picked plane). Create Sketch shows it on the
+  // origin plane under the mouse while it waits for a plane.
+  void setPlaneRuler(const QString& originPlane);
   // The grid's minor step now (mm), shown or not: what sketch points snap to.
   double gridStep() const;
   // The faces where Section Analysis or Hide Above Sketch cuts the bodies
@@ -1870,6 +1880,9 @@ private:
   // Rebuilds the grid's lines when the zoom changes their step or the view
   // nears their edge (or always with `force`).
   void updateGrid(bool force = false);
+  // Fork: the plane ruler's grid and labels for this frame's camera.
+  void updatePlaneRuler();
+  void paintPlaneRuler(QPainter& painter);
   void remove(const occ::handle<AIS_Shape>& object);
   void activatePicking(const occ::handle<AIS_Shape>& object);
   void activateAllPicking();
@@ -2416,6 +2429,23 @@ private:
   gp_Ax3 m_gridPlane;
   Graphic3d_ZLayerId m_gridLayer = Graphic3d_ZLayerId_UNKNOWN;
   int m_gridRebuilds = 0; // updateGrid's rebuilds so far (a 3D mouse motion's log counts them)
+  // Fork: the plane ruler (setPlaneRuler): the plane, the grid's plane before
+  // the ruler moved it there (while moved), its axes in the grid's layer,
+  // its labels painted over the view, and what the labels read.
+  QString m_rulerPlane;
+  bool m_rulerMovedGrid = false;
+  gp_Ax3 m_gridPlaneBeforeRuler;
+  gp_Ax3 m_rulerFrame;
+  occ::handle<PlaneRulerAxes> m_rulerAxes3d;
+  QPointer<ViewPaintLayer> m_rulerLabels;
+  struct RulerAxis {
+    gp_Dir direction;
+    double min = 0.0; // mm along it the plane reaches
+    double max = 0.0;
+    QColor color;
+  };
+  RulerAxis m_rulerAxes[2];
+  double m_rulerStep = 0.0; // mm between numbered ticks; 0: none drawn
   std::optional<CameraState> m_home;
   // The step of a camera change under way (runViewOperation), which a
   // failure names: set by fitCamera too, hence mutable.
