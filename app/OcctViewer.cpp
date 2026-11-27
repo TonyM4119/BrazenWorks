@@ -8915,39 +8915,20 @@ void OcctViewer::updatePlaneRuler() {
     hide();
     return;
   }
-  // The model's millimetres per unit of the shape: an origin drawn at a size
-  // on the screen (mitcad#1748) is scaled to each frame's zoom, as
-  // logOriginSize reads it.
-  const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
-  double unit = 1.0;
-  if (!plane->TransformPersistence().IsNull()) {
-    int width = 0;
-    int height = 0;
-    m_view->Window()->Size(width, height);
-    if (height <= 0) {
-      hide();
-      return;
-    }
-    const double focus = gp_Vec(camera->Eye(), gp::Origin()).Dot(gp_Vec(camera->Direction()));
-    unit = std::abs(camera->ViewDimensions(focus).Y()) / height;
-  }
-  PlaneRulerGrid::Lines lines;
-  lines.uMin = lines.vMin = std::numeric_limits<double>::max();
-  lines.uMax = lines.vMax = -std::numeric_limits<double>::max();
-  for (TopExp_Explorer it(plane->Shape(), TopAbs_VERTEX); it.More(); it.Next()) {
-    const gp_XYZ corner = BRep_Tool::Pnt(TopoDS::Vertex(it.Current())).XYZ() * unit;
-    lines.uMin = std::min(lines.uMin, corner.Dot(u.XYZ()));
-    lines.uMax = std::max(lines.uMax, corner.Dot(u.XYZ()));
-    lines.vMin = std::min(lines.vMin, corner.Dot(v.XYZ()));
-    lines.vMax = std::max(lines.vMax, corner.Dot(v.XYZ()));
-  }
-  const double half = std::max({-lines.uMin, lines.uMax, -lines.vMin, lines.vMax});
+  // Fork: as Fusion's, the grid reaches across most of the view on the
+  // plane, centred on the origin, whatever the plane's square measures; the
+  // numbers run along the axes' positive halves past the grid's edge.
   const double perMm = 1.0 / modelPerPixel(gp::Origin());
-  const PlaneRulerTicks ticks = planeRulerTicks(perMm, half, m_gridUnit);
-  if (!(ticks.step > 0.0) || !(lines.uMax > lines.uMin) || !(lines.vMax > lines.vMin)) {
+  const double across = std::max(width(), height()) / perMm; // the view's larger side (mm)
+  const PlaneRulerTicks ticks = planeRulerTicks(perMm, kPlaneRulerGridReach * across, m_gridUnit);
+  if (!(ticks.step > 0.0) || !std::isfinite(across)) {
     hide();
     return;
   }
+  const double half = std::ceil(kPlaneRulerGridReach * across / ticks.step) * ticks.step;
+  PlaneRulerGrid::Lines lines;
+  lines.uMin = lines.vMin = -half;
+  lines.uMax = lines.vMax = half;
   // The lines between the numbered ticks only where they are 10 pixels apart.
   const bool fine = ticks.step / ticks.subdivisions * perMm >= kPlaneRulerMinGridPixels;
   lines.step = fine ? ticks.step / ticks.subdivisions : ticks.step;
@@ -8965,8 +8946,9 @@ void OcctViewer::updatePlaneRuler() {
            std::abs(drawn.uMax - lines.uMax) > tolerance || std::abs(drawn.vMin - lines.vMin) > tolerance ||
            std::abs(drawn.vMax - lines.vMax) > tolerance;
   }();
-  m_rulerAxes[0] = {u, lines.uMin, lines.uMax, qtColor(role(u))};
-  m_rulerAxes[1] = {v, lines.vMin, lines.vMax, qtColor(role(v))};
+  const double labelled = kPlaneRulerLabelReach * half;
+  m_rulerAxes[0] = {u, 0.0, labelled, qtColor(role(u))};
+  m_rulerAxes[1] = {v, 0.0, labelled, qtColor(role(v))};
   m_rulerStep = ticks.step;
   if (changed || !m_context->IsDisplayed(m_rulerGrid)) {
     m_rulerGrid->setLines(lines);
@@ -9014,27 +8996,40 @@ void OcctViewer::paintPlaneRuler(QPainter& painter) {
     if (std::abs(side.y()) > 0.3 ? side.y() < 0.0 : side.x() < 0.0) {
       side = -side;
     }
-    const QColor text = m_backgroundDark ? axis.color.lighter(135) : axis.color.darker(115);
-    // None on the plane's edge, where its outline runs.
-    const long first = static_cast<long>(std::ceil(axis.min / m_rulerStep + 0.3));
-    const long last = static_cast<long>(std::floor(axis.max / m_rulerStep - 0.3));
+    // The numbers in a quiet grey, as Fusion's; the ticks in the axis colour.
+    const QColor tick = m_backgroundDark ? axis.color.lighter(135) : axis.color.darker(115);
+    const QColor text = m_backgroundDark ? QColor(214, 219, 226) : QColor(72, 76, 84);
+    const long first = static_cast<long>(std::ceil(axis.min / m_rulerStep - 1e-9));
+    const long last = static_cast<long>(std::floor(axis.max / m_rulerStep + 1e-9));
+    // The numbers turned along the axis, as Fusion's, never upside down.
+    double angle = std::atan2(along.y(), along.x()) * 180.0 / 3.14159265358979323846;
+    if (angle > 90.0) {
+      angle -= 180.0;
+    } else if (angle < -90.0) {
+      angle += 180.0;
+    }
     for (long k = first; k <= last; ++k) {
       if (k == 0) {
         continue;
       }
       const double at = static_cast<double>(k) * m_rulerStep;
       const QPointF point = toWidgetF(gp_Pnt(axis.direction.XYZ() * at));
-      painter.setPen(QPen(text, 1.5));
+      painter.setPen(QPen(tick, 1.5));
       painter.drawLine(point - side * 3.0, point + side * 3.0);
       const QString label = planeRulerLabel(at, m_gridUnit);
       const double width = metrics.horizontalAdvance(label);
       const double height = metrics.ascent() + metrics.descent();
-      const double reach = std::abs(side.x()) * width / 2.0 + std::abs(side.y()) * height / 2.0;
-      const QPointF centre = point + side * (6.0 + reach);
+      // Beside the axis by half the text's height: turned along it, the
+      // text's height lies across it.
+      const QPointF centre = point + side * (5.0 + height / 2.0);
       QPainterPath path;
-      path.addText(centre.x() - width / 2.0, centre.y() + (metrics.ascent() - metrics.descent()) / 2.0, font, label);
+      path.addText(-width / 2.0, (metrics.ascent() - metrics.descent()) / 2.0, font, label);
+      painter.save();
+      painter.translate(centre);
+      painter.rotate(angle);
       painter.strokePath(path, QPen(halo, 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
       painter.fillPath(path, text);
+      painter.restore();
     }
   }
 }

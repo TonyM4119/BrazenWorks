@@ -16,7 +16,7 @@ PlaneRulerTicks planeRulerTicks(double pixelsPerMm, double halfSizeMm, const QSt
   // The fewest unit lengths between ticks: far enough apart on the screen,
   // and few enough to the plane's edge.
   const double least = std::max(kPlaneRulerMinLabelPixels / pixelsPerMm, halfSizeMm / kPlaneRulerMaxLabels) / unitMm;
-  static constexpr double kMantissas[] = {1.0, 2.0, 5.0};
+  static constexpr double kMantissas[] = {1.0, 2.5, 5.0};
   static constexpr double kFractions[] = {0.125, 0.25, 0.5};
   if (imperial && least <= 0.5 * (1.0 + 1e-9)) {
     for (const double fraction : kFractions) {
@@ -34,7 +34,7 @@ PlaneRulerTicks planeRulerTicks(double pixelsPerMm, double halfSizeMm, const QSt
         continue;
       }
       if (mantissa * power >= least * (1.0 - 1e-9)) {
-        return {mantissa * power * unitMm, mantissa == 2.0 ? 4 : 5};
+        return {mantissa * power * unitMm, 5};
       }
     }
   }
