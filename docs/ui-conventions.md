@@ -1485,8 +1485,10 @@ surface colour with a line at its foot; no cards. Its parts:
   four, Inspect three); the tabs are spaced wide (20 px each side of a
   name); the workspace block is a framed button (the window's colour in a
   hairline frame, 8 px in from the panel's edges), at least 120 px wide.
-- **The view cube** (`ViewCube.cpp`): solid faces, light grey lighter at
-  the top (dark greys on a dark background), a grey line round each face,
+- **The view cube** (`ViewCube.cpp`): crisp as Fusion's, the faces 1.24
+  of its size and thin bevels of 0.10 a shade darker (the same size across
+  as before), solid faces, light grey lighter at the top (dark greys on a
+  dark background), a grey line round each face,
   the names in plain grey without a halo, the bevels a shade darker, and
   thin coloured axes along the cube's edges.
 

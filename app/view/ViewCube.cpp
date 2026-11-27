@@ -69,8 +69,12 @@ constexpr double kBaseSize = 70.0;
 // the edges and corners about twice as easy to hit), the faces a little
 // smaller and the cube a tenth larger across (1.44 against 1.3 times the
 // size), still inside the arrows and below the Home button.
-constexpr double kFaceShare = 0.86;
-constexpr double kBevelShare = 0.29;
+// Fork: as Fusion's cube, crisp: the faces most of it and thin bevels, the
+// cube as large across as MitCad's (1.24 + 2 x 0.10 = 1.44 times the size;
+// MitCad: 0.86 and 0.29). The edges and corners keep their picking's extra
+// sensitivity (ComputeSelection).
+constexpr double kFaceShare = 1.24;
+constexpr double kBevelShare = 0.10;
 // The faces' textures: about four texels to a pixel of a face at 2x.
 constexpr int kTexture = 512;
 // The cube's own perspective (mitcad#774): the tangent of half its field of
@@ -103,9 +107,9 @@ struct Glass {
 // names in a quiet grey without a halo, the bevels a shade darker, a grey
 // line round each face; on a dark background the same in dark greys.
 const Glass kDarkGlass{QColor(0x46, 0x4a, 0x50), QColor(0x34, 0x37, 0x3c), 255, QColor(0xc4, 0xc9, 0xd0),
-                       QColor(0, 0, 0), 0.0, QColor(0x55, 0x5a, 0x61), 0.0};
+                       QColor(0, 0, 0), 0.0, QColor(0x6a, 0x70, 0x78), 0.0};
 const Glass kLightGlass{QColor(0xf6, 0xf6, 0xf7), QColor(0xdd, 0xde, 0xe0), 255, QColor(0x6c, 0x6f, 0x75),
-                        QColor(255, 255, 255), 0.0, QColor(0xc9, 0xcb, 0xcf), 0.0};
+                        QColor(255, 255, 255), 0.0, QColor(0xa4, 0xa7, 0xad), 0.0};
 
 const Glass& glassFor(bool dark) { return dark ? kDarkGlass : kLightGlass; }
 
@@ -220,7 +224,7 @@ QImage faceImage(const QString& label, const Glass& glass) {
   font.setLetterSpacing(QFont::PercentageSpacing, 106);
   // Of the face: as large on the screen as on AIS_ViewCube's larger face
   // (0.17 of it; kFaceShare), and the widest names a little wider on it.
-  constexpr double kLetters = 0.20;
+  constexpr double kLetters = 0.15; // Fork: the face larger, the names as large on the screen
   font.setPixelSize(qRound(n * kLetters));
   QPainterPath path;
   path.addText(0, 0, font, label);
