@@ -2396,6 +2396,10 @@ private:
   QHash<QString, QJsonValue>* m_queryMemo = nullptr;
   QString& m_filePath = m_documentSession->state().filePath;
   QString& m_documentName = m_documentSession->state().documentName;
+  // Fork: the units the next new design is made in when the start page's New
+  // row chose them (inches, millimeters); empty: Preferences › General's.
+  QString m_newDesignUnits;
+  QString newDesignUnitsNow() const;
   AutosaveManager* m_autosave = nullptr; // writes to the recovery folder (P8)
   // A recovered document's file as the earlier session had it (fileDigest;
   // P8c): Save asks before writing over a change made since. Cleared by

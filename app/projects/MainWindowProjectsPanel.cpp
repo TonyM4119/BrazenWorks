@@ -626,7 +626,7 @@ void MainWindow::createDesignInProject(const QString& root, const QString& path)
   }
   // In the default units for new designs (Preferences > General,
   // mitcad#1036): the file is made in them, and opens in them.
-  const QString units = GeneralSettings::load().newDesignUnits;
+  const QString units = newDesignUnitsNow(); // Fork: the start page's choice, else the default
   QJsonObject refused;
   const std::optional<QJsonObject> answer =
       projectWrite(root,

@@ -124,6 +124,12 @@ public:
 
   bool isStub() const { return m_center.log().shown() == MessageLog::Shown::Stub; }
   bool hasMessage() const { return m_center.log().shown() != MessageLog::Shown::None; }
+  // Fork: whether a warning or an error is shown in full (the start page
+  // keeps the band only for those: FloatingLayout::showOnlyCards).
+  bool showsProblem() const {
+    const MessageEntry* full = m_center.log().full();
+    return full != nullptr && (full->level == NoticeLevel::Warning || full->level == NoticeLevel::Error);
+  }
   // The content height of the band showing a message in full: two lines
   // of text (the band keeps that room for the stub too, so that the cards
   // above it do not move).

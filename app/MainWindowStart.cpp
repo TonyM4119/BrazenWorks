@@ -5,6 +5,7 @@
 // window's cards (or docks) hidden while it is there; the page at launch
 // by its Show start page at launch; a save's preview of the design; the
 // projects' browser's session and state icons (mitcad#1301).
+#include "AboutDialog.hpp" // Fork: the start page's About
 #include "MainWindow.hpp"
 
 #include <algorithm>
@@ -139,6 +140,20 @@ void MainWindow::createStartPage() {
   host.canOpen = [](const QString& path) { return fileKind(path) != FileKind::None; };
   host.drop = [this](const QStringList& paths) { openDropped(paths); };
   host.defaultUnits = [] { return GeneralSettings::load().newDesignUnits; };
+  // Fork: the start page's New row (inches, millimeters), its sidebar's
+  // Back row and About.
+  host.newDesignIn = [this](const QString& units) {
+    m_newDesignUnits = units;
+    newDesign();
+    m_newDesignUnits.clear();
+  };
+  host.back = [this] { leaveStartPageForDesign(); };
+  host.documentName = [this] { return m_noDesign ? QString() : documentName(); };
+  host.about = [this] { showAboutDialog(this); };
+  host.commandEnabled = [this](const QString& id) {
+    const QAction* action = m_registry->action(id);
+    return action != nullptr && action->isEnabled();
+  };
   host.openUrl = [](const QString& url) { openExternalUrl(QUrl(url)); };
   // The workspace tabs, or the toolbar that holds them: the Floating
   // toolbar panel on Windows and Linux (mitcad#1990), the Docked toolbar
