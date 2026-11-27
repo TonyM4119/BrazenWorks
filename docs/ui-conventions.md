@@ -1466,6 +1466,17 @@ surface colour with a line at its foot; no cards. Its parts:
   the UI tests keep labels), each group's caption in capitals (0.85,
   DemiBold) with its ˅, thin lines between the groups.
 
+- **The workspace list** (a click on the block): "WORKSPACE" in capitals,
+  then an entry per workspace, at least 440 px wide: a bar at its left and
+  its icon on a tinted tile in the workspace's colour (Design the accent,
+  Make amber, Render deep red, Drawing teal; the bar full by the shown or
+  hovered entry, lighter by the others), its name in DemiBold with a
+  "Current" pill on the shown one, a line on what it is for, and its tabs
+  (Render's and Drawing's stages) in the quieter text; the shown entry on
+  a tint of the accent. Under them a line and a short note: every
+  workspace works on the same design, and the list is locked while a
+  sketch is open.
+
 Where the points below say otherwise (cards, the 84 px block with its
 icon, the accent rectangle, 30 px icons, labels by default), these win.
 
