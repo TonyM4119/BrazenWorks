@@ -134,6 +134,10 @@ void MainWindow::updateModeBanner() {
     m_viewer->setPlanesBehind(false);
     m_viewer->setPlanesByDepth(false);
   }
+  // Fork: the plane ruler shows only while Create Sketch waits for a plane.
+  if (m_mode != Mode::PickPlane) {
+    m_viewer->setPlaneRuler(QString());
+  }
   // Files that waited for the command or the sketch, and a Move that
   // waited for an inspection, go on once it closed (mitcad#2281).
   followArrivals();

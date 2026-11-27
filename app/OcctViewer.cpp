@@ -47,6 +47,7 @@
 #include "view/ViewTessellation.hpp"
 #include "view/TexturedBody.hpp"
 #include "view/ViewPaintLayer.hpp"
+#include "view/PlaneRuler.hpp"
 #include "sketch/PointMarkers.hpp"
 #ifdef __APPLE__
 #include "render/MacFrameDisplay.hpp"
@@ -80,6 +81,8 @@
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QPainter>
+#include <QPainterPath>
+#include <QFontMetricsF>
 #include <QPointingDevice>
 #include <QScopedValueRollback>
 #include <QScreen>
@@ -556,14 +559,16 @@ QColor capHatchColor(const QColor& color) {
 // The layout grid's colours over a background: lighter on a dark one,
 // darker on a light one, the major lines twice as far from it as the minor
 // ones (13 and 24 percent of the way to white).
-void setGridColors(LayoutGrid& grid, const QColor& background) {
+// Fork: also the plane ruler's grid, nearer the foreground (`minor`, `major`).
+template <typename Grid>
+void setGridColors(Grid& grid, const QColor& background, float minor = 0.13f, float major = 0.24f) {
   const float target = background.lightnessF() < 0.5f ? 1.0f : 0.0f;
   const auto mix = [&](float amount) {
     const auto towards = [&](float from) { return from + (target - from) * amount; };
     return occtColor(QColor::fromRgbF(towards(background.redF()), towards(background.greenF()),
                                       towards(background.blueF())));
   };
-  grid.setColors(mix(0.13f), mix(0.24f));
+  grid.setColors(mix(minor), mix(major));
 }
 
 // Wraps the framebuffer object Qt binds for paintGL() so that OCCT renders
@@ -1999,6 +2004,10 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
   m_grid = new LayoutGrid();
   m_grid->SetZLayer(m_gridLayer);
   setGridColors(*m_grid, m_paper);
+  // Fork: the plane ruler's grid in the same layer, under the bodies.
+  m_rulerGrid = new PlaneRulerGrid();
+  m_rulerGrid->SetZLayer(m_gridLayer);
+  setGridColors(*m_rulerGrid, m_paper, 0.22f, 0.40f);
 
   // In glass of its own (mitcad#430).
   m_orientationCube = makeViewCube();
@@ -8742,6 +8751,8 @@ void OcctViewer::setBackground(const QColor& top, const QColor& bottom, bool gra
   m_backgroundGradient = gradient;
   applyBackground();
   setGridColors(*m_grid, paper);
+  setGridColors(*m_rulerGrid, paper, 0.22f, 0.40f); // Fork: the plane ruler's
+  m_rulerGrid->setLines({});                         // drawn again in them
   updateGrid(true);
   sceneChanged();
 }
@@ -8841,6 +8852,191 @@ void OcctViewer::updateGrid(bool force) {
     m_context->Display(m_grid, 0, -1, false);
   }
   m_view->Invalidate();
+}
+
+void OcctViewer::setPlaneRuler(const QString& originPlane) {
+  if (originPlane == m_rulerPlane) {
+    return;
+  }
+  m_rulerPlane = originPlane;
+  qDebug().noquote() << (originPlane.isEmpty() ? QStringLiteral("Plane ruler hidden")
+                                               : QStringLiteral("Plane ruler on %1").arg(originPlane));
+  if (!originPlane.isEmpty() && !m_rulerLabels) {
+    m_rulerLabels = addPaintLayer(
+        QStringLiteral("plane ruler"), [this](QPainter& painter) { paintPlaneRuler(painter); }, this);
+  }
+  m_rulerGrid->setLines({}); // built for the new plane
+  updatePlaneRuler();
+  m_view->Invalidate();
+  sceneChanged();
+}
+
+void OcctViewer::updatePlaneRuler() {
+  const auto hide = [this] {
+    if (m_context->IsDisplayed(m_rulerGrid)) {
+      m_context->Erase(m_rulerGrid, false);
+      m_view->Invalidate();
+    }
+    if (m_rulerLabels) {
+      m_rulerLabels->setShown(false);
+    }
+    m_rulerStep = 0.0;
+  };
+  if (m_rulerPlane.isEmpty() || m_view->Window().IsNull() || showsRenderedImage()) {
+    hide();
+    return;
+  }
+  // The root's origin plane as drawn now.
+  occ::handle<AIS_Shape> plane;
+  for (const occ::handle<AIS_Shape>& datum : m_datums) {
+    const auto info = m_pickInfo.find(datum.get());
+    if (info != m_pickInfo.end() && info->second.item.kind == SelectKind::Plane &&
+        info->second.item.owner == m_rulerPlane && info->second.item.occurrence.isEmpty() &&
+        m_context->IsDisplayed(datum)) {
+      plane = datum;
+    }
+  }
+  // Its axes: u along the first one its name gives, v along the second, the
+  // normal so that u and v are the grid's x and y.
+  gp_Dir u = gp::DX();
+  gp_Dir v = gp::DY();
+  gp_Dir normal = gp::DZ();
+  if (m_rulerPlane == QLatin1String("xz")) {
+    v = gp::DZ();
+    normal = -gp::DY();
+  } else if (m_rulerPlane == QLatin1String("yz")) {
+    u = gp::DY();
+    v = gp::DZ();
+    normal = gp::DX();
+  } else if (m_rulerPlane != QLatin1String("xy")) {
+    plane.Nullify();
+  }
+  if (plane.IsNull()) {
+    hide();
+    return;
+  }
+  // The model's millimetres per unit of the shape: an origin drawn at a size
+  // on the screen (mitcad#1748) is scaled to each frame's zoom, as
+  // logOriginSize reads it.
+  const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
+  double unit = 1.0;
+  if (!plane->TransformPersistence().IsNull()) {
+    int width = 0;
+    int height = 0;
+    m_view->Window()->Size(width, height);
+    if (height <= 0) {
+      hide();
+      return;
+    }
+    const double focus = gp_Vec(camera->Eye(), gp::Origin()).Dot(gp_Vec(camera->Direction()));
+    unit = std::abs(camera->ViewDimensions(focus).Y()) / height;
+  }
+  PlaneRulerGrid::Lines lines;
+  lines.uMin = lines.vMin = std::numeric_limits<double>::max();
+  lines.uMax = lines.vMax = -std::numeric_limits<double>::max();
+  for (TopExp_Explorer it(plane->Shape(), TopAbs_VERTEX); it.More(); it.Next()) {
+    const gp_XYZ corner = BRep_Tool::Pnt(TopoDS::Vertex(it.Current())).XYZ() * unit;
+    lines.uMin = std::min(lines.uMin, corner.Dot(u.XYZ()));
+    lines.uMax = std::max(lines.uMax, corner.Dot(u.XYZ()));
+    lines.vMin = std::min(lines.vMin, corner.Dot(v.XYZ()));
+    lines.vMax = std::max(lines.vMax, corner.Dot(v.XYZ()));
+  }
+  const double half = std::max({-lines.uMin, lines.uMax, -lines.vMin, lines.vMax});
+  const double perMm = 1.0 / modelPerPixel(gp::Origin());
+  const PlaneRulerTicks ticks = planeRulerTicks(perMm, half, m_gridUnit);
+  if (!(ticks.step > 0.0) || !(lines.uMax > lines.uMin) || !(lines.vMax > lines.vMin)) {
+    hide();
+    return;
+  }
+  // The lines between the numbered ticks only where they are 10 pixels apart.
+  const bool fine = ticks.step / ticks.subdivisions * perMm >= kPlaneRulerMinGridPixels;
+  lines.step = fine ? ticks.step / ticks.subdivisions : ticks.step;
+  lines.major = fine ? ticks.subdivisions : 1;
+  const auto role = [this](const gp_Dir& axis) {
+    const ColorRole which = axis.IsParallel(gp::DX(), 1e-9)   ? ColorRole::AxisX
+                            : axis.IsParallel(gp::DY(), 1e-9) ? ColorRole::AxisY
+                                                              : ColorRole::AxisZ;
+    return viewRole(which, m_backgroundDark);
+  };
+  const bool changed = [&] {
+    const PlaneRulerGrid::Lines& drawn = m_rulerGrid->lines();
+    const double tolerance = 1e-6 * half;
+    return drawn.step != lines.step || drawn.major != lines.major || std::abs(drawn.uMin - lines.uMin) > tolerance ||
+           std::abs(drawn.uMax - lines.uMax) > tolerance || std::abs(drawn.vMin - lines.vMin) > tolerance ||
+           std::abs(drawn.vMax - lines.vMax) > tolerance;
+  }();
+  m_rulerAxes[0] = {u, lines.uMin, lines.uMax, qtColor(role(u))};
+  m_rulerAxes[1] = {v, lines.vMin, lines.vMax, qtColor(role(v))};
+  m_rulerStep = ticks.step;
+  if (changed || !m_context->IsDisplayed(m_rulerGrid)) {
+    m_rulerGrid->setLines(lines);
+    m_rulerGrid->setAxisColors(role(u), role(v));
+    gp_Trsf placement;
+    placement.SetDisplacement(gp_Ax3(), gp_Ax3(gp::Origin(), normal, u));
+    m_rulerGrid->SetLocalTransformation(placement);
+    if (m_context->IsDisplayed(m_rulerGrid)) {
+      m_context->Redisplay(m_rulerGrid, false);
+    } else {
+      m_context->Display(m_rulerGrid, 0, -1, false);
+    }
+    m_view->Invalidate();
+    if (m_rulerLabels) {
+      m_rulerLabels->update();
+    }
+  }
+  if (m_rulerLabels) {
+    m_rulerLabels->setShown(true);
+  }
+}
+
+void OcctViewer::paintPlaneRuler(QPainter& painter) {
+  if (!(m_rulerStep > 0.0)) {
+    return;
+  }
+  painter.setRenderHint(QPainter::Antialiasing);
+  QFont font = this->font();
+  font.setPointSizeF(font.pointSizeF() * 0.9);
+  const QFontMetricsF metrics(font);
+  // A halo of the background round each number, so that it reads over the
+  // grid and the plane.
+  const QColor halo = m_backgroundDark ? QColor(22, 24, 28, 210) : QColor(255, 255, 255, 220);
+  const QPointF origin = toWidgetF(gp::Origin());
+  for (const RulerAxis& axis : m_rulerAxes) {
+    const QPointF one = toWidgetF(gp_Pnt(axis.direction.XYZ() * m_rulerStep));
+    QPointF along = one - origin;
+    const double length = std::hypot(along.x(), along.y());
+    if (length < 0.6 * kPlaneRulerMinLabelPixels) {
+      continue; // the axis seen end on: its numbers would pile up
+    }
+    along /= length;
+    // The numbers beside the axis: below a lying one, right of a standing one.
+    QPointF side(-along.y(), along.x());
+    if (std::abs(side.y()) > 0.3 ? side.y() < 0.0 : side.x() < 0.0) {
+      side = -side;
+    }
+    const QColor text = m_backgroundDark ? axis.color.lighter(135) : axis.color.darker(115);
+    // None on the plane's edge, where its outline runs.
+    const long first = static_cast<long>(std::ceil(axis.min / m_rulerStep + 0.3));
+    const long last = static_cast<long>(std::floor(axis.max / m_rulerStep - 0.3));
+    for (long k = first; k <= last; ++k) {
+      if (k == 0) {
+        continue;
+      }
+      const double at = static_cast<double>(k) * m_rulerStep;
+      const QPointF point = toWidgetF(gp_Pnt(axis.direction.XYZ() * at));
+      painter.setPen(QPen(text, 1.5));
+      painter.drawLine(point - side * 3.0, point + side * 3.0);
+      const QString label = planeRulerLabel(at, m_gridUnit);
+      const double width = metrics.horizontalAdvance(label);
+      const double height = metrics.ascent() + metrics.descent();
+      const double reach = std::abs(side.x()) * width / 2.0 + std::abs(side.y()) * height / 2.0;
+      const QPointF centre = point + side * (6.0 + reach);
+      QPainterPath path;
+      path.addText(centre.x() - width / 2.0, centre.y() + (metrics.ascent() - metrics.descent()) / 2.0, font, label);
+      painter.strokePath(path, QPen(halo, 3.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+      painter.fillPath(path, text);
+    }
+  }
 }
 
 void OcctViewer::setSectionCaps(const std::vector<SectionCap>& caps, const gp_Ax3& plane) {
@@ -11283,6 +11479,7 @@ void OcctViewer::handleViewRedraw(const occ::handle<AIS_InteractiveContext>& con
   // The camera has moved for this frame: the grid follows the zoom at once,
   // the cube's own perspective the direction (mitcad#774).
   updateGrid();
+  updatePlaneRuler(); // Fork: its size follows the zoom too
   updateCubeEye();
   // Whether OCCT draws this frame in full, not only its immediate layers
   // over the scene it keeps.
