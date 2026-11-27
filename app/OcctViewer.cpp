@@ -3986,6 +3986,12 @@ void OcctViewer::setDatums(const std::vector<DatumDisplay>& datums) {
     m_datums.push_back(object);
   }
   logOriginSize(); // its size as drawn now (mitcad#1748)
+  // Fork: the origin planes' names on them (paintPlaneNames).
+  if (!m_planeNames && !m_datums.empty()) {
+    m_planeNames = addPaintLayer(
+        QStringLiteral("plane names"), [this](QPainter& painter) { paintPlaneNames(painter); }, this);
+    m_planeNames->setShown(true);
+  }
   // For UI tests (mitcad#1642): what of the design's origin is drawn, when
   // that changes.
   const OriginDrawing origin = originDrawing();
@@ -8973,6 +8979,96 @@ void OcctViewer::updatePlaneRuler() {
   }
 }
 
+void OcctViewer::paintPlaneNames(QPainter& painter) {
+  if (m_view->Window().IsNull() || showsRenderedImage()) {
+    return;
+  }
+  const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
+  int windowWidth = 0;
+  int windowHeight = 0;
+  m_view->Window()->Size(windowWidth, windowHeight);
+  if (windowHeight <= 0) {
+    return;
+  }
+  painter.setRenderHint(QPainter::Antialiasing);
+  // Fusion's warm brown, a little see-through, as the planes' outlines.
+  const QColor ink = m_backgroundDark ? QColor(236, 170, 96, 230) : QColor(196, 112, 36, 220);
+  QFont font = this->font();
+  font.setPixelSize(100); // drawn at 100 units, scaled onto the plane
+  for (const occ::handle<AIS_Shape>& datum : m_datums) {
+    const auto info = m_pickInfo.find(datum.get());
+    if (info == m_pickInfo.end() || info->second.item.kind != SelectKind::Plane ||
+        !info->second.item.occurrence.isEmpty() || !m_context->IsDisplayed(datum)) {
+      continue;
+    }
+    const std::optional<gp_Ax3> frame = originPlaneFrame(info->second.item.owner);
+    if (!frame) {
+      continue;
+    }
+    // The plane's square in the model: an origin drawn at a size on the
+    // screen (mitcad#1748) scaled to this frame's zoom, as logOriginSize.
+    double unit = 1.0;
+    if (!datum->TransformPersistence().IsNull()) {
+      const double focus = gp_Vec(camera->Eye(), gp::Origin()).Dot(gp_Vec(camera->Direction()));
+      unit = std::abs(camera->ViewDimensions(focus).Y()) / windowHeight;
+    }
+    const gp_XYZ u = frame->XDirection().XYZ();
+    const gp_XYZ v = frame->YDirection().XYZ();
+    double uMin = 0.0, uMax = 0.0, vMin = 0.0, vMax = 0.0;
+    bool any = false;
+    for (TopExp_Explorer it(datum->Shape(), TopAbs_VERTEX); it.More(); it.Next()) {
+      const gp_XYZ corner = BRep_Tool::Pnt(TopoDS::Vertex(it.Current())).XYZ() * unit;
+      const double a = corner.Dot(u);
+      const double b = corner.Dot(v);
+      uMin = any ? std::min(uMin, a) : a;
+      uMax = any ? std::max(uMax, a) : a;
+      vMin = any ? std::min(vMin, b) : b;
+      vMax = any ? std::max(vMax, b) : b;
+      any = true;
+    }
+    const double side = std::min(uMax - uMin, vMax - vMin);
+    if (!any || !(side > 0.0)) {
+      continue;
+    }
+    // The name near the plane's far corner along v, a fifth of its side
+    // high, lying in the plane: text x along u, text y down along -v.
+    const double height = 0.2 * side;
+    const gp_XYZ anchor = u * (uMin + 0.12 * (uMax - uMin)) + v * (vMax - 0.12 * (vMax - vMin));
+    const QPointF at = toWidgetF(gp_Pnt(anchor));
+    QPointF alongU = toWidgetF(gp_Pnt(anchor + u * height)) - at;
+    const QPointF downV = toWidgetF(gp_Pnt(anchor - v * height)) - at;
+    // Seen nearly edge on: no name.
+    const double area = alongU.x() * downV.y() - alongU.y() * downV.x();
+    if (std::abs(area) < 120.0) {
+      continue;
+    }
+    const QString name = info->second.item.owner.toUpper();
+    QPainterPath path;
+    path.addText(0, 0, font, name);
+    const QRectF bounds = path.boundingRect();
+    QPointF origin = at;
+    QPointF down = downV;
+    // Seen from behind, the name mirrored back so that it reads, from its
+    // end; then never upside down: running leftwards, it is turned half
+    // round about its middle.
+    if (area < 0.0) {
+      origin += alongU * (bounds.width() / 100.0);
+      alongU = -alongU;
+    }
+    if (alongU.x() < 0.0) {
+      origin += alongU * (bounds.width() / 100.0) + down * (bounds.height() / 100.0);
+      alongU = -alongU;
+      down = -down;
+    }
+    const QTransform onPlane(alongU.x() / 100.0, alongU.y() / 100.0, down.x() / 100.0, down.y() / 100.0,
+                             origin.x(), origin.y());
+    painter.save();
+    painter.setTransform(QTransform::fromTranslate(-bounds.left(), -bounds.top()) * onPlane, true);
+    painter.fillPath(path, ink);
+    painter.restore();
+  }
+}
+
 void OcctViewer::paintPlaneRuler(QPainter& painter) {
   if (!(m_rulerStep > 0.0)) {
     return;
@@ -9488,6 +9584,9 @@ void OcctViewer::sceneChanged() {
     return; // still being constructed
   }
   m_view->Invalidate(); // a cached frame is no longer valid
+  if (m_planeNames) {
+    m_planeNames->update(); // Fork: the origin planes shown or hidden
+  }
   refreshBrowserHover(); // a body of a browser row's drawn anew (mitcad#1022)
   refreshSelectionShadows(); // a selected body's likewise (mitcad#1631)
   requestFrame();
