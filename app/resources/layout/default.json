@@ -9,18 +9,21 @@
         {
           "group": "CREATE",
           "entries": [
-            {"command": "solid.new_component", "repeat": true},
             {"command": "sketch.create", "button": true},
-            "-",
             {"command": "solid.extrude", "button": true},
             {"command": "solid.revolve", "button": true},
-            {"command": "solid.sweep", "button": true},
-            {"command": "solid.loft", "button": true},
+            {"command": "solid.hole", "button": true},
+            {"command": "solid.rectangular_pattern", "button": true},
+            {"command": "solid.form", "button": true},
+            {"command": "assemble.derived_component", "button": true},
+            {"command": "solid.new_component", "repeat": true},
+            "-",
+            "solid.sweep",
+            "solid.loft",
             "solid.rib",
             "solid.web",
             "solid.emboss",
             "-",
-            {"command": "solid.hole", "button": true},
             "solid.cell_grid",
             "solid.thread",
             "-",
@@ -34,9 +37,9 @@
             "-",
             {
               "submenu": "Pattern",
-              "entries": ["solid.rectangular_pattern", "solid.circular_pattern", "solid.path_pattern", "solid.pattern_at_points"]
+              "entries": ["solid.circular_pattern", "solid.path_pattern", "solid.pattern_at_points"]
             },
-            {"command": "solid.mirror", "button": true},
+            "solid.mirror",
             {"command": "surface.thicken", "repeat": true},
             "solid.boundary_fill",
             "-",
@@ -47,7 +50,6 @@
             "-",
             "solid.plastic",
             "solid.envelope",
-            "solid.form",
             "solid.flex",
             "-",
             {
@@ -61,8 +63,12 @@
           "entries": [
             {"command": "solid.press_pull", "button": true},
             {"command": "solid.fillet", "button": true},
-            {"command": "solid.chamfer", "button": true},
             {"command": "solid.shell", "button": true},
+            {"command": "solid.combine", "button": true},
+            {"command": "solid.split_body", "button": true},
+            {"command": "solid.move", "button": true},
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            "solid.chamfer",
             "solid.draft",
             "-",
             "solid.offset_face",
@@ -72,23 +78,29 @@
             "solid.split_face",
             "solid.delete_face",
             "-",
-            {"command": "solid.combine", "button": true},
-            {"command": "solid.split_body", "button": true},
             "solid.panelize",
             "solid.scale",
             "solid.convert_mesh",
             {
               "submenu": "Mesh",
-              "entries": ["solid.mesh_section", "solid.mesh_repair", "solid.mesh_decimate", "solid.mesh_remove", "solid.mesh_segment", "solid.mesh_fit_surface", "solid.mesh_smooth", "solid.mesh_combine", "solid.mesh_offset", "solid.mesh_align", "solid.mesh_plane_cut"]
+              "entries": [
+                "solid.mesh_section",
+                "solid.mesh_repair",
+                "solid.mesh_decimate",
+                "solid.mesh_remove",
+                "solid.mesh_segment",
+                "solid.mesh_fit_surface",
+                "solid.mesh_smooth",
+                "solid.mesh_combine",
+                "solid.mesh_offset",
+                "solid.mesh_align",
+                "solid.mesh_plane_cut"
+              ]
             },
             "-",
-            {"command": "solid.move", "button": true},
             "solid.align",
             "-",
-            {
-              "submenu": "Joinery",
-              "entries": ["solid.dogbone", "solid.mortise_tenon"]
-            },
+            {"submenu": "Joinery", "entries": ["solid.dogbone", "solid.mortise_tenon"]},
             "-",
             "solid.material",
             "solid.appearance"
@@ -98,12 +110,11 @@
           "group": "ASSEMBLE",
           "entries": [
             {"command": "solid.new_component", "button": true},
-            "-",
             {"command": "assemble.joint", "button": true},
-            {"command": "assemble.as_built_joint", "button": true},
+            "assemble.as_built_joint",
             "assemble.joint_origin",
             "assemble.rigid_group",
-            {"command": "assemble.constraint_one", "button": true},
+            "assemble.constraint_one",
             "assemble.constraint",
             "-",
             "assemble.drive_joint",
@@ -118,12 +129,20 @@
           ]
         },
         {
+          "group": "CONFIGURE",
+          "entries": [
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            {"command": "manage.favorite_parameters", "button": true, "repeat": true},
+            {"command": "solid.configurations", "button": true, "repeat": true}
+          ]
+        },
+        {
           "group": "CONSTRUCT",
           "entries": [
             {"command": "construct.offset_plane", "button": true},
-            {"command": "construct.plane_angle", "button": true},
+            "construct.plane_angle",
             "construct.tangent_plane",
-            {"command": "construct.midplane", "button": true},
+            "construct.midplane",
             "construct.plane_two_edges",
             "construct.plane_three_points",
             "construct.plane_tangent_point",
@@ -154,8 +173,8 @@
           "group": "INSPECT",
           "entries": [
             {"command": "inspect.measure", "button": true},
-            {"command": "inspect.interference", "button": true},
             {"command": "inspect.section", "button": true},
+            "inspect.interference",
             {"command": "inspect.print_analysis", "repeat": true},
             "inspect.draft_analysis",
             "inspect.point_cloud_deviation",
@@ -176,16 +195,15 @@
           "group": "INSERT",
           "entries": [
             {"command": "insert.component", "button": true},
-            "insert.library_component",
-            "-",
-            {"command": "insert.mesh", "button": true},
-            {"command": "insert.dxf", "button": true},
+            {"command": "insert.image_reference", "button": true},
+            {"command": "insert.library_component", "button": true},
+            "insert.mesh",
+            "insert.dxf",
             "insert.svg",
             "insert.points",
             "insert.open_design",
             "insert.component_web",
             "file.import",
-            "insert.image_reference",
             "insert.point_cloud",
             "insert.decal"
           ]
@@ -204,37 +222,37 @@
         {
           "group": "CREATE",
           "entries": [
-            {"command": "sketch.create", "button": true, "repeat": true},
-            "-",
+            {"command": "sketch.create", "button": true},
             {"command": "surface.extrude", "button": true},
+            {"command": "surface.patch", "button": true},
             {"command": "surface.revolve", "button": true},
-            {"command": "surface.sweep", "button": true},
-            {"command": "surface.loft", "button": true},
+            {"command": "surface.offset", "button": true},
+            {"command": "solid.form", "button": true},
+            "surface.sweep",
+            "surface.loft",
             "surface.helix",
             "-",
-            {"command": "surface.patch", "button": true},
             "surface.ruled",
             "surface.boundary",
-            "surface.blend",
-            "-",
-            "surface.offset"
+            "surface.blend"
           ]
         },
         {
           "group": "MODIFY",
           "entries": [
-            {"command": "surface.trim", "button": true},
-            {"command": "surface.untrim", "button": true},
-            {"command": "surface.extend", "button": true},
-            "-",
             {"command": "surface.stitch", "button": true},
             {"command": "surface.unstitch", "button": true},
+            {"command": "surface.trim", "button": true},
+            {"command": "surface.extend", "button": true},
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            "surface.untrim",
+            "-",
             "surface.reverse_normal",
             "-",
             "surface.match",
             "surface.fair",
             "-",
-            {"command": "surface.thicken", "button": true},
+            "surface.thicken",
             {"command": "solid.boundary_fill", "repeat": true}
           ]
         },
@@ -247,12 +265,20 @@
           ]
         },
         {
+          "group": "CONFIGURE",
+          "entries": [
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            {"command": "manage.favorite_parameters", "button": true, "repeat": true},
+            {"command": "solid.configurations", "button": true, "repeat": true}
+          ]
+        },
+        {
           "group": "CONSTRUCT",
           "entries": [
             {"command": "construct.offset_plane", "button": true},
-            {"command": "construct.plane_angle", "button": true},
+            "construct.plane_angle",
             "construct.tangent_plane",
-            {"command": "construct.midplane", "button": true},
+            "construct.midplane",
             "construct.plane_two_edges",
             "construct.plane_three_points",
             "construct.plane_tangent_point",
@@ -284,14 +310,19 @@
         },
         {
           "group": "INSPECT",
-          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+          "entries": [
+            {"command": "inspect.measure", "button": true},
+            {"command": "inspect.section", "button": true}
+          ]
         },
         {
           "group": "INSERT",
           "entries": [
             {"command": "insert.component", "button": true},
-            {"command": "insert.mesh", "button": true},
-            {"command": "insert.dxf", "button": true}
+            {"command": "insert.image_reference", "button": true},
+            {"command": "insert.library_component", "button": true},
+            "insert.mesh",
+            "insert.dxf"
           ]
         },
         {
@@ -367,6 +398,8 @@
           "group": "CREATE",
           "entries": [
             {"command": "insert.mesh", "button": true},
+            {"command": "insert.point_cloud", "button": true},
+            {"command": "solid.mesh_fit_surface", "button": true},
             {"command": "solid.mesh_section", "button": true},
             "file.import"
           ]
@@ -382,20 +415,17 @@
         {
           "group": "MODIFY",
           "entries": [
-            {"command": "solid.mesh_remove", "button": true},
+            {"command": "solid.mesh_plane_cut", "button": true},
             {"command": "solid.mesh_decimate", "button": true},
             {"command": "solid.mesh_smooth", "button": true},
-            {"command": "solid.mesh_plane_cut", "button": true},
+            {"command": "solid.mesh_remove", "button": true},
             {"command": "solid.mesh_offset", "button": true},
             {"command": "solid.mesh_combine", "button": true},
-            {"command": "solid.move", "button": true}
-          ]
-        },
-        {
-          "group": "CONVERT",
-          "entries": [
+            {"command": "solid.move", "button": true},
             {"command": "solid.convert_mesh", "button": true},
-            {"command": "solid.mesh_fit_surface", "button": true}
+            {"command": "solid.scale", "button": true},
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            "solid.mesh_fit_surface"
           ]
         },
         {
@@ -407,31 +437,51 @@
           ]
         },
         {
+          "group": "CONFIGURE",
+          "entries": [
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            {"command": "manage.favorite_parameters", "button": true, "repeat": true},
+            {"command": "solid.configurations", "button": true, "repeat": true}
+          ]
+        },
+        {
           "group": "CONSTRUCT",
           "entries": [
             {"command": "construct.offset_plane", "button": true},
-            {"command": "construct.plane_angle", "button": true},
-            {"command": "construct.midplane", "button": true},
+            "construct.plane_angle",
+            "construct.midplane",
             "construct.axis_two_points",
             "construct.point_vertex"
           ]
         },
         {
           "group": "INSPECT",
-          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+          "entries": [
+            {"command": "inspect.measure", "button": true},
+            {"command": "inspect.section", "button": true}
+          ]
         },
         {
           "group": "INSERT",
           "entries": [
             {"command": "insert.component", "button": true},
-            {"command": "insert.mesh", "button": true},
-            {"command": "insert.dxf", "button": true}
+            {"command": "insert.image_reference", "button": true},
+            {"command": "insert.library_component", "button": true},
+            "insert.mesh",
+            "insert.dxf"
           ]
         },
-        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]},
+        {
+          "group": "SELECT",
+          "entries": [
+            {"extra": "solid.selection"}
+          ]
+        },
         {
           "group": "EXPORT",
-          "entries": [{"command": "file.export", "button": true}]
+          "entries": [
+            {"command": "file.export", "button": true}
+          ]
         }
       ]
     },
@@ -441,49 +491,44 @@
         {
           "group": "CREATE",
           "entries": [
-            {"command": "sketch.create", "button": true, "repeat": true},
-            "-",
-            {"command": "sheet.face", "button": true},
+            {"command": "solid.new_component", "button": true},
+            {"command": "sketch.create", "button": true},
             {"command": "sheet.flange", "button": true},
-            {"command": "sheet.hem", "button": true},
-            "sheet.convert",
+            {"command": "sheet.convert", "button": true},
+            {"command": "solid.extrude", "button": true},
+            "sheet.face",
+            "sheet.hem",
             "sheet.lofted_flange",
             "-",
-            {"command": "sheet.bend", "button": true},
+            "sheet.bend",
             "sheet.fold"
           ]
         },
         {
           "group": "MODIFY",
           "entries": [
+            {"command": "sheet.rules", "button": true},
+            {"command": "sheet.bend", "button": true},
+            {"command": "sheet.unfold", "button": true},
+            {"command": "sheet.refold", "button": true},
             {"command": "sheet.cut", "button": true},
+            {"command": "solid.parameters", "button": true, "repeat": true},
             "sheet.perforate",
             "-",
             "sheet.corner_relief",
             "sheet.corner_round",
             "sheet.corner_chamfer",
             "-",
-            {"command": "sheet.unfold", "button": true},
-            {"command": "sheet.refold", "button": true},
-            {"command": "sheet.flat_pattern", "button": true},
+            "sheet.flat_pattern",
             "sheet.show_flat",
             "-",
-            {"command": "sheet.export_dxf", "repeat": true, "button": true},
+            {"command": "sheet.export_dxf", "repeat": true},
             "sheet.flat_pattern_drawing",
-            {"command": "sheet.export_bend_table", "repeat": true}
-          ]
-        },
-        {
-          "group": "RULES",
-          "entries": [
-            {"command": "sheet.rules", "button": true, "repeat": true},
-            {"command": "sheet.edit_rules", "repeat": true}
-          ]
-        },
-        {
-          "group": "PROCESS",
-          "entries": [
-            {"command": "sheet.finger_joint", "button": true},
+            {"command": "sheet.export_bend_table", "repeat": true},
+            "-",
+            {"command": "sheet.edit_rules", "repeat": true},
+            "-",
+            "sheet.finger_joint",
             "sheet.t_nut_slot",
             "sheet.kerf_bend",
             "sheet.flat_pack",
@@ -502,12 +547,20 @@
           ]
         },
         {
+          "group": "CONFIGURE",
+          "entries": [
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            {"command": "manage.favorite_parameters", "button": true, "repeat": true},
+            {"command": "solid.configurations", "button": true, "repeat": true}
+          ]
+        },
+        {
           "group": "CONSTRUCT",
           "entries": [
             {"command": "construct.offset_plane", "button": true},
-            {"command": "construct.plane_angle", "button": true},
+            "construct.plane_angle",
             "construct.tangent_plane",
-            {"command": "construct.midplane", "button": true},
+            "construct.midplane",
             "construct.plane_two_edges",
             "construct.plane_three_points",
             "construct.plane_tangent_point",
@@ -536,14 +589,19 @@
         },
         {
           "group": "INSPECT",
-          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+          "entries": [
+            {"command": "inspect.measure", "button": true},
+            {"command": "inspect.section", "button": true}
+          ]
         },
         {
           "group": "INSERT",
           "entries": [
             {"command": "insert.component", "button": true},
-            {"command": "insert.mesh", "button": true},
-            {"command": "insert.dxf", "button": true}
+            {"command": "insert.image_reference", "button": true},
+            {"command": "insert.library_component", "button": true},
+            "insert.mesh",
+            "insert.dxf"
           ]
         },
         {
@@ -558,18 +616,26 @@
       "tab": "PLASTIC",
       "groups": [
         {
+          "group": "SETUP",
+          "entries": [
+            {"command": "solid.material", "button": true},
+            {"command": "solid.plastic", "button": true}
+          ]
+        },
+        {
           "group": "CREATE",
           "entries": [
             {"command": "sketch.create", "button": true},
             {"command": "solid.extrude", "button": true},
             {"command": "solid.revolve", "button": true},
-            {"command": "solid.plastic", "button": true},
+            {"command": "solid.hole", "button": true},
+            {"command": "solid.cell_grid", "button": true},
             {"command": "solid.rib", "button": true},
             {"command": "solid.web", "button": true},
             {"command": "solid.emboss", "button": true},
-            "-",
-            "solid.hole",
-            "solid.mirror"
+            {"command": "solid.thread", "button": true},
+            {"command": "solid.mirror", "button": true},
+            "solid.plastic"
           ]
         },
         {
@@ -578,11 +644,12 @@
             {"command": "solid.press_pull", "button": true},
             {"command": "solid.fillet", "button": true},
             {"command": "solid.shell", "button": true},
-            {"command": "solid.draft", "button": true},
             {"command": "solid.combine", "button": true},
+            {"command": "solid.split_body", "button": true},
             {"command": "solid.move", "button": true},
-            "solid.chamfer",
-            "solid.split_body"
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            "solid.draft",
+            "solid.chamfer"
           ]
         },
         {
@@ -594,28 +661,47 @@
           ]
         },
         {
+          "group": "CONFIGURE",
+          "entries": [
+            {"command": "solid.parameters", "button": true, "repeat": true},
+            {"command": "manage.favorite_parameters", "button": true, "repeat": true},
+            {"command": "solid.configurations", "button": true, "repeat": true}
+          ]
+        },
+        {
           "group": "CONSTRUCT",
           "entries": [
             {"command": "construct.offset_plane", "button": true},
-            {"command": "construct.plane_angle", "button": true},
-            {"command": "construct.midplane", "button": true},
+            "construct.plane_angle",
+            "construct.midplane",
             "construct.axis_two_points",
             "construct.point_vertex"
           ]
         },
         {
           "group": "INSPECT",
-          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+          "entries": [
+            {"command": "inspect.measure", "button": true},
+            {"command": "inspect.draft_analysis", "button": true},
+            {"command": "inspect.section", "button": true}
+          ]
         },
         {
           "group": "INSERT",
           "entries": [
             {"command": "insert.component", "button": true},
-            {"command": "insert.mesh", "button": true},
-            {"command": "insert.dxf", "button": true}
+            {"command": "insert.image_reference", "button": true},
+            {"command": "insert.library_component", "button": true},
+            "insert.mesh",
+            "insert.dxf"
           ]
         },
-        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]}
+        {
+          "group": "SELECT",
+          "entries": [
+            {"extra": "solid.selection"}
+          ]
+        }
       ]
     },
     {
@@ -1406,7 +1492,6 @@
     "solid.form_edit",
     "solid.form_fill_hole",
     "solid.form_bridge",
-    "assemble.derived_component",
     "insert.mount_part",
     "insert.calibrate_image_reference",
     "insert.move_point_cloud",
