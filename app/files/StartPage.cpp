@@ -22,6 +22,10 @@
 #include <QHBoxLayout>
 #include <QIcon>
 #include <QKeyEvent>
+#include <QKeySequence>
+#include <QLinearGradient>
+#include <QPolygonF>
+#include <QShortcut>
 #include <QLabel>
 #include <QLineEdit>
 #include <QMenu>
@@ -196,6 +200,12 @@ public:
     m_key = key;
     update();
   }
+  // Fork: the first, chosen card of the New row (SolidCraft's start page):
+  // the accent's outline and a tint of it.
+  void setPrimary(bool primary) {
+    m_primary = primary;
+    update();
+  }
 
   QSize sizeHint() const override {
     return m_kind == Kind::Action ? QSize(240, 88) : QSize(260, 48);
@@ -217,12 +227,20 @@ protected:
     const bool hovered = underMouse() && isEnabled();
     const bool action = m_kind == Kind::Action;
     if (action || hovered || isDown()) {
-      const QColor fill = action ? roleColor(ColorRole::Raised, this) : QColor(Qt::transparent);
-      painter.setPen(action ? QPen(hasFocus() ? accentColor(palette()) : roleColor(ColorRole::Line, this),
-                                   hasFocus() ? 2 : 1)
+      QColor fill = action ? roleColor(ColorRole::Raised, this) : QColor(Qt::transparent);
+      const bool outlined = hasFocus() || m_primary; // Fork: the primary card's outline
+      painter.setPen(action ? QPen(outlined ? accentColor(palette()) : roleColor(ColorRole::Line, this),
+                                   outlined ? 2 : 1)
                             : QPen(Qt::NoPen));
       painter.setBrush(fill);
-      painter.drawRoundedRect(box, kRadius, kRadius);
+      painter.drawRoundedRect(m_primary ? box.adjusted(0.5, 0.5, -0.5, -0.5) : box, kRadius, kRadius);
+      if (m_primary) {
+        QColor tint = accentColor(palette());
+        tint.setAlpha(38);
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(tint);
+        painter.drawRoundedRect(box.adjusted(1, 1, -1, -1), kRadius, kRadius);
+      }
       if (hovered || isDown()) {
         painter.setPen(Qt::NoPen);
         painter.setBrush(roleColor(ColorRole::HoverFill, this));
@@ -268,6 +286,141 @@ private:
   QString m_icon;
   QString m_line;
   QString m_key;
+  bool m_primary = false;
+};
+
+// Fork: the start page's sidebar (SolidCraft's start page): a blue panel
+// down the page's left, rounded as the backdrop, with the File commands,
+// the resources and the settings as rows of white text.
+const QColor kSidebarTop(0x2f, 0x7b, 0xe5);
+const QColor kSidebarBottom(0x3a, 0x8e, 0xf2);
+constexpr int kSidebarWidth = 280;
+// The width a New card needs to show its title and line whole.
+constexpr int kNewCardWidth = 290;
+
+class StartSidebar : public QWidget {
+public:
+  explicit StartSidebar(QWidget* parent = nullptr) : QWidget(parent) {
+    setFixedWidth(kSidebarWidth);
+    setAutoFillBackground(false);
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    QLinearGradient fill(0, 0, 0, height());
+    fill.setColorAt(0.0, kSidebarTop);
+    fill.setColorAt(1.0, kSidebarBottom);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(fill);
+    painter.drawRoundedRect(QRectF(rect()), kRadius, kRadius);
+  }
+};
+
+// A row of the sidebar: its text at the left, the command's key at the
+// right, white on the blue; the page's row (Start) and a hovered row on a
+// lighter band; a row whose command is off dimmed. Back to <design> has a
+// chevron before its text and an Esc badge.
+class StartSideItem : public QAbstractButton {
+public:
+  explicit StartSideItem(const QString& text, QWidget* parent = nullptr) : QAbstractButton(parent) {
+    setText(text);
+    setAccessibleName(plain(text));
+    setAttribute(Qt::WA_Hover);
+    setCursor(Qt::PointingHandCursor);
+    setFocusPolicy(Qt::StrongFocus);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  }
+  void setKey(const QString& key) {
+    m_key = key;
+    update();
+  }
+  void setCurrent(bool current) {
+    m_current = current;
+    update();
+  }
+  void setBack(bool back) {
+    m_back = back;
+    update();
+  }
+  QSize sizeHint() const override { return QSize(kSidebarWidth - 24, m_back ? 40 : 32); }
+
+protected:
+  bool event(QEvent* event) override {
+    hoverRepaint(this, event);
+    return QAbstractButton::event(event);
+  }
+
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QRectF box = QRectF(rect()).adjusted(0.5, 2.5, -0.5, -2.5);
+    const bool hovered = (underMouse() || hasFocus()) && isEnabled();
+    if (m_current || hovered || isDown()) {
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(QColor(255, 255, 255, m_current ? 56 : (isDown() ? 46 : 30)));
+      painter.drawRoundedRect(box, kControlRadius + 2, kControlRadius + 2);
+    }
+    const QColor ink(255, 255, 255, isEnabled() ? 255 : 115);
+    int left = 14;
+    if (m_back) {
+      // A chevron pointing left.
+      painter.setPen(QPen(ink, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+      const double cy = height() / 2.0;
+      painter.drawPolyline(QPolygonF{QPointF(left + 5, cy - 5), QPointF(left, cy), QPointF(left + 5, cy + 5)});
+      left += 18;
+    }
+    int right = width() - 14;
+    const QFont keyFont = scaledFont(this, 0.88, false);
+    if (!m_key.isEmpty()) {
+      const QFontMetrics keys(keyFont);
+      const int keyWidth = keys.horizontalAdvance(m_key);
+      painter.setFont(keyFont);
+      if (m_back) {
+        // The key in a small outlined badge.
+        const QRectF badge(right - keyWidth - 10, (height() - keys.height() - 4) / 2.0, keyWidth + 10,
+                           keys.height() + 4);
+        painter.setPen(QPen(QColor(255, 255, 255, 150), 1));
+        painter.setBrush(Qt::NoBrush);
+        painter.drawRoundedRect(badge, 4, 4);
+        painter.setPen(ink);
+        painter.drawText(badge, Qt::AlignCenter, m_key);
+        right = int(badge.left()) - 8;
+      } else {
+        painter.setPen(QColor(255, 255, 255, isEnabled() ? 190 : 100));
+        painter.drawText(QRect(right - keyWidth, 0, keyWidth, height()), Qt::AlignRight | Qt::AlignVCenter, m_key);
+        right -= keyWidth + 10;
+      }
+    }
+    const QFont textFont = scaledFont(this, 1.0, m_current || m_back);
+    painter.setFont(textFont);
+    painter.setPen(ink);
+    const QFontMetrics metrics(textFont);
+    painter.drawText(QRect(left, 0, std::max(10, right - left), height()), Qt::AlignLeft | Qt::AlignVCenter,
+                     metrics.elidedText(plain(text()), Qt::ElideRight, std::max(10, right - left)));
+  }
+
+private:
+  QString m_key;
+  bool m_current = false;
+  bool m_back = false;
+};
+
+// A thin line between the sidebar's groups.
+class StartSideRule : public QWidget {
+public:
+  StartSideRule() {
+    setFixedHeight(11);
+    setAttribute(Qt::WA_TransparentForMouseEvents);
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setPen(QPen(QColor(255, 255, 255, 70), 1));
+    painter.drawLine(QPointF(14, height() / 2.0 + 0.5), QPointF(width() - 14, height() / 2.0 + 0.5));
+  }
 };
 
 // A link: the accent's text, underlined while the mouse is over it.
@@ -759,8 +912,9 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   auto* header = new QHBoxLayout;
   auto* titles = new QVBoxLayout;
   titles->setSpacing(2);
-  titles->addWidget(heading(tr("Welcome to MitCad"), 1.9, QStringLiteral("startPageTitle")));
-  auto* subtitle = new QLabel(tr("Create a design or pick up where you left off."));
+  // Fork: SolidCraft's start page: Start, and what it is for.
+  titles->addWidget(heading(tr("Start"), 1.9, QStringLiteral("startPageTitle")));
+  auto* subtitle = new QLabel(tr("Create a design, open a recent file, or start a tutorial."));
   subtitle->setObjectName(QStringLiteral("startPageSubtitle"));
   subtitle->setFont(scaledFont(subtitle, 1.1, false));
   setRoleStyleSheet(subtitle, ColorRole::TextSecondary);
@@ -782,9 +936,21 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   header->addWidget(m_whatsNew, 0, Qt::AlignTop);
   column->addLayout(header);
 
-  // The quick actions.
-  auto* actionRow = new QHBoxLayout;
-  actionRow->setSpacing(12);
+  // The quick actions. Fork: under a New heading, as SolidCraft's start
+  // page: New Design in inches first and chosen, then in millimeters,
+  // Open… and Import…; Open Project… is in the sidebar.
+  auto* newHeading = heading(tr("New"), 1.25, QStringLiteral("startPageNewTitle"));
+  column->addWidget(newHeading);
+  // In a grid that is one row of four where each card has room for its
+  // text, two rows of two where not (layoutNewCards).
+  m_newCards = new QWidget;
+  m_newCards->setObjectName(QStringLiteral("startPageNewCards"));
+  m_newGrid = new QGridLayout(m_newCards);
+  m_newGrid->setContentsMargins(0, 0, 0, 0);
+  m_newGrid->setHorizontalSpacing(12);
+  m_newGrid->setVerticalSpacing(12);
+  m_newCards->installEventFilter(this); // its width sets the columns
+  const auto actionRow = [this](QWidget* tile) { m_newTiles.append(tile); };
   const auto actionTile = [this, actionRow](const QString& iconName, const QString& title, const QString& line,
                                             const QString& id) {
     auto* tile = new StartTile(StartTile::Kind::Action, iconName, title);
@@ -793,15 +959,40 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
     tile->setKey(m_host.shortcutText ? m_host.shortcutText(id) : QString());
     connect(tile, &QAbstractButton::clicked, this,
             [this, title, id] { choose(plain(title), [this, id] { m_host.trigger(id); }); });
-    actionRow->addWidget(tile, 1);
+    actionRow(tile);
     return tile;
   };
-  m_newDesign = actionTile(QStringLiteral("new-design"), tr("New Design"), QString(), QStringLiteral("file.new_design"));
-  actionTile(QStringLiteral("open"), tr("Open Design…"), tr("Browse your files"), QStringLiteral("file.open"));
-  actionTile(QStringLiteral("new-project"), tr("Open Project…"), tr("A project and its designs"),
-            QStringLiteral("file.open_project"));
-  actionTile(QStringLiteral("import"), tr("Import File…"), tr("STEP, IGES, DXF and more"), QStringLiteral("file.import"));
-  column->addLayout(actionRow);
+  // A new design in the units given, whatever Preferences › General's
+  // default (which Ctrl+N keeps using).
+  const auto unitsTile = [this, actionRow](const QString& title, const QString& line, const QString& units,
+                                           const QString& name) {
+    auto* tile = new StartTile(StartTile::Kind::Action, QStringLiteral("new-design"), title);
+    tile->setObjectName(QStringLiteral("startPageAction_") + name);
+    tile->setLine(line);
+    connect(tile, &QAbstractButton::clicked, this, [this, title, units] {
+      choose(plain(title), [this, units] {
+        if (m_host.newDesignIn) {
+          m_host.newDesignIn(units);
+        } else {
+          m_host.trigger(QStringLiteral("file.new_design"));
+        }
+      });
+    });
+    actionRow(tile);
+    return tile;
+  };
+  auto* inches = unitsTile(tr("New Design, Inches"), tr("Inches · opens in Design"), QStringLiteral("in"),
+                           QStringLiteral("file.new_design_inches"));
+  inches->setPrimary(true);
+  m_newDesign = unitsTile(tr("New Design, mm"), tr("Millimeters · opens in Design"), QStringLiteral("mm"),
+                          QStringLiteral("file.new_design"));
+  actionTile(QStringLiteral("open"), tr("Open…"), tr("A design from your files"), QStringLiteral("file.open"));
+  actionTile(QStringLiteral("import"), tr("Import…"), tr("STEP, IGES or mesh into a new design"),
+             QStringLiteral("file.import"));
+  layoutNewCards();
+  column->addWidget(m_newCards);
+  // Fork: the designs' browser under a Recent heading.
+  column->addWidget(heading(tr("Recent"), 1.25, QStringLiteral("startPageRecentHeading")));
 
   // The designs' browser (mitcad#1301), or the tutorials (mitcad#2346,
   // showTutorials), and Resources side by side.
@@ -1053,74 +1244,137 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   recentColumn->addWidget(m_dropArea);
   middle->addWidget(recentPanel, 3);
 
-  auto* resources = new StartPanel;
-  resources->setObjectName(QStringLiteral("startPageResources"));
-  resources->setMinimumWidth(260);
-  resources->setMaximumWidth(360);
-  auto* resourceColumn = new QVBoxLayout(resources);
-  resourceColumn->setContentsMargins(14, 14, 14, 14);
-  resourceColumn->setSpacing(2);
-  auto* resourceTitle = heading(tr("Resources"), 1.3, QStringLiteral("startPageResourcesTitle"));
-  resourceTitle->setContentsMargins(4, 0, 0, 6);
-  resourceColumn->addWidget(resourceTitle);
-  const auto resourceTile = [this, resourceColumn](const QString& iconName, const QString& title,
-                                                   const QString& line, const QString& id) {
-    auto* tile = new StartTile(StartTile::Kind::Resource, iconName, title);
-    tile->setObjectName(QStringLiteral("startPageResource_") + id);
-    tile->setLine(line);
-    connect(tile, &QAbstractButton::clicked, this,
-            [this, title, id] { choose(plain(title), [this, id] { m_host.trigger(id); }); });
-    resourceColumn->addWidget(tile);
-  };
-  resourceTile(QStringLiteral("library"), tr("Component Libraries"), tr("Standard components to place"),
-              QStringLiteral("insert.library_component"));
-  resourceTile(QStringLiteral("web"), tr("User Guide"), tr("Tools and workflows"), QStringLiteral("help.user_guide"));
-  // The tutorials to start, shown in the centre (mitcad#2346).
-  if (m_host.tutorials) {
-    resourceTile(QStringLiteral("tutorial"), tr("Tutorials"), tr("Learn step by step in a design"),
-                 QStringLiteral("help.tutorials"));
-  }
-  resourceTile(QStringLiteral("keyboard"), tr("Keyboard Shortcuts"), tr("Every key and the mouse"),
-              QStringLiteral("help.shortcuts"));
-  resourceTile(QStringLiteral("assistant-chat"), tr("Connect AI Assistant"), tr("Set up your preferred agent"),
-              QStringLiteral("help.connect_assistant"));
-  resourceColumn->addStretch(1);
-  middle->addWidget(resources, 1, Qt::AlignTop);
+  // Fork: the resources are rows of the sidebar (below).
   column->addLayout(middle);
   column->addStretch(1);
-  m_column->addWidget(m_scroll, 1);
+  // Fork: the sidebar at the left of the page's content (SolidCraft's
+  // start page), made below.
+  auto* split = new QHBoxLayout;
+  split->setContentsMargins(0, 0, 0, 0);
+  split->setSpacing(20);
+  split->addWidget(m_scroll, 1);
+  m_column->addLayout(split, 1);
 
-  // The footer: Show start page at launch, Preferences…, Report an Issue.
-  auto* footer = new StartPanel;
-  footer->setObjectName(QStringLiteral("startPageFooter"));
-  auto* footerRow = new QHBoxLayout(footer);
-  footerRow->setContentsMargins(16, 8, 16, 8);
-  footerRow->setSpacing(10);
+  // Fork: the sidebar (SolidCraft's start page): Back to the design (Esc);
+  // Start; the File commands; the resources (the Resources panel's rows,
+  // with its names and commands); the settings; and Show start page at
+  // launch at its foot (the footer's). Each row runs the command that is
+  // there today; a resource row keeps its startPageResource_<id> name and
+  // Preferences and Report an Issue theirs, for the UI tests' places.
+  auto* sidebar = new StartSidebar;
+  sidebar->setObjectName(QStringLiteral("startPageSidebar"));
+  // Its rows scroll in a window too short for them (a 1366 x 768 screen);
+  // Show start page at launch stays at its foot.
+  auto* sideOuter = new QVBoxLayout(sidebar);
+  sideOuter->setContentsMargins(12, 12, 12, 14);
+  sideOuter->setSpacing(6);
+  auto* sideScroll = new QScrollArea;
+  sideScroll->setObjectName(QStringLiteral("startPageSidebarScroll"));
+  sideScroll->setFrameShape(QFrame::NoFrame);
+  sideScroll->setWidgetResizable(true);
+  sideScroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+  auto* sideRows = new QWidget;
+  sideScroll->setWidget(sideRows);
+  sideScroll->setAutoFillBackground(false);
+  sideScroll->viewport()->setAutoFillBackground(false);
+  sideRows->setAutoFillBackground(false);
+  sideOuter->addWidget(sideScroll, 1);
+  auto* side = new QVBoxLayout(sideRows);
+  side->setContentsMargins(0, 0, 0, 0);
+  side->setSpacing(0);
+  auto* back = new StartSideItem(tr("Back"));
+  back->setObjectName(QStringLiteral("startPageBack"));
+  back->setBack(true);
+  back->setKey(QStringLiteral("Esc"));
+  back->setToolTip(tr("Back to the design (Esc)"));
+  m_back = back;
+  connect(back, &QAbstractButton::clicked, this, [this] {
+    choose(QStringLiteral("Back"), [this] {
+      if (m_host.back) {
+        m_host.back();
+      }
+    });
+  });
+  side->addWidget(back);
+  side->addSpacing(6);
+  auto* startRow = new StartSideItem(tr("Start"));
+  startRow->setObjectName(QStringLiteral("startPageStartRow"));
+  startRow->setCurrent(true);
+  connect(startRow, &QAbstractButton::clicked, this, [this] {
+    if (m_tutorialsShown) {
+      showDesigns();
+    }
+  });
+  side->addWidget(startRow);
+  const auto command = [this, side](const QString& text, const QString& id, const QString& name = QString()) {
+    auto* row = new StartSideItem(text);
+    row->setObjectName(name.isEmpty() ? QStringLiteral("startPageSide_") + id : name);
+    row->setKey(m_host.shortcutText ? m_host.shortcutText(id) : QString());
+    connect(row, &QAbstractButton::clicked, this, [this, text, id] { choose(plain(text), [this, id] { m_host.trigger(id); }); });
+    side->addWidget(row);
+    return row;
+  };
+  command(tr("New"), QStringLiteral("file.new_design"));
+  command(tr("Open"), QStringLiteral("file.open"));
+  command(tr("Open Project"), QStringLiteral("file.open_project"));
+  command(tr("Recover"), QStringLiteral("file.recover"));
+  side->addWidget(new StartSideRule);
+  command(tr("Save"), QStringLiteral("file.save"));
+  command(tr("Save As"), QStringLiteral("file.save_as"));
+  command(tr("Export"), QStringLiteral("file.export"));
+  command(tr("Design Properties"), QStringLiteral("file.design_properties"));
+  side->addWidget(new StartSideRule);
+  // The resources, under the names and commands the Resources panel had.
+  if (m_host.tutorials) {
+    command(tr("Tutorials"), QStringLiteral("help.tutorials"), QStringLiteral("startPageResource_help.tutorials"));
+  }
+  command(tr("Component Libraries"), QStringLiteral("insert.library_component"),
+          QStringLiteral("startPageResource_insert.library_component"));
+  command(tr("User Guide"), QStringLiteral("help.user_guide"), QStringLiteral("startPageResource_help.user_guide"));
+  command(tr("Keyboard Shortcuts"), QStringLiteral("help.shortcuts"), QStringLiteral("startPageResource_help.shortcuts"));
+  command(tr("Connect AI Assistant"), QStringLiteral("help.connect_assistant"),
+          QStringLiteral("startPageResource_help.connect_assistant"));
+  side->addWidget(new StartSideRule);
+  command(tr("Preferences"), QStringLiteral("tools.preferences"), QStringLiteral("startPagePreferences"));
+  auto* about = new StartSideItem(tr("About %1").arg(QString::fromUtf8(brand::kDisplayName)));
+  about->setObjectName(QStringLiteral("startPageAbout"));
+  connect(about, &QAbstractButton::clicked, this, [this] {
+    choose(QStringLiteral("About"), [this] {
+      if (m_host.about) {
+        m_host.about();
+      }
+    });
+  });
+  side->addWidget(about);
+  auto* report = new StartSideItem(tr("Report an Issue"));
+  report->setObjectName(QStringLiteral("startPageReport"));
+  report->setToolTip(tr("Opens the issue list in the web browser"));
+  connect(report, &QAbstractButton::clicked, this,
+          [this] { choose(QStringLiteral("Report an Issue"), [this] { m_host.openUrl(m_host.issuesUrl); }); });
+  side->addWidget(report);
+  side->addStretch(1);
   m_atLaunch = new QCheckBox(tr("Show start page at launch"));
   m_atLaunch->setObjectName(QStringLiteral("startPageAtLaunch"));
   m_atLaunch->setChecked(recent::showAtLaunch());
+  // White on the blue, as the rows.
+  QPalette onBlue = m_atLaunch->palette();
+  onBlue.setColor(QPalette::WindowText, Qt::white);
+  onBlue.setColor(QPalette::Text, Qt::white);
+  m_atLaunch->setPalette(onBlue);
+  m_atLaunch->setContentsMargins(14, 0, 0, 0);
   connect(m_atLaunch, &QCheckBox::toggled, this, [](bool on) {
     recent::setShowAtLaunch(on);
     qInfo().noquote() << QStringLiteral("Start page at launch: %1").arg(on ? QStringLiteral("on") : QStringLiteral("off"));
   });
-  footerRow->addWidget(m_atLaunch);
-  footerRow->addStretch(1);
-  auto* preferences = new StartLink(tr("Preferences…"));
-  preferences->setObjectName(QStringLiteral("startPagePreferences"));
-  connect(preferences, &QAbstractButton::clicked, this, [this] {
-    choose(QStringLiteral("Preferences"), [this] { m_host.trigger(QStringLiteral("tools.preferences")); });
-  });
-  footerRow->addWidget(preferences);
-  auto* bar = new QLabel(QStringLiteral("|"));
-  setRoleStyleSheet(bar, ColorRole::TextSecondary);
-  footerRow->addWidget(bar);
-  auto* report = new StartLink(tr("Report an Issue"));
-  report->setObjectName(QStringLiteral("startPageReport"));
-  report->setToolTip(tr("Opens MitCad's issue list in the web browser"));
-  connect(report, &QAbstractButton::clicked, this,
-          [this] { choose(QStringLiteral("Report an Issue"), [this] { m_host.openUrl(m_host.issuesUrl); }); });
-  footerRow->addWidget(report);
-  m_column->addWidget(footer);
+  auto* launchRow = new QHBoxLayout;
+  launchRow->setContentsMargins(14, 0, 8, 0);
+  launchRow->addWidget(m_atLaunch);
+  sideOuter->addLayout(launchRow);
+  split->insertWidget(0, sidebar);
+  // Esc goes back to the design, as the sidebar's first row.
+  auto* escape = new QShortcut(QKeySequence(Qt::Key_Escape), this);
+  escape->setContext(Qt::WidgetWithChildrenShortcut);
+  connect(escape, &QShortcut::activated, back, &QAbstractButton::click);
 
   hide();
   viewer->installEventFilter(this);
@@ -1196,8 +1450,11 @@ void StartPage::hidePage() {
 
 void StartPage::refresh() {
   const QString units = m_host.defaultUnits ? m_host.defaultUnits() : QStringLiteral("mm");
-  static_cast<StartTile*>(m_newDesign)->setLine(tr("Default units: %1").arg(units));
   qInfo().noquote() << QStringLiteral("Start page new design units: %1").arg(units);
+  // Fork: the sidebar's Back row names the design it goes back to.
+  const QString name = m_host.documentName ? m_host.documentName() : QString();
+  m_back->setText(name.isEmpty() ? tr("Back") : tr("Back to %1").arg(name));
+  m_back->setAccessibleName(m_back->text());
   m_designs = recent::load();
   rebuildList();
   // The projects again (a design saved, a project added or synced).
@@ -1952,7 +2209,29 @@ void StartPage::logPlaces() {
   });
 }
 
+void StartPage::layoutNewCards() {
+  // Fork: four in a row where each card has kNewCardWidth, else two by two.
+  const int width = m_newCards->width() > 0 ? m_newCards->width() : m_newCards->sizeHint().width();
+  const int columns = width >= 4 * kNewCardWidth + 3 * m_newGrid->horizontalSpacing() ? 4 : 2;
+  if (columns == m_newColumns && m_newGrid->count() == m_newTiles.size()) {
+    return;
+  }
+  m_newColumns = columns;
+  for (QWidget* tile : std::as_const(m_newTiles)) {
+    m_newGrid->removeWidget(tile);
+  }
+  for (int i = 0; i < m_newTiles.size(); ++i) {
+    m_newGrid->addWidget(m_newTiles.at(i), i / columns, i % columns);
+  }
+  for (int c = 0; c < 4; ++c) {
+    m_newGrid->setColumnStretch(c, c < columns ? 1 : 0);
+  }
+}
+
 bool StartPage::eventFilter(QObject* watched, QEvent* event) {
+  if (watched == m_newCards && event->type() == QEvent::Resize) { // Fork
+    layoutNewCards();
+  }
   // A press in the search field gives it the keyboard, whatever delivered
   // the press: the letters typed then are the field's, never the window's
   // single-key shortcuts (S, Command Search). Qt gives the focus on a click

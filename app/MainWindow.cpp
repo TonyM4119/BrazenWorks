@@ -9749,7 +9749,7 @@ bool MainWindow::installEmptyDocument(const QString& name, QString* error) {
   // In the default units for new designs (Preferences > General,
   // mitcad#1036), read now: a change of the preference changes no open
   // design, only the next new one.
-  const QString units = GeneralSettings::load().newDesignUnits;
+  const QString units = newDesignUnitsNow(); // Fork: the start page's choice, else the default
   const bool installed = installDocument(
       name.isEmpty() ? tr("Untitled") : name, QString(),
       [units](ModelJob&) { return new_design_document_in(rustStr(units.toUtf8())); }, reason);
@@ -9766,6 +9766,10 @@ bool MainWindow::installEmptyDocument(const QString& name, QString* error) {
   updateWindowTitle();
   qInfo().noquote() << QStringLiteral("New design in %1").arg(units);
   return true;
+}
+
+QString MainWindow::newDesignUnitsNow() const {
+  return m_newDesignUnits.isEmpty() ? GeneralSettings::load().newDesignUnits : m_newDesignUnits;
 }
 
 void MainWindow::logNewDesignActive() {

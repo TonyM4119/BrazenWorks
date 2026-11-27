@@ -14,7 +14,15 @@
 // with the view's own background around it (StartBackdrop.hpp,
 // mitcad#1439).
 //
-// From the top: "Welcome to MitCad" with What's New in X.Y (the version's
+// Fork: laid out as SolidCraft's start page: a blue sidebar down the left
+// (Back to <design> with Esc, Start, the File commands, the resources that
+// were the Resources panel, Preferences, About, Report an Issue and Show
+// start page at launch, which were the footer), and at its right Start, a
+// New row (New Design in inches first and chosen, in millimeters, Open…,
+// Import…; one row of four where they fit, else two by two) and Recent:
+// the designs' browser below.
+//
+// Upstream, from the top: "Welcome to MitCad" with What's New in X.Y (the version's
 // release page in the browser: nothing is fetched at start-up); the quick
 // actions New Design (in the default units for new designs), Open
 // Design…, Open Project… and Import File…, each with its key; the designs'
@@ -134,6 +142,13 @@ public:
     std::function<void(const QStringList& paths)> drop;
     // The units of a new design (Preferences › General).
     std::function<QString()> defaultUnits;
+    // Fork: a new design in the units given ("in", "mm"), whatever the
+    // default (the New row's cards); back to the design (the sidebar's
+    // Back row, Esc); the design's name it names; About.
+    std::function<void(const QString& units)> newDesignIn;
+    std::function<void()> back;
+    std::function<QString()> documentName;
+    std::function<void()> about;
     // An address in the browser (logged instead in UI tests).
     std::function<void(const QString& url)> openUrl;
     // The workspace tabs: the page's content starts below them where they
@@ -233,6 +248,13 @@ private:
   QVBoxLayout* m_column = nullptr;   // the page's margins follow the view's insets
   QScrollArea* m_scroll = nullptr;
   QAbstractButton* m_newDesign = nullptr;
+  QAbstractButton* m_back = nullptr; // Fork: the sidebar's Back to <design>
+  // Fork: the New row's cards, four in a row or two by two (layoutNewCards).
+  void layoutNewCards();
+  QWidget* m_newCards = nullptr;
+  QGridLayout* m_newGrid = nullptr;
+  QList<QWidget*> m_newTiles;
+  int m_newColumns = 0;
   QAbstractButton* m_whatsNew = nullptr;
   QAbstractButton* m_recentRow = nullptr;
   QAbstractButton* m_pinnedRow = nullptr;
