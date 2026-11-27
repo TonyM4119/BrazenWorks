@@ -284,6 +284,10 @@ public:
 
   // Rebuilds the rows, keeping what was expanded, selected and scrolled to.
   void rebuild(const DocumentSnapshot& snapshot, bool originShown);
+  // Fork: the design's name, which the root row shows (as Fusion's Browser
+  // shows the document's) while the root has the model's default name; its
+  // path and the logs keep "Root". Empty: "Root" shown.
+  void setDesignName(const QString& name);
   // The explode view the 3D view shows (mitcad#2113; empty: none): its row
   // in bold. Takes effect at the next rebuild.
   void setShownExplodeView(const QString& name) { m_shownExplodeView = name; }
@@ -757,6 +761,7 @@ private:
   void bindingsRested();
   QString m_bindingsHover;
   QTimer* m_bindingsTimer = nullptr;
+  QString m_designName; // Fork: setDesignName
 };
 
 } // namespace mitcad

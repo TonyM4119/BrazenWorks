@@ -2497,6 +2497,19 @@ bool BrowserPanel::markLevel(QTreeWidgetItem* row, const DocumentSnapshot::Featu
   return true;
 }
 
+void BrowserPanel::setDesignName(const QString& name) {
+  if (name == m_designName) {
+    return;
+  }
+  m_designName = name;
+  QTreeWidgetItem* root = m_tree->topLevelItemCount() > 0 ? m_tree->topLevelItem(0) : nullptr;
+  if (root != nullptr && m_nodes.value(root).name == tr("Root")) {
+    // Not a rename (itemEdited): the shown text only.
+    const QSignalBlocker blocker(m_tree);
+    root->setText(kName, name.isEmpty() ? tr("Root") : name);
+  }
+}
+
 QTreeWidgetItem* BrowserPanel::addRow(QTreeWidgetItem* parent, const BrowserNode& node,
                                       const QString& icon, const QString& tooltip) {
   auto* item = parent != nullptr ? new QTreeWidgetItem(parent) : new QTreeWidgetItem(m_tree);
@@ -3488,12 +3501,18 @@ void BrowserPanel::rebuild(const DocumentSnapshot& snapshot, bool originShown) {
   rootNode.name = root;
   QTreeWidgetItem* rootItem = addRow(nullptr, rootNode, QStringLiteral("component"),
                                      tr("The design's root component"));
+  // Fork: the design's name on the root row, as Fusion's (setDesignName).
+  if (!m_designName.isEmpty() && root == tr("Root")) {
+    rootItem->setText(kName, m_designName);
+  }
 
   BrowserNode node;
   node.component = rootNode.uid;
   node.type = BrowserNode::Type::Settings;
   node.name = tr("Design Settings");
   QTreeWidgetItem* settings = addRow(rootItem, node, QStringLiteral("settings"));
+  // Fork: shown as Fusion's Document Settings; its path keeps its name.
+  settings->setText(kName, tr("Document Settings"));
   node.type = BrowserNode::Type::Units;
   node.name = tr("Units: %1").arg(snapshot.lengthUnit);
   addRow(settings, node, QStringLiteral("units"), tr("Double-click to change the design's unit"));

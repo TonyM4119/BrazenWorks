@@ -1610,6 +1610,13 @@ Docked tab row before the selector came there).
 
 ## 14. Cards
 
+**Fork (PureCAD): Fusion's look.** A card's title is in small capitals
+(0.85 of the text, Medium, 0.5 px apart) in the quiet text colour
+("BROWSER", "TIMELINE"). In the Browser the root row shows the design's
+name while the root keeps the model's default name, and the settings row
+reads Document Settings; their paths and logs keep Root and Design
+Settings.
+
 A card (`GlassCard`) floats over the view: card material, card radius,
 a soft shadow. The left column's cards (Browser, Drawings, Render's
 stage list) start at the view margin's left and one card gap under the

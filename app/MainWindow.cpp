@@ -9838,6 +9838,10 @@ void MainWindow::updateWindowTitle() {
                                                     .arg(QFileInfo(m_inPlaceFile).fileName(), documentName())
                                               : documentName();
   setWindowTitle(QStringLiteral("%1[*] - %2 %3").arg(titleName, programName(), programVersion()));
+  // Fork: the Browser's root row shows the design's name, as Fusion's.
+  if (m_controller != nullptr && m_controller->browser() != nullptr) {
+    m_controller->browser()->setDesignName(m_noDesign ? QString() : documentName());
+  }
   const bool modified = isModified();
   setWindowModified(modified);
   // Save follows the mark (its enabled() reads it), also after a save that
