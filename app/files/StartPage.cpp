@@ -209,11 +209,12 @@ public:
     update();
   }
 
+  // Fork: SolidCraft's New cards: lower, with a lighter title.
   QSize sizeHint() const override {
-    return m_kind == Kind::Action ? QSize(240, 88) : QSize(260, 48);
+    return m_kind == Kind::Action ? QSize(220, 76) : QSize(260, 48);
   }
   QSize minimumSizeHint() const override {
-    return m_kind == Kind::Action ? QSize(170, 88) : QSize(200, 48);
+    return m_kind == Kind::Action ? QSize(170, 76) : QSize(200, 48);
   }
 
 protected:
@@ -253,14 +254,17 @@ protected:
       painter.setBrush(Qt::NoBrush);
       painter.drawRoundedRect(box, kRadius, kRadius);
     }
-    const int glyph = action ? 36 : 26;
-    const int pad = action ? 16 : 8;
+    const int glyph = action ? 32 : 26;
+    const int pad = action ? 18 : 8;
     const QRect iconBox(pad, (height() - glyph) / 2, glyph, glyph);
     themeIcon(m_icon).paint(&painter, iconBox, Qt::AlignCenter, isEnabled() ? QIcon::Normal : QIcon::Disabled);
     const int left = iconBox.right() + (action ? 16 : 12);
     const int room = std::max(10, width() - left - pad);
-    const QFont titleFont = scaledFont(this, action ? 1.15 : 1.0, true);
-    const QFont lineFont = scaledFont(this, action ? 1.0 : 0.92, false);
+    QFont titleFont = scaledFont(this, action ? 1.05 : 1.0, !action);
+    if (action) {
+      titleFont.setWeight(QFont::DemiBold); // Fork: as SolidCraft's card titles
+    }
+    const QFont lineFont = scaledFont(this, action ? 0.92 : 0.92, false);
     const QFontMetrics titleMetrics(titleFont);
     const QFontMetrics lineMetrics(lineFont);
     const int lines = (m_line.isEmpty() ? 0 : 1) + (m_key.isEmpty() ? 0 : 1);
@@ -298,7 +302,7 @@ const QColor kSidebarTop(0x22, 0x61, 0xc4);
 const QColor kSidebarBottom(0x1d, 0x56, 0xb0);
 constexpr int kSidebarWidth = 300;
 // The width a New card needs to show its title and line whole.
-constexpr int kNewCardWidth = 360;
+constexpr int kNewCardWidth = 200; // Fork: four in a row but on a narrow window
 
 class StartSidebar : public QWidget {
 public:
@@ -1051,8 +1055,9 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
                                             const QString& id) {
     auto* tile = new StartTile(StartTile::Kind::Action, iconName, title);
     tile->setObjectName(QStringLiteral("startPageAction_") + id);
-    tile->setLine(line);
-    tile->setKey(m_host.shortcutText ? m_host.shortcutText(id) : QString());
+    // Fork: the key in the line, as SolidCraft's ("A design (Ctrl+O)").
+    const QString key = m_host.shortcutText ? m_host.shortcutText(id) : QString();
+    tile->setLine(key.isEmpty() ? line : QStringLiteral("%1 (%2)").arg(line, key));
     connect(tile, &QAbstractButton::clicked, this,
             [this, title, id] { choose(plain(title), [this, id] { m_host.trigger(id); }); });
     actionRow(tile);
@@ -1082,7 +1087,7 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   inches->setPrimary(true);
   m_newDesign = unitsTile(tr("New Design, mm"), tr("Millimeters · opens in Design"), QStringLiteral("mm"),
                           QStringLiteral("file.new_design"));
-  actionTile(QStringLiteral("open"), tr("Open…"), tr("A design from your files"), QStringLiteral("file.open"));
+  actionTile(QStringLiteral("open"), tr("Open…"), tr("A design"), QStringLiteral("file.open"));
   actionTile(QStringLiteral("import"), tr("Import…"), tr("STEP, IGES or mesh into a new design"),
              QStringLiteral("file.import"));
   layoutNewCards();
@@ -2332,7 +2337,7 @@ void StartPage::rebuildRecentRows() {
     delete item;
   }
   if (m_designs.isEmpty()) {
-    auto* none = new QLabel(tr("No recent designs yet: designs you open or save show here."));
+    auto* none = new QLabel(tr("Designs you open or save appear here."));
     none->setObjectName(QStringLiteral("startPageRecentNone"));
     setRoleStyleSheet(none, ColorRole::TextSecondary);
     m_recentRowsLayout->addWidget(none);
