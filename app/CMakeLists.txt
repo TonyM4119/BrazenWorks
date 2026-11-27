@@ -2276,9 +2276,10 @@ target_sources(mitcad PRIVATE print/MaterialProperties.cpp print/MaterialPropert
 target_sources(mitcad PRIVATE view/GridSpacing.cpp view/GridSpacing.hpp)
 
 # Fork: the plane ruler (view/PlaneRuler.hpp): while Create Sketch waits for
-# a plane, the origin plane under the mouse shows a grid and numbered ticks.
-target_sources(mitcad PRIVATE view/PlaneRuler.cpp view/PlaneRuler.hpp view/PlaneRulerGrid.cpp
-                              view/PlaneRulerGrid.hpp)
+# a plane, the layout grid moves onto the origin plane under the mouse, with
+# its axes and numbered ticks.
+target_sources(mitcad PRIVATE view/PlaneRuler.cpp view/PlaneRuler.hpp view/PlaneRulerAxes.cpp
+                              view/PlaneRulerAxes.hpp)
 
 # The arrow keys turn the 3D view by Preferences › Navigation's step while
 # it has the keyboard (mitcad#1211, app/COMMANDS.md "Arrow keys"): the

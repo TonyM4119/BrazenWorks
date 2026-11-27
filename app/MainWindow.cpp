@@ -8333,6 +8333,9 @@ void MainWindow::createSketch(const QJsonObject& fields) {
 }
 
 void MainWindow::createSketchOnPick(SelectionItem item) {
+  // Fork: the plane ruler gone, the layout grid back where it was, before
+  // the sketch puts the grid on its own plane.
+  m_viewer->setPlaneRuler(QString());
   // A tutorial's guide step on another plane holds the pick back
   // (mitcad#2440): the plane can still be picked.
   if (!guideAllowsPlane(item)) {

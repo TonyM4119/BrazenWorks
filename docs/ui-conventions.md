@@ -1729,26 +1729,22 @@ red pixel, an edge the band reaches or a square corner.
 
 ## 18b. Plane ruler (fork)
 
-While Create Sketch waits for a plane, the origin plane under the mouse
-shows a ruler, as Fusion's: a grid on that plane across most of the view
-(centred on the origin, reaching 0.6 of the view's larger side, whatever
-the plane's own square measures) in the layout grid's layer (under the
-bodies, a little stronger than the layout grid), the plane's two axes
-across it in their axis colours, and numbered ticks along both axes.
+While Create Sketch waits for a plane, the root origin plane under the
+mouse (XY, XZ or YZ) gets a ruler, as in Fusion: **the layout grid moves
+onto that plane**, so that it shows the plane the sketch would be drawn
+on; no second grid is drawn. Over it:
 
-- The numbers are in the design's length unit, without the unit's name
-  (2.5, 5, 7.5 …). The step is 1, 2.5 or 5 times a power of ten (1/8,
-  1/4, 1/2 below one in inch and foot designs), at least 80 logical pixels
-  apart and at most four to the grid's edge.
-- The grid divides each numbered step into five (four for 1/4 and 1/8)
-  where those lines are at least 10 logical pixels apart; closer, only the
-  numbered steps' lines are drawn.
-- The numbers run along each axis's positive half, past the grid's edge to
-  1.7 times its reach, beside a tick in the axis colour, turned along the
-  axis (never upside down), in a quiet grey with a halo of the background.
-  An axis seen end on gets no numbers.
-- Only the root's origin planes get a ruler, and only during the pick; it
-  goes when the mouse leaves the plane or the pick ends.
+- the plane's two axes across the view, in their axis colours;
+- numbered ticks along each axis's positive half, on the grid's major
+  lines: their spacing times 1, 2, 5, 10 … so that the numbers are at
+  least 80 logical pixels apart; in the design's length unit without the
+  unit's name; beside a tick in the axis colour, turned along the axis
+  (never upside down), in a quiet grey with a halo of the background. An
+  axis seen end on gets no numbers.
+
+When the mouse leaves the plane or the pick ends, the axes and numbers go
+and the grid goes back to the plane it was on (a sketch opened on the
+picked plane then puts it on its own plane, as before).
 
 ## 19. What not to do
 

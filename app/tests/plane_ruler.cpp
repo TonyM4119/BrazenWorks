@@ -1,6 +1,6 @@
 // SPDX-License-Identifier: MIT
-// Fork: the plane ruler (view/PlaneRuler.hpp): the numbered ticks' step per
-// unit, the grid lines per tick, and the labels' text.
+// Fork: the plane ruler (view/PlaneRuler.hpp): the numbered ticks' spacing
+// on the layout grid's major lines, and the labels' text.
 #include "UnitTests.hpp"
 #include "view/PlaneRuler.hpp"
 
@@ -26,42 +26,21 @@ void check(bool condition, const char* expression, int line) {
 
 bool nearly(double a, double b) { return std::abs(a - b) <= 1e-9 * std::max(1.0, std::abs(b)); }
 
-// The step in units of `size` mm for a grid `half` units from the origin
-// to its edge, where one unit is `pixels` logical pixels on the screen.
-mitcad::PlaneRulerTicks ticksAt(double half, double pixels, const char* unit, double size) {
-  return mitcad::planeRulerTicks(pixels / size, half * size, QString::fromLatin1(unit));
-}
-
 void stepTests() {
-  // Fusion's look: 2.5, 5, 7.5 ... with the grid in fifths.
-  mitcad::PlaneRulerTicks ticks = ticksAt(10.0, 40.0, "in", 25.4);
-  CHECK(nearly(ticks.step, 2.5 * 25.4));
-  CHECK(ticks.subdivisions == 5);
-  ticks = ticksAt(40.0, 10.0, "in", 25.4);
-  CHECK(nearly(ticks.step, 10.0 * 25.4));
-  // Below an inch: halves, quarters and eighths, the grid in quarters.
-  ticks = ticksAt(2.0, 200.0, "in", 25.4);
-  CHECK(nearly(ticks.step, 0.5 * 25.4));
-  CHECK(ticks.subdivisions == 5);
-  ticks = ticksAt(0.8, 400.0, "in", 25.4);
-  CHECK(nearly(ticks.step, 0.25 * 25.4));
-  CHECK(ticks.subdivisions == 4);
-  ticks = ticksAt(0.4, 800.0, "in", 25.4);
-  CHECK(nearly(ticks.step, 0.125 * 25.4));
-  // Metric: 1, 2.5, 5 times a power of ten mm.
-  ticks = ticksAt(100.0, 4.0, "mm", 1.0);
-  CHECK(nearly(ticks.step, 25.0));
-  ticks = ticksAt(400.0, 1.0, "mm", 1.0);
-  CHECK(nearly(ticks.step, 100.0));
-  ticks = ticksAt(1.0, 200.0, "mm", 1.0);
-  CHECK(nearly(ticks.step, 0.5));
-  // Ticks far enough apart on the screen.
-  ticks = ticksAt(50.0, 0.5, "mm", 1.0);
-  CHECK(ticks.step * 0.5 >= mitcad::kPlaneRulerMinLabelPixels);
-  // No scale, no size: no ticks.
-  CHECK(mitcad::planeRulerTicks(0.0, 10.0, QStringLiteral("mm")).step == 0.0);
-  CHECK(mitcad::planeRulerTicks(1.0, 0.0, QStringLiteral("mm")).step == 0.0);
-  CHECK(mitcad::planeRulerTicks(std::nan(""), 10.0, QStringLiteral("mm")).step == 0.0);
+  // On the grid's major lines: their spacing times 1, 2, 5, 10 ...
+  CHECK(nearly(mitcad::planeRulerLabelStep(10.0, 10.0), 10.0));   // 100 px apart
+  CHECK(nearly(mitcad::planeRulerLabelStep(10.0, 5.0), 20.0));    // 50 px: twice
+  CHECK(nearly(mitcad::planeRulerLabelStep(10.0, 2.0), 50.0));    // 20 px: five times
+  CHECK(nearly(mitcad::planeRulerLabelStep(10.0, 0.5), 200.0));   // 5 px: 20 times
+  CHECK(nearly(mitcad::planeRulerLabelStep(25.4, 4.0), 25.4));    // 1 in major lines at 101 px
+  CHECK(nearly(mitcad::planeRulerLabelStep(6.35, 4.0), 31.75));   // 1/4 in at 25 px: five times, 1.25 in
+  for (const double scale : {0.01, 0.3, 1.0, 7.0, 40.0}) {
+    CHECK(mitcad::planeRulerLabelStep(5.0, scale) * scale >= mitcad::kPlaneRulerMinLabelPixels - 1e-9);
+  }
+  // No spacing, no scale: no numbers.
+  CHECK(mitcad::planeRulerLabelStep(0.0, 1.0) == 0.0);
+  CHECK(mitcad::planeRulerLabelStep(5.0, 0.0) == 0.0);
+  CHECK(mitcad::planeRulerLabelStep(std::nan(""), 1.0) == 0.0);
 }
 
 #define EXPECT_LABEL(mm, unit, text)                                                                       \

@@ -2004,10 +2004,9 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
   m_grid = new LayoutGrid();
   m_grid->SetZLayer(m_gridLayer);
   setGridColors(*m_grid, m_paper);
-  // Fork: the plane ruler's grid in the same layer, under the bodies.
-  m_rulerGrid = new PlaneRulerGrid();
-  m_rulerGrid->SetZLayer(m_gridLayer);
-  setGridColors(*m_rulerGrid, m_paper, 0.22f, 0.40f);
+  // Fork: the plane ruler's axes in the same layer, under the bodies.
+  m_rulerAxes3d = new PlaneRulerAxes();
+  m_rulerAxes3d->SetZLayer(m_gridLayer);
 
   // In glass of its own (mitcad#430).
   m_orientationCube = makeViewCube();
@@ -8751,8 +8750,6 @@ void OcctViewer::setBackground(const QColor& top, const QColor& bottom, bool gra
   m_backgroundGradient = gradient;
   applyBackground();
   setGridColors(*m_grid, paper);
-  setGridColors(*m_rulerGrid, paper, 0.22f, 0.40f); // Fork: the plane ruler's
-  m_rulerGrid->setLines({});                         // drawn again in them
   updateGrid(true);
   sceneChanged();
 }
@@ -8854,18 +8851,60 @@ void OcctViewer::updateGrid(bool force) {
   m_view->Invalidate();
 }
 
+namespace {
+
+// The frame of a root origin plane ("xy", "xz", "yz") whose x and y are the
+// plane's first and second axes, as the layout grid lies on it; none for
+// another name.
+std::optional<gp_Ax3> originPlaneFrame(const QString& plane) {
+  if (plane == QLatin1String("xy")) {
+    return gp_Ax3(gp::Origin(), gp::DZ(), gp::DX());
+  }
+  if (plane == QLatin1String("xz")) {
+    return gp_Ax3(gp::Origin(), -gp::DY(), gp::DX()); // y along +Z
+  }
+  if (plane == QLatin1String("yz")) {
+    return gp_Ax3(gp::Origin(), gp::DX(), gp::DY()); // y along +Z
+  }
+  return std::nullopt;
+}
+
+bool sameFrame(const gp_Ax3& a, const gp_Ax3& b) {
+  return a.Location().Distance(b.Location()) < 1e-9 && a.Direction().IsEqual(b.Direction(), 1e-9) &&
+         a.XDirection().IsEqual(b.XDirection(), 1e-9);
+}
+
+} // namespace
+
 void OcctViewer::setPlaneRuler(const QString& originPlane) {
-  if (originPlane == m_rulerPlane) {
+  const std::optional<gp_Ax3> frame = originPlaneFrame(originPlane);
+  const QString plane = frame ? originPlane : QString();
+  if (plane == m_rulerPlane) {
     return;
   }
-  m_rulerPlane = originPlane;
-  qDebug().noquote() << (originPlane.isEmpty() ? QStringLiteral("Plane ruler hidden")
-                                               : QStringLiteral("Plane ruler on %1").arg(originPlane));
-  if (!originPlane.isEmpty() && !m_rulerLabels) {
-    m_rulerLabels = addPaintLayer(
-        QStringLiteral("plane ruler"), [this](QPainter& painter) { paintPlaneRuler(painter); }, this);
+  m_rulerPlane = plane;
+  qDebug().noquote() << (plane.isEmpty() ? QStringLiteral("Plane ruler hidden")
+                                         : QStringLiteral("Plane ruler on %1").arg(plane));
+  if (frame) {
+    // The layout grid onto the plane: the plane a sketch would be drawn on.
+    if (!m_rulerMovedGrid) {
+      m_gridPlaneBeforeRuler = m_gridPlane;
+      m_rulerMovedGrid = true;
+    }
+    m_rulerFrame = *frame;
+    setGridPlane(*frame);
+    if (!m_rulerLabels) {
+      m_rulerLabels = addPaintLayer(
+          QStringLiteral("plane ruler"), [this](QPainter& painter) { paintPlaneRuler(painter); }, this);
+    }
+  } else if (m_rulerMovedGrid) {
+    // Back where it was, unless a sketch on the picked plane put it there.
+    m_rulerMovedGrid = false;
+    if (sameFrame(m_gridPlane, m_rulerFrame)) {
+      setGridPlane(m_gridPlaneBeforeRuler);
+    }
   }
-  m_rulerGrid->setLines({}); // built for the new plane
+  m_rulerAxes3d->setExtent(0.0); // drawn again for the plane
   updatePlaneRuler();
   m_view->Invalidate();
   sceneChanged();
@@ -8873,8 +8912,8 @@ void OcctViewer::setPlaneRuler(const QString& originPlane) {
 
 void OcctViewer::updatePlaneRuler() {
   const auto hide = [this] {
-    if (m_context->IsDisplayed(m_rulerGrid)) {
-      m_context->Erase(m_rulerGrid, false);
+    if (m_context->IsDisplayed(m_rulerAxes3d)) {
+      m_context->Erase(m_rulerAxes3d, false);
       m_view->Invalidate();
     }
     if (m_rulerLabels) {
@@ -8882,91 +8921,54 @@ void OcctViewer::updatePlaneRuler() {
     }
     m_rulerStep = 0.0;
   };
-  if (m_rulerPlane.isEmpty() || m_view->Window().IsNull() || showsRenderedImage()) {
+  const std::optional<gp_Ax3> frame = originPlaneFrame(m_rulerPlane);
+  if (!frame || m_view->Window().IsNull() || showsRenderedImage()) {
     hide();
     return;
   }
-  // The root's origin plane as drawn now.
-  occ::handle<AIS_Shape> plane;
-  for (const occ::handle<AIS_Shape>& datum : m_datums) {
-    const auto info = m_pickInfo.find(datum.get());
-    if (info != m_pickInfo.end() && info->second.item.kind == SelectKind::Plane &&
-        info->second.item.owner == m_rulerPlane && info->second.item.occurrence.isEmpty() &&
-        m_context->IsDisplayed(datum)) {
-      plane = datum;
-    }
-  }
-  // Its axes: u along the first one its name gives, v along the second, the
-  // normal so that u and v are the grid's x and y.
-  gp_Dir u = gp::DX();
-  gp_Dir v = gp::DY();
-  gp_Dir normal = gp::DZ();
-  if (m_rulerPlane == QLatin1String("xz")) {
-    v = gp::DZ();
-    normal = -gp::DY();
-  } else if (m_rulerPlane == QLatin1String("yz")) {
-    u = gp::DY();
-    v = gp::DZ();
-    normal = gp::DX();
-  } else if (m_rulerPlane != QLatin1String("xy")) {
-    plane.Nullify();
-  }
-  if (plane.IsNull()) {
-    hide();
-    return;
-  }
-  // Fork: as Fusion's, the grid reaches across most of the view on the
-  // plane, centred on the origin, whatever the plane's square measures; the
-  // numbers run along the axes' positive halves past the grid's edge.
+  const gp_Dir u = frame->XDirection();
+  const gp_Dir v = frame->YDirection();
+  // The numbers on the layout grid's major lines, far enough apart; the
+  // axes and the numbers across the view.
   const double perMm = 1.0 / modelPerPixel(gp::Origin());
   const double across = std::max(width(), height()) / perMm; // the view's larger side (mm)
-  const PlaneRulerTicks ticks = planeRulerTicks(perMm, kPlaneRulerGridReach * across, m_gridUnit);
-  if (!(ticks.step > 0.0) || !std::isfinite(across)) {
+  const double minor = gridStep();
+  const double step = planeRulerLabelStep(minor * layoutGridMajor(minor, m_gridUnit), perMm);
+  if (!(step > 0.0) || !std::isfinite(across)) {
     hide();
     return;
   }
-  const double half = std::ceil(kPlaneRulerGridReach * across / ticks.step) * ticks.step;
-  PlaneRulerGrid::Lines lines;
-  lines.uMin = lines.vMin = -half;
-  lines.uMax = lines.vMax = half;
-  // The lines between the numbered ticks only where they are 10 pixels apart.
-  const bool fine = ticks.step / ticks.subdivisions * perMm >= kPlaneRulerMinGridPixels;
-  lines.step = fine ? ticks.step / ticks.subdivisions : ticks.step;
-  lines.major = fine ? ticks.subdivisions : 1;
   const auto role = [this](const gp_Dir& axis) {
     const ColorRole which = axis.IsParallel(gp::DX(), 1e-9)   ? ColorRole::AxisX
                             : axis.IsParallel(gp::DY(), 1e-9) ? ColorRole::AxisY
                                                               : ColorRole::AxisZ;
     return viewRole(which, m_backgroundDark);
   };
-  const bool changed = [&] {
-    const PlaneRulerGrid::Lines& drawn = m_rulerGrid->lines();
-    const double tolerance = 1e-6 * half;
-    return drawn.step != lines.step || drawn.major != lines.major || std::abs(drawn.uMin - lines.uMin) > tolerance ||
-           std::abs(drawn.uMax - lines.uMax) > tolerance || std::abs(drawn.vMin - lines.vMin) > tolerance ||
-           std::abs(drawn.vMax - lines.vMax) > tolerance;
-  }();
-  const double labelled = kPlaneRulerLabelReach * half;
-  m_rulerAxes[0] = {u, 0.0, labelled, qtColor(role(u))};
-  m_rulerAxes[1] = {v, 0.0, labelled, qtColor(role(v))};
-  m_rulerStep = ticks.step;
-  if (changed || !m_context->IsDisplayed(m_rulerGrid)) {
-    m_rulerGrid->setLines(lines);
-    m_rulerGrid->setAxisColors(role(u), role(v));
+  const double reach = std::ceil(across / step) * step;
+  m_rulerAxes[0] = {u, 0.0, reach, qtColor(role(u))};
+  m_rulerAxes[1] = {v, 0.0, reach, qtColor(role(v))};
+  const bool changed = step != m_rulerStep;
+  m_rulerStep = step;
+  // The axes reach well past the view; drawn again when the view nears
+  // their ends or they reach too far.
+  const double extent = m_rulerAxes3d->extent();
+  if (!m_context->IsDisplayed(m_rulerAxes3d) || extent < 1.5 * across || extent > 8.0 * across) {
+    m_rulerAxes3d->setExtent(3.0 * across);
+    m_rulerAxes3d->setColors(role(u), role(v));
     gp_Trsf placement;
-    placement.SetDisplacement(gp_Ax3(), gp_Ax3(gp::Origin(), normal, u));
-    m_rulerGrid->SetLocalTransformation(placement);
-    if (m_context->IsDisplayed(m_rulerGrid)) {
-      m_context->Redisplay(m_rulerGrid, false);
+    placement.SetDisplacement(gp_Ax3(), *frame);
+    m_rulerAxes3d->SetLocalTransformation(placement);
+    if (m_context->IsDisplayed(m_rulerAxes3d)) {
+      m_context->Redisplay(m_rulerAxes3d, false);
     } else {
-      m_context->Display(m_rulerGrid, 0, -1, false);
+      m_context->Display(m_rulerAxes3d, 0, -1, false);
     }
     m_view->Invalidate();
-    if (m_rulerLabels) {
-      m_rulerLabels->update();
-    }
   }
   if (m_rulerLabels) {
+    if (changed) {
+      m_rulerLabels->update();
+    }
     m_rulerLabels->setShown(true);
   }
 }

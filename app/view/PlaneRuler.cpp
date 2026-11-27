@@ -7,38 +7,20 @@
 
 namespace mitcad {
 
-PlaneRulerTicks planeRulerTicks(double pixelsPerMm, double halfSizeMm, const QString& unit) {
-  if (!(pixelsPerMm > 0.0) || !std::isfinite(pixelsPerMm) || !(halfSizeMm > 0.0) || !std::isfinite(halfSizeMm)) {
-    return {};
+double planeRulerLabelStep(double majorMm, double pixelsPerMm) {
+  if (!(majorMm > 0.0) || !std::isfinite(majorMm) || !(pixelsPerMm > 0.0) || !std::isfinite(pixelsPerMm)) {
+    return 0.0;
   }
-  const double unitMm = gridSpacingMillimetres(1.0, unit);
-  const bool imperial = imperialGrid(unit);
-  // The fewest unit lengths between ticks: far enough apart on the screen,
-  // and few enough to the plane's edge.
-  const double least = std::max(kPlaneRulerMinLabelPixels / pixelsPerMm, halfSizeMm / kPlaneRulerMaxLabels) / unitMm;
-  static constexpr double kMantissas[] = {1.0, 2.5, 5.0};
-  static constexpr double kFractions[] = {0.125, 0.25, 0.5};
-  if (imperial && least <= 0.5 * (1.0 + 1e-9)) {
-    for (const double fraction : kFractions) {
-      if (fraction >= least * (1.0 - 1e-9)) {
-        return {fraction * unitMm, fraction == 0.5 ? 5 : 4};
+  static constexpr double kFactors[] = {1.0, 2.0, 5.0};
+  for (double power = 1.0; power < 1e9; power *= 10.0) {
+    for (const double factor : kFactors) {
+      const double step = majorMm * factor * power;
+      if (step * pixelsPerMm >= kPlaneRulerMinLabelPixels * (1.0 - 1e-9)) {
+        return step;
       }
     }
   }
-  int exponent = static_cast<int>(std::floor(std::log10(least)));
-  for (int round = 0; round < 2; ++round, ++exponent) {
-    const double power = std::pow(10.0, exponent);
-    for (const double mantissa : kMantissas) {
-      // An inch design below one stays on its fractions (above).
-      if (imperial && mantissa * power < 1.0) {
-        continue;
-      }
-      if (mantissa * power >= least * (1.0 - 1e-9)) {
-        return {mantissa * power * unitMm, 5};
-      }
-    }
-  }
-  return {10.0 * std::pow(10.0, exponent) * unitMm, 5};
+  return 0.0;
 }
 
 QString planeRulerLabel(double millimetres, const QString& unit) {
