@@ -1704,6 +1704,29 @@ red pixel, an edge the band reaches or a square corner.
   with the side cards above it.
 - A panel or bar does not change height with its content's mode.
 
+## 18a. Motion and smoothness (fork)
+
+- **Camera glides** (Home, Fit, the view cube, Look At, the standard views,
+  entering a sketch on its plane and leaving it back to the view before)
+  ease in and out, on a sine curve (`view/EasedCameraAnimation.hpp`): 0.6 s
+  up to a quarter turn, longer for larger turns, at most 1 s. Fit glides like Home. With
+  view changes not animated (Preferences › Navigation), every move is
+  instant.
+- **Menus, drop-down lists and tooltips** use Qt's open animations (fade
+  and slide), off under the UI tests.
+- **Toolbar buttons'** hover highlight fades in and out (120 ms) instead of
+  snapping (`RibbonButton`, `framework/Motion.hpp`).
+- **The command card** fades in when it shows or a command's panel opens
+  in it (180 ms), and fades out when it hides (120 ms), card and shadow
+  together (`GlassCard::setOpacityLevel`). It does not slide: the floating
+  layout places the cards.
+- Under the UI tests (`MITCAD_TEST_INPUT`) nothing animates.
+- Motion stays short: the application should feel quick, not floaty. No
+  animation blocks input, and none runs while nothing changes.
+- **Smoothness** (Preferences › Display, Smooth by default) and
+  **Anti-aliasing** (Off, 2x, 4x, 8x; 4x by default) set how smooth the 3D
+  view draws curves and edges (`view/ViewQualityPreference.hpp`).
+
 ## 19. What not to do
 
 - Two texts for one control by default (a label beside a button that

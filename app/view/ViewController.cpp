@@ -142,6 +142,7 @@
 #include "SelectionLook.hpp"
 #include "ShortcutOverview.hpp"
 #include "SmallCirclesPreference.hpp"
+#include "ViewQualityPreference.hpp" // Fork
 // General: the operation a new Extrude starts with (mitcad#2164).
 #include "../framework/ExtrudeStartPreference.hpp"
 
@@ -3327,6 +3328,53 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(smallCircles, &QComboBox::currentIndexChanged, host, saving(applySmallCircles));
   } else {
     connect(dialog.get(), &QDialog::accepted, smallCircles, applySmallCircles);
+  }
+  // Fork: Smoothness and Anti-aliasing (view/ViewQualityPreference.hpp), in
+  // one row (Preferences fits a 1366 x 768 screen). Saved when the dialog is
+  // accepted, at once in the Settings window: a Smoothness change meshes the
+  // open designs' shown bodies again, an Anti-aliasing one redraws every view.
+  auto* smoothness = new QComboBox;
+  smoothness->setObjectName(QStringLiteral("preferencesSmoothness"));
+  smoothness->addItem(tr("Smooth"), smoothnessId(Smoothness::Smooth));
+  smoothness->addItem(tr("Standard"), smoothnessId(Smoothness::Standard));
+  smoothness->setItemData(0, tr("Rounder holes, cylinders and fillets; more triangles to draw"), Qt::ToolTipRole);
+  smoothness->setItemData(1, tr("Coarser curves, for very large designs on slower computers"), Qt::ToolTipRole);
+  smoothness->setCurrentIndex(smoothness->findData(smoothnessId(savedSmoothness())));
+  smoothness->setToolTip(tr("How finely the 3D view draws curved edges and faces; exported meshes do not change"));
+  auto* antialiasing = new QComboBox;
+  antialiasing->setObjectName(QStringLiteral("preferencesAntialiasing"));
+  antialiasing->addItem(tr("Off"), 0);
+  antialiasing->addItem(tr("2x"), 2);
+  antialiasing->addItem(tr("4x"), 4);
+  antialiasing->addItem(tr("8x"), 8);
+  antialiasing->setCurrentIndex(antialiasing->findData(savedAntialiasing()));
+  antialiasing->setToolTip(tr("Smooths the jagged edges of faces, lines and the grid in the 3D view; "
+                              "higher is smoother but asks more of the graphics card"));
+  auto* qualityRow = new QHBoxLayout;
+  qualityRow->addWidget(smoothness);
+  auto* antialiasingLabel = new QLabel(tr("Anti-aliasing:"));
+  antialiasingLabel->setBuddy(antialiasing);
+  qualityRow->addSpacing(12);
+  qualityRow->addWidget(antialiasingLabel);
+  qualityRow->addWidget(antialiasing);
+  qualityRow->addStretch(1);
+  auto* smoothnessLabel = new QLabel(tr("Smoothness:"));
+  smoothnessLabel->setBuddy(smoothness);
+  display->addRow(smoothnessLabel, qualityRow);
+  const auto applyQuality = [smoothness, antialiasing] {
+    const Smoothness chosen = smoothnessFromId(smoothness->currentData().toString()).value_or(defaultSmoothness());
+    if (saveSmoothness(chosen)) {
+      qDebug().noquote() << QStringLiteral("Preferences: smoothness %1").arg(smoothnessId(chosen));
+    }
+    if (saveAntialiasing(antialiasing->currentData().toInt())) {
+      qDebug().noquote() << QStringLiteral("Preferences: anti-aliasing %1").arg(antialiasing->currentData().toInt());
+    }
+  };
+  if (window != nullptr) {
+    connect(smoothness, &QComboBox::currentIndexChanged, host, saving(applyQuality));
+    connect(antialiasing, &QComboBox::currentIndexChanged, host, saving(applyQuality));
+  } else {
+    connect(dialog.get(), &QDialog::accepted, smoothness, applyQuality);
   }
   // Origin planes (mitcad#1748): a size on the screen (the default) or in
   // millimetres, the Corner or the Centred style, in one row (Preferences

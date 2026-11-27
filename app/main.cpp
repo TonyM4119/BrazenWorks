@@ -82,6 +82,7 @@
 #include "update/InstallationCheck.hpp"
 #include "update/OpenSslConfiguration.hpp"
 #include "view/SmallCirclesPreference.hpp"
+#include "view/ViewQualityPreference.hpp" // Fork
 #include "webbrowser/BrowserComponent.hpp"
 #include "webbrowser/ComponentWebFiles.hpp"
 
@@ -738,6 +739,20 @@ int runApplication(int argc, char* argv[]) {
   // any body is meshed for display.
   mitcad::applySavedSmallCircles();
   qDebug().noquote() << QStringLiteral("Small circles: %1").arg(mitcad::smallCirclesId(mitcad::viewSmallCircles()));
+  // Fork: the view's smoothness and anti-aliasing as Preferences has them.
+  mitcad::applySavedSmoothness();
+  qDebug().noquote() << QStringLiteral("Smoothness: %1, anti-aliasing: %2 samples")
+                            .arg(mitcad::smoothnessId(mitcad::viewSmoothness()))
+                            .arg(mitcad::savedAntialiasing());
+  // Fork: menus, drop-down lists and tooltips fade and slide open instead of
+  // popping up (Qt's UI effects), but not in the UI tests (MITCAD_TEST_INPUT),
+  // which time them.
+  if (qEnvironmentVariableIsEmpty("MITCAD_TEST_INPUT")) {
+    for (const Qt::UIEffect effect : {Qt::UI_AnimateMenu, Qt::UI_FadeMenu, Qt::UI_AnimateCombo,
+                                      Qt::UI_AnimateTooltip, Qt::UI_FadeTooltip}) {
+      QApplication::setEffectEnabled(effect, true);
+    }
+  }
   mitcad::WindowManager manager(nativeUiRequested);
   mitcad::DocumentFrame::install(manager);
   mitcad::MainWindow* ownedWindow = nullptr;

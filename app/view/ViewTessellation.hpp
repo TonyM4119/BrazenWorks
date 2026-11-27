@@ -85,14 +85,38 @@ inline std::atomic<int>& viewSmallCirclesChoice() {
 }
 inline SmallCircles viewSmallCircles() { return static_cast<SmallCircles>(viewSmallCirclesChoice().load()); }
 
+// Fork: Smoothness (Preferences › Display, view/ViewQualityPreference.hpp).
+// Standard is the upstream's tuning above. Smooth, the default, cuts curved
+// edges and faces about twice as finely: the edges' angle kViewSmoothAngle
+// (3 degrees a step instead of 6), the faces' insides kViewSmoothInteriorAngle,
+// and small circles in at least kViewSmoothSmallCircleSegments pieces a turn.
+// Rounder holes, cylinders and fillets for about twice the triangles on
+// curved faces; planes do not change. The process starts with Standard, so
+// that the tests' meshes stay the upstream's; the application applies the
+// saved choice at the start (applySavedSmoothness), Smooth by default.
+enum class Smoothness { Standard, Smooth };
+constexpr double kViewSmoothAngle = 6.0 * 3.14159265358979323846 / 180.0;
+constexpr double kViewSmoothInteriorAngle = 8.0 * 3.14159265358979323846 / 180.0;
+constexpr int kViewSmoothSmallCircleSegments = 24;
+
+inline std::atomic<int>& viewSmoothnessChoice() {
+  static std::atomic<int> choice{static_cast<int>(Smoothness::Standard)};
+  return choice;
+}
+inline Smoothness viewSmoothness() { return static_cast<Smoothness>(viewSmoothnessChoice().load()); }
+
 // The view's options with the planes' choice (fast, checked).
 inline io::MeshOptions viewMeshOptionsWith(bool fastPlanes, bool checkPlanes) {
-  io::MeshOptions options{kViewDeviation, kViewAngle, false, kViewFaceTriangles, fastPlanes, checkPlanes};
+  const bool smooth = viewSmoothness() == Smoothness::Smooth; // Fork
+  io::MeshOptions options{kViewDeviation, smooth ? kViewSmoothAngle : kViewAngle, false, kViewFaceTriangles,
+                          fastPlanes, checkPlanes};
   options.size_deviation = kViewSizeDeviation;
   options.size_deviation_max = kViewDeviationMax;
-  options.interior_angle = kViewInteriorAngle;
+  options.interior_angle = smooth ? kViewSmoothInteriorAngle : kViewInteriorAngle;
   options.hold_face_triangles = true;
-  options.small_circle_segments = viewSmallCircles() == SmallCircles::Adaptive ? kViewSmallCircleSegments : 0;
+  options.small_circle_segments = viewSmallCircles() == SmallCircles::Adaptive
+                                      ? (smooth ? kViewSmoothSmallCircleSegments : kViewSmallCircleSegments)
+                                      : 0;
   return options;
 }
 
@@ -176,6 +200,15 @@ inline void useViewMeshing() { io::use_bounded_presentation_meshes(viewMeshOptio
 // presentations' meshing with it); returns whether it changed. The meshes
 // made before stay as they are: the application meshes the shown bodies
 // again (framework/DisplayMeshes, remeshForDisplay).
+// Fork: the same for Smoothness.
+inline bool setViewSmoothness(Smoothness choice) {
+  if (viewSmoothnessChoice().exchange(static_cast<int>(choice)) == static_cast<int>(choice)) {
+    return false;
+  }
+  useViewMeshing();
+  return true;
+}
+
 inline bool setViewSmallCircles(SmallCircles choice) {
   if (viewSmallCirclesChoice().exchange(static_cast<int>(choice)) == static_cast<int>(choice)) {
     return false;

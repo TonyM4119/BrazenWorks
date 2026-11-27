@@ -175,6 +175,8 @@
 #include "view/OriginPreference.hpp"
 #include "view/SelectionLook.hpp"
 #include "view/SmallCirclesPreference.hpp"
+#include "view/ViewQualityPreference.hpp" // Fork
+#include "framework/Motion.hpp"           // Fork
 #include "view/SpaceMouseController.hpp"
 #include "view/ViewController.hpp"
 #include "render/RenderWorkspace.hpp"
@@ -604,6 +606,9 @@ MainWindow::MainWindow(bool demo, QWidget* parent, bool nativeUi)
   // Preferences > Display > Small circles changed (mitcad#879): the shown
   // bodies' display meshes made again with the new choice.
   connect(&SmallCirclesNotifier::instance(), &SmallCirclesNotifier::changed, this, [this] { remeshDisplay(); });
+  // Fork: Preferences > Display > Smoothness changed: the same.
+  connect(&ViewQualityNotifier::instance(), &ViewQualityNotifier::smoothnessChanged, this,
+          [this] { remeshDisplay(); });
   // Preferences > Display > Origin planes changed (mitcad#1748): the origin
   // drawn anew in every window at once.
   connect(&OriginDisplayNotifier::instance(), &OriginDisplayNotifier::changed, this,
@@ -2942,7 +2947,15 @@ void MainWindow::createFloatingPanels() {
   // its largest (mitcad#426).
   m_controller->browser()->setAvailableHeight(
       [this, browser = m_controller->browser()] { return m_floating->maximumContentHeight(browser); });
-  connect(m_commandPages, &QStackedWidget::currentChanged, this, [this] { updateCommandCard(); });
+  connect(m_commandPages, &QStackedWidget::currentChanged, this, [this] {
+    // Fork: a command's panel fades in, also into a card that showed the
+    // idle hints (framework/Motion.hpp).
+    if (m_commandCard != nullptr && motion::enabled() && m_commandCard->isVisible() &&
+        m_commandPages->currentWidget() != m_idlePage) {
+      m_commandCard->setOpacityLevel(0.0);
+    }
+    updateCommandCard();
+  });
   setCentralWidget(m_floating);
   m_floating->watchContent(m_idlePage);
   if (auto* scroll = qobject_cast<QScrollArea*>(m_idlePage)) {
@@ -3157,9 +3170,20 @@ void MainWindow::updateCommandCard() {
     return;
   }
   const bool idle = m_commandPages->currentWidget() == m_idlePage;
-  m_commandCard->setVisible(!(idle && m_idleInfo->text().isEmpty() && !m_autoselect->available() &&
-                              m_selectionCreate->entries().isEmpty() &&
-                              (m_sketchKindRow == nullptr || m_sketchKindRow->isHidden())));
+  const bool shown = !(idle && m_idleInfo->text().isEmpty() && !m_autoselect->available() &&
+                       m_selectionCreate->entries().isEmpty() &&
+                       (m_sketchKindRow == nullptr || m_sketchKindRow->isHidden()));
+  // Fork: the card fades in and out (framework/Motion.hpp; at once under the
+  // UI tests); the layout follows when it is gone.
+  if (shown) {
+    motion::fadeIn(m_commandCard);
+  } else {
+    motion::fadeOut(m_commandCard, [floating = QPointer<FloatingLayout>(m_floating)] {
+      if (floating) {
+        floating->requestLayout();
+      }
+    });
+  }
   m_floating->requestLayout();
 }
 
@@ -6875,7 +6899,7 @@ void MainWindow::fitView() {
       for (const gp_Pnt& corner : corners) {
         box.Add(corner);
       }
-      m_viewer->frameBox(box);
+      m_viewer->frameBox(box, true); // Fork: glides
       qDebug().noquote() << QStringLiteral("Fit: the selection");
       return;
     }
@@ -6884,12 +6908,12 @@ void MainWindow::fitView() {
   if (!m_isolation.isEmpty()) {
     const Bnd_Box box = m_viewer->bodiesBox();
     if (!box.IsVoid()) {
-      m_viewer->frameBox(box);
+      m_viewer->frameBox(box, true); // Fork: glides
       qDebug().noquote() << QStringLiteral("Fit: the isolated bodies");
       return;
     }
   }
-  m_viewer->fitAll();
+  m_viewer->glideToFit(); // Fork: glides, as Home does
   qDebug().noquote() << QStringLiteral("Fit: everything shown");
 }
 

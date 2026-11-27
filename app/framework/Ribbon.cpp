@@ -19,7 +19,9 @@
 #include <QCursor>
 #include <QDialog>
 #include <QDialogButtonBox>
+#include <QEasingCurve>
 #include <QEnterEvent>
+#include <QVariantAnimation>
 #include <QEvent>
 #include <QFontMetrics>
 #include <QFormLayout>
@@ -54,6 +56,7 @@
 #include <QtLogging>
 
 #include "BoostButton.hpp"
+#include "Motion.hpp" // Fork
 #include "CommandLayout.hpp"
 #include "CommandRegistry.hpp"
 #include "Icons.hpp"
@@ -2102,6 +2105,37 @@ RibbonButton::RibbonButton(QAction* action, int iconSize, QWidget* parent)
   }
 }
 
+void RibbonButton::enterEvent(QEnterEvent* event) {
+  QToolButton::enterEvent(event);
+  fadeHover(1.0);
+}
+
+void RibbonButton::leaveEvent(QEvent* event) {
+  QToolButton::leaveEvent(event);
+  fadeHover(0.0);
+}
+
+void RibbonButton::fadeHover(qreal level) {
+  if (!motion::enabled()) {
+    m_hoverLevel = level;
+    update();
+    return;
+  }
+  if (m_hover == nullptr) {
+    m_hover = new QVariantAnimation(this);
+    m_hover->setEasingCurve(QEasingCurve::OutQuad);
+    connect(m_hover, &QVariantAnimation::valueChanged, this, [this](const QVariant& value) {
+      m_hoverLevel = value.toReal();
+      update();
+    });
+  }
+  m_hover->stop();
+  m_hover->setDuration(motion::kFast);
+  m_hover->setStartValue(m_hoverLevel);
+  m_hover->setEndValue(level);
+  m_hover->start();
+}
+
 int RibbonButton::arrowWidth() const {
   return popupMode() == QToolButton::MenuButtonPopup || m_menuArrow ? kSplitArrowWidth : 0;
 }
@@ -2178,8 +2212,14 @@ void RibbonButton::paintEvent(QPaintEvent*) {
   } else if (isDown() && active) {
     painter.setBrush(textTint(pal, 36));
     painter.drawRoundedRect(box, kControlRadius, kControlRadius);
-  } else if (underMouse() && active) {
-    painter.setBrush(textTint(pal, 20));
+  } else if (const qreal hover =
+                 underMouse() || (m_hover != nullptr && m_hover->state() == QAbstractAnimation::Running)
+                     ? m_hoverLevel
+                     : 0.0;
+             hover > 0.0 && active) {
+    // Fork: the hover highlight at its faded level (fadeHover); none once the
+    // pointer left without a leave event (the button hidden under it).
+    painter.setBrush(textTint(pal, qRound(20 * hover)));
     painter.drawRoundedRect(box, kControlRadius, kControlRadius);
   }
   if (isChecked() && active) {

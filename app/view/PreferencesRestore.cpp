@@ -56,6 +56,7 @@
 #include "OriginPreference.hpp"
 #include "SelectionLook.hpp"
 #include "SmallCirclesPreference.hpp"
+#include "ViewQualityPreference.hpp" // Fork
 #include "VersionWatermark.hpp"
 
 namespace mitcad {
@@ -214,6 +215,8 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
     setBrowserRowSpacing(BrowserRowSpacing::Standard);
     drawings::saveCornerDots(drawings::CornerDots());
     saveSmallCircles(SmallCircles::Adaptive);
+    saveSmoothness(defaultSmoothness()); // Fork
+    saveAntialiasing(4);                // Fork
     saveOriginDisplay(OriginDisplay());
   }
 
