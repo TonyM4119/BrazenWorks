@@ -115,32 +115,32 @@ void roleValueTests() {
     return rgbOf(colour) == rgb && closeOpacity(colour.alphaF(), opacity);
   };
   // Fork: PureCAD's colour family (Icons.cpp colourPaint).
-  CHECK(is(iconRoleColour(IconRole::Outline, true, true), 0xcbd7e8, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Outline, false, true), 0x3a4a5e, 1.0));
-  CHECK(is(iconRoleColour(IconRole::TopFace, true, false), 0xa9c7ee, 1.0));
-  CHECK(is(iconRoleColour(IconRole::TopFace, false, false), 0xdce9f8, 1.0));
-  CHECK(is(iconRoleColour(IconRole::SideFace, true, false), 0x7099cf, 1.0));
-  CHECK(is(iconRoleColour(IconRole::SideFace, false, false), 0xa3c2e8, 1.0));
-  CHECK(is(iconRoleColour(IconRole::FarSide, true, false), 0x4b72a8, 1.0));
-  CHECK(is(iconRoleColour(IconRole::FarSide, false, false), 0x6f97cc, 1.0));
-  CHECK(is(iconRoleColour(IconRole::PaleSurface, true, false), 0xbcd0ee, 0.20));
-  CHECK(is(iconRoleColour(IconRole::PaleSurface, false, false), 0xe4edf8, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Hollow, true, false), 0xf0f6ff, 0.14));
+  CHECK(is(iconRoleColour(IconRole::Outline, true, true), 0xdce2e8, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Outline, false, true), 0x2b3036, 1.0));
+  CHECK(is(iconRoleColour(IconRole::TopFace, true, false), 0xb9c4cf, 1.0));
+  CHECK(is(iconRoleColour(IconRole::TopFace, false, false), 0xe6ecf2, 1.0));
+  CHECK(is(iconRoleColour(IconRole::SideFace, true, false), 0x8a98a7, 1.0));
+  CHECK(is(iconRoleColour(IconRole::SideFace, false, false), 0xbfcbd8, 1.0));
+  CHECK(is(iconRoleColour(IconRole::FarSide, true, false), 0x627180, 1.0));
+  CHECK(is(iconRoleColour(IconRole::FarSide, false, false), 0x93a4b6, 1.0));
+  CHECK(is(iconRoleColour(IconRole::PaleSurface, true, false), 0xc8d2dc, 0.20));
+  CHECK(is(iconRoleColour(IconRole::PaleSurface, false, false), 0xeef2f6, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Hollow, true, false), 0xf0f4f8, 0.14));
   CHECK(is(iconRoleColour(IconRole::Hollow, false, false), 0xffffff, 1.0));
-  CHECK(is(iconRoleColour(IconRole::ConstructionNear, true, true), 0xe2b45e, 1.0));
-  CHECK(is(iconRoleColour(IconRole::ConstructionNear, true, false), 0xe2b45e, 0.42));
-  CHECK(is(iconRoleColour(IconRole::ConstructionFar, true, false), 0xe2b45e, 0.22));
-  CHECK(is(iconRoleColour(IconRole::ConstructionNear, false, true), 0xc98a1c, 1.0));
-  CHECK(is(iconRoleColour(IconRole::ConstructionNear, false, false), 0xf5c46e, 0.78));
-  CHECK(is(iconRoleColour(IconRole::ConstructionFar, false, false), 0xf7d9a6, 0.62));
-  CHECK(is(iconRoleColour(IconRole::Action, true, true), 0xff9a3c, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Action, false, true), 0xef7d16, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Sketch, true, true), 0x6ea8ff, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Sketch, false, true), 0x1f6bd6, 1.0));
+  CHECK(is(iconRoleColour(IconRole::ConstructionNear, true, true), 0xe8b45e, 1.0));
+  CHECK(is(iconRoleColour(IconRole::ConstructionNear, true, false), 0xe8b45e, 0.42));
+  CHECK(is(iconRoleColour(IconRole::ConstructionFar, true, false), 0xe8b45e, 0.22));
+  CHECK(is(iconRoleColour(IconRole::ConstructionNear, false, true), 0xd98a1c, 1.0));
+  CHECK(is(iconRoleColour(IconRole::ConstructionNear, false, false), 0xf6c06a, 0.75));
+  CHECK(is(iconRoleColour(IconRole::ConstructionFar, false, false), 0xf8d9a8, 0.60));
+  CHECK(is(iconRoleColour(IconRole::Action, true, true), 0x5ea3f5, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Action, false, true), 0x1769d1, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Sketch, true, true), 0x6aaaf5, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Sketch, false, true), 0x1769d1, 1.0));
   CHECK(is(iconRoleColour(IconRole::Pencil, true, false), 0xf2c14e, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Pencil, true, true), 0xcbd7e8, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Pencil, true, true), 0xdce2e8, 1.0));
   CHECK(is(iconRoleColour(IconRole::Pencil, false, false), 0xf6c445, 1.0));
-  CHECK(is(iconRoleColour(IconRole::Pencil, false, true), 0x3a4a5e, 1.0));
+  CHECK(is(iconRoleColour(IconRole::Pencil, false, true), 0x2b3036, 1.0));
   CHECK(iconRole(QColor(0x2b, 0x3a, 0x4a)) == IconRole::Outline);
   CHECK(iconRole(QColor(0x3f, 0x4d, 0x66)) == IconRole::Outline);
   CHECK(iconRole(QColor(0xc9, 0xdd, 0xf6)) == IconRole::TopFace);
@@ -158,14 +158,14 @@ void roleValueTests() {
   const QByteArray svg = "<svg stroke=\"#2b3a4a\"><path fill=\"#c9ddf6\"/><stop stop-color=\"#7aa6dc\"/>"
                          "<path fill=\"#f3c48a\" stroke=\"#d9801a\"/></svg>";
   const QByteArray dark = themedIconSvg(svg, true);
-  CHECK(dark.contains("stroke=\"#cbd7e8\">"));
-  CHECK(dark.contains("fill=\"#a9c7ee\""));
-  CHECK(dark.contains("stop-color=\"#4b72a8\""));
-  CHECK(dark.contains("fill=\"#e2b45e\" fill-opacity=\"0.42\" stroke=\"#e2b45e\"/>"));
+  CHECK(dark.contains("stroke=\"#dce2e8\">"));
+  CHECK(dark.contains("fill=\"#b9c4cf\""));
+  CHECK(dark.contains("stop-color=\"#627180\""));
+  CHECK(dark.contains("fill=\"#e8b45e\" fill-opacity=\"0.42\" stroke=\"#e8b45e\"/>"));
   const QByteArray light = themedIconSvg(svg, false);
-  CHECK(light.contains("stroke=\"#3a4a5e\">"));
-  CHECK(light.contains("fill=\"#dce9f8\"/>"));
-  CHECK(light.contains("fill=\"#f5c46e\" fill-opacity=\"0.78\" stroke=\"#c98a1c\"/>"));
+  CHECK(light.contains("stroke=\"#2b3036\">"));
+  CHECK(light.contains("fill=\"#e6ecf2\"/>"));
+  CHECK(light.contains("fill=\"#f6c06a\" fill-opacity=\"0.75\" stroke=\"#d98a1c\"/>"));
   // An unknown colour is left as drawn.
   CHECK(themedIconSvg("<path fill=\"#123456\"/>", true) == "<path fill=\"#123456\"/>");
 }
@@ -350,8 +350,8 @@ QString element(const QByteArray& svg, const QString& pattern) {
 // the root's 1.3 keeps 1.3, one with its own width keeps it, and so do the
 // sketch's strokes. Every icon stays a valid drawing with the same colours.
 void outlineWeightTests() {
-  // Dimension: an action rectangle with no width of its own, a sketch line
-  // with its own 1.6, outline lines that take the root's.
+  // Dimension (fork's drawing): its two dark bars with their own 1.5,
+  // halved; the sketch's blue measure line keeps its own 1.3.
   const QByteArray dimension = iconSource(QStringLiteral("dimension"));
   CHECK(!dimension.isEmpty());
   CHECK(themedIconSvg(dimension, false, false, 1.0) == themedIconSvg(dimension, false));
@@ -359,14 +359,11 @@ void outlineWeightTests() {
     const QByteArray thin = themedIconSvg(dimension, dark, false, kThinOutlineWeight);
     const QString root = element(thin, QStringLiteral("<svg [^>]*>"));
     CHECK(root.contains(QStringLiteral("stroke-width=\"0.65\"")));
-    const QString action = element(thin, QStringLiteral("<rect [^>]*>"));
-    CHECK(action.contains(QStringLiteral("stroke-width=\"1.3\"")));
-    CHECK(action.contains(QStringLiteral("stroke=\"%1\"")
-                              .arg(iconRoleColour(IconRole::Action, dark, true).name(QColor::HexRgb))));
-    const QString sketch = element(thin, QStringLiteral("<path d=\"M3 20 H21\"[^>]*>"));
-    CHECK(sketch.contains(QStringLiteral("stroke-width=\"1.6\"")));
-    // The outline's own lines inherit the root's 0.65.
-    CHECK(!element(thin, QStringLiteral("<path d=\"M3 10 H21\"[^>]*>")).contains(QStringLiteral("stroke-width")));
+    const QString sketch = element(thin, QStringLiteral("<path d=\"M3.8 12 H20.2\"[^>]*>"));
+    CHECK(sketch.contains(QStringLiteral("stroke-width=\"1.3\"")));
+    CHECK(sketch.contains(QStringLiteral("stroke=\"%1\"")
+                              .arg(iconRoleColour(IconRole::Sketch, dark, true).name(QColor::HexRgb))));
+    CHECK(element(thin, QStringLiteral("<path d=\"M3 5 V19 M21 5 V19\"[^>]*>")).contains(QStringLiteral("stroke-width=\"0.75\"")));
   }
   // Extrude: the action arrows' own 1.8 stays.
   const QByteArray extrude = themedIconSvg(iconSource(QStringLiteral("extrude")), false, false, kThinOutlineWeight);
