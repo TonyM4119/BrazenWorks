@@ -116,8 +116,11 @@ void shippedDefaultTests() {
   // The tabs of mitcad#1975: Surface and Sheet Metal after Solid, Manage
   // after Make's; the Make tab split into 3D Print, Laser and CNC (the
   // owner, 18.11.2026); the Render workspace's tab last (mitcad#1990).
+  // Fork: Assembly and Mesh after Surface, Plastic after Sheet Metal, as
+  // Fusion's (and SolidCraft's Assemble).
   CHECK(tabs == (QStringList{QStringLiteral("START"), QStringLiteral("SOLID"), QStringLiteral("SURFACE"),
-                             QStringLiteral("SHEET METAL"), QStringLiteral("BUILD"), QStringLiteral("MAKE_PRINT"),
+                             QStringLiteral("ASSEMBLY"), QStringLiteral("MESH"), QStringLiteral("SHEET METAL"),
+                             QStringLiteral("PLASTIC"), QStringLiteral("BUILD"), QStringLiteral("MAKE_PRINT"),
                              QStringLiteral("MAKE_LASER"), QStringLiteral("MAKE_CNC"), QStringLiteral("MANAGE"),
                              QStringLiteral("SKETCH"), QStringLiteral("DRAWING"), QStringLiteral("CUT SHEET"),
                              QStringLiteral("RENDER")}));

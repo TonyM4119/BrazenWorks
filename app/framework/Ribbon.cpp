@@ -113,6 +113,16 @@ const QString kRender = QStringLiteral("RENDER");
 constexpr int kRenderPage = 10;
 constexpr int kMakeLaserPage = 11;
 constexpr int kMakeCncPage = 12;
+// Fork: Mesh and Plastic tabs of the Design workspace, as Fusion's: MESH
+// after SURFACE, PLASTIC after SHEET METAL.
+const QString kMesh = QStringLiteral("MESH");
+const QString kPlastic = QStringLiteral("PLASTIC");
+constexpr int kMeshPage = 13;
+constexpr int kPlasticPage = 14;
+// Fork: an Assembly tab after SURFACE (SolidCraft's Assemble), its key
+// apart from the Assemble groups' name.
+const QString kAssembly = QStringLiteral("ASSEMBLY");
+constexpr int kAssemblyPage = 15;
 // The tabs of a mode (a sketch, a drawing, the Render workspace): their
 // names in the accent colour.
 bool isModeTab(int page) {
@@ -157,6 +167,12 @@ const QString& tabName(int page) {
     return kManage;
   case kRenderPage:
     return kRender;
+  case kMeshPage:
+    return kMesh;
+  case kPlasticPage:
+    return kPlastic;
+  case kAssemblyPage:
+    return kAssembly;
   default:
     return kSolid;
   }
@@ -186,6 +202,15 @@ int modelPage(const QString& tab) {
   }
   if (tab == kManage) {
     return kManagePage;
+  }
+  if (tab == kMesh) {
+    return kMeshPage;
+  }
+  if (tab == kPlastic) {
+    return kPlasticPage;
+  }
+  if (tab == kAssembly) {
+    return kAssemblyPage;
   }
   return kSolidPage;
 }
@@ -2109,7 +2134,14 @@ namespace {
     // Sketch blocks (mitcad#2110).
     QT_TRANSLATE_NOOP("RibbonName", "Blocks"),
     // Laser's Nest and the cut sheet's Cutting (mitcad#2553).
-    QT_TRANSLATE_NOOP("RibbonName", "Nest"), QT_TRANSLATE_NOOP("RibbonName", "Cutting")};
+    QT_TRANSLATE_NOOP("RibbonName", "Nest"), QT_TRANSLATE_NOOP("RibbonName", "Cutting"),
+    // Fork: the Plastic tab and the Mesh tab's Convert group.
+    QT_TRANSLATE_NOOP("RibbonName", "Plastic"), QT_TRANSLATE_NOOP("RibbonName", "Convert"),
+    // Fork: the Assembly tab and its groups.
+    QT_TRANSLATE_NOOP("RibbonName", "Assembly"), QT_TRANSLATE_NOOP("RibbonName", "Components"),
+    QT_TRANSLATE_NOOP("RibbonName", "Joints"), QT_TRANSLATE_NOOP("RibbonName", "Position"),
+    QT_TRANSLATE_NOOP("RibbonName", "Motion"), QT_TRANSLATE_NOOP("RibbonName", "Contact"),
+    QT_TRANSLATE_NOOP("RibbonName", "Explode")};
 
 // Subgroups shown by another name than their key, which stays in the
 // layout and the user's layer (a "/" would split a place's path): the
@@ -2603,6 +2635,11 @@ void Ribbon::createPages() {
   // into one tab per method), after MAKE_PRINT in the bar.
   m_pages->addWidget(createPage(kMakeLaser));
   m_pages->addWidget(createPage(kMakeCnc));
+  // Fork: MESH and PLASTIC (pages 13 and 14), placed in the bar by the
+  // layout's order (modelTabOrder).
+  m_pages->addWidget(createPage(kMesh));
+  m_pages->addWidget(createPage(kPlastic));
+  m_pages->addWidget(createPage(kAssembly)); // page 15
 }
 
 void Ribbon::rebuild() {
@@ -2670,8 +2707,8 @@ QStringList Ribbon::modelTabOrder() const {
   // (mitcad#375), MAKE_PRINT, MAKE_LASER and MAKE_CNC (mitcad#1049, the
   // owner 18.11.2026) and MANAGE (mitcad#1975) in the layout's order;
   // SKETCH comes after them while sketching, a drawing's tab alone.
-  static const QStringList model = {kStart, kSolid, kSurface, kSheetMetal, kBuild,
-                                    kMakePrint, kMakeLaser, kMakeCnc, kManage};
+  static const QStringList model = {kStart,      kSolid, kSurface,   kAssembly,  kMesh,    kSheetMetal,
+                                    kPlastic,    kBuild, kMakePrint, kMakeLaser, kMakeCnc, kManage};
   // Those the user hid (mitcad#1975) are left out; Start never is.
   QStringList hidden = CommandLayoutStore::instance().userLayer().hiddenTabs;
   hidden.removeAll(kStart);
@@ -2716,6 +2753,9 @@ void Ribbon::addModelTabs() {
              : page == kSurfacePage    ? tr("Surface: surfaces made, trimmed, stitched and thickened")
              : page == kSheetMetalPage ? tr("Sheet Metal: faces, flanges and bends, their rules and flat patterns")
              : page == kManagePage     ? tr("Manage: the design's parameters, configurations, materials and rules")
+             : page == kMeshPage       ? tr("Mesh: meshes inserted, repaired, reduced, cut and turned into bodies")
+             : page == kPlasticPage    ? tr("Plastic: molded parts with bosses, lips, snap fits, ribs and draft")
+             : page == kAssemblyPage   ? tr("Assembly: components, joints, positions, motion and contact")
                                        : tr("Solid modeling"));
     inserted.append(key);
   };
@@ -2732,7 +2772,8 @@ void Ribbon::addModelTabs() {
 }
 
 QStringList Ribbon::hideableTabs() {
-  return {kSolid, kSurface, kSheetMetal, kBuild, kMakePrint, kMakeLaser, kMakeCnc, kManage};
+  return {kSolid,  kSurface, kAssembly,  kMesh,      kSheetMetal, kPlastic,
+          kBuild,  kMakePrint, kMakeLaser, kMakeCnc, kManage};
 }
 
 void Ribbon::setTabContent(const QString& tab, QWidget* leading, QWidget* trailing) {
@@ -4970,7 +5011,8 @@ QString Ribbon::workspaceOfTab(const QString& tab) {
   if (tab == kMakePrint || tab == kMakeLaser || tab == kMakeCnc) {
     return kMakeWorkspace;
   }
-  if (tab == kSolid || tab == kSurface || tab == kSheetMetal || tab == kBuild || tab == kManage) {
+  if (tab == kSolid || tab == kSurface || tab == kSheetMetal || tab == kBuild || tab == kManage || tab == kMesh ||
+      tab == kPlastic || tab == kAssembly) {
     return kDesignWorkspace;
   }
   return QString();
@@ -6034,8 +6076,8 @@ QString Ribbon::workspaceOfName(const QString& name) {
 }
 
 QStringList Ribbon::guideTabs() {
-  return {kStart,    kSolid,   kSurface, kSheetMetal, kBuild,    kMakePrint, kMakeLaser,
-          kMakeCnc,  kManage,  kSketch,  kDrawing,    kCutSheet, kRender};
+  return {kStart,     kSolid,   kSurface, kAssembly, kMesh,    kSheetMetal, kPlastic, kBuild,
+          kMakePrint, kMakeLaser, kMakeCnc, kManage, kSketch, kDrawing,    kCutSheet, kRender};
 }
 
 QString Ribbon::tabOfName(const QString& name) {

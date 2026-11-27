@@ -1524,7 +1524,8 @@ user's state back. The panel is never moved to another edge of the window
 or floated (declined on GitHub mitcad/Mitcad#571).
 
 The workspaces: **Design** (the
-Solid, Surface, Sheet Metal, Build and Manage tabs), **Make** (a tab per
+Solid, Surface, Assembly, Mesh, Sheet Metal, Plastic, Build and Manage
+tabs; Fork: Assembly, Mesh and Plastic as Fusion's and SolidCraft's), **Make** (a tab per
 manufacturing method: 3D Print, Laser and CNC; its entry in the list
 reads "3D Print · Laser · CNC"), **Render** (its stages) and
 **Drawing** (an open drawing's tab). A model workspace opens on the tab

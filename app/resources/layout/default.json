@@ -303,6 +303,139 @@
       ]
     },
     {
+      "tab": "ASSEMBLY",
+      "groups": [
+        {
+          "group": "COMPONENTS",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "insert.component", "button": true},
+            "insert.library_component"
+          ]
+        },
+        {
+          "group": "JOINTS",
+          "entries": [
+            {"command": "assemble.joint", "button": true},
+            {"command": "assemble.as_built_joint", "button": true},
+            {"command": "assemble.joint_origin", "button": true},
+            {"command": "assemble.rigid_group", "button": true},
+            "-",
+            {"command": "assemble.constraint_one", "button": true},
+            "assemble.constraint"
+          ]
+        },
+        {
+          "group": "POSITION",
+          "entries": [
+            {"command": "solid.move", "button": true},
+            {"command": "solid.align", "button": true},
+            {"command": "assemble.flex_hang", "button": true}
+          ]
+        },
+        {
+          "group": "MOTION",
+          "entries": [
+            {"command": "assemble.drive_joint", "button": true},
+            {"command": "assemble.motion_link", "button": true},
+            {"command": "assemble.motion_study", "button": true},
+            {"command": "assemble.animate_joint", "button": true}
+          ]
+        },
+        {
+          "group": "CONTACT",
+          "entries": [
+            {"command": "assemble.contact_set", "button": true},
+            {"command": "inspect.interference", "button": true}
+          ]
+        },
+        {
+          "group": "EXPLODE",
+          "entries": [{"command": "assemble.explode", "button": true}]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]}
+      ]
+    },
+    {
+      "tab": "MESH",
+      "groups": [
+        {
+          "group": "CREATE",
+          "entries": [
+            {"command": "insert.mesh", "button": true},
+            {"command": "solid.mesh_section", "button": true},
+            "file.import"
+          ]
+        },
+        {
+          "group": "PREPARE",
+          "entries": [
+            {"command": "solid.mesh_repair", "button": true},
+            {"command": "solid.mesh_segment", "button": true},
+            {"command": "solid.mesh_align", "button": true}
+          ]
+        },
+        {
+          "group": "MODIFY",
+          "entries": [
+            {"command": "solid.mesh_remove", "button": true},
+            {"command": "solid.mesh_decimate", "button": true},
+            {"command": "solid.mesh_smooth", "button": true},
+            {"command": "solid.mesh_plane_cut", "button": true},
+            {"command": "solid.mesh_offset", "button": true},
+            {"command": "solid.mesh_combine", "button": true},
+            {"command": "solid.move", "button": true}
+          ]
+        },
+        {
+          "group": "CONVERT",
+          "entries": [
+            {"command": "solid.convert_mesh", "button": true},
+            {"command": "solid.mesh_fit_surface", "button": true}
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
+          ]
+        },
+        {
+          "group": "CONSTRUCT",
+          "entries": [
+            {"command": "construct.offset_plane", "button": true},
+            {"command": "construct.plane_angle", "button": true},
+            {"command": "construct.midplane", "button": true},
+            "construct.axis_two_points",
+            "construct.point_vertex"
+          ]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]},
+        {
+          "group": "EXPORT",
+          "entries": [{"command": "file.export", "button": true}]
+        }
+      ]
+    },
+    {
       "tab": "SHEET METAL",
       "groups": [
         {
@@ -419,6 +552,70 @@
             {"extra": "solid.selection"}
           ]
         }
+      ]
+    },
+    {
+      "tab": "PLASTIC",
+      "groups": [
+        {
+          "group": "CREATE",
+          "entries": [
+            {"command": "sketch.create", "button": true},
+            {"command": "solid.extrude", "button": true},
+            {"command": "solid.revolve", "button": true},
+            {"command": "solid.plastic", "button": true},
+            {"command": "solid.rib", "button": true},
+            {"command": "solid.web", "button": true},
+            {"command": "solid.emboss", "button": true},
+            "-",
+            "solid.hole",
+            "solid.mirror"
+          ]
+        },
+        {
+          "group": "MODIFY",
+          "entries": [
+            {"command": "solid.press_pull", "button": true},
+            {"command": "solid.fillet", "button": true},
+            {"command": "solid.shell", "button": true},
+            {"command": "solid.draft", "button": true},
+            {"command": "solid.combine", "button": true},
+            {"command": "solid.move", "button": true},
+            "solid.chamfer",
+            "solid.split_body"
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
+          ]
+        },
+        {
+          "group": "CONSTRUCT",
+          "entries": [
+            {"command": "construct.offset_plane", "button": true},
+            {"command": "construct.plane_angle", "button": true},
+            {"command": "construct.midplane", "button": true},
+            "construct.axis_two_points",
+            "construct.point_vertex"
+          ]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]}
       ]
     },
     {
