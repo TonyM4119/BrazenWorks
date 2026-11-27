@@ -1,0 +1,89 @@
+# SPDX-License-Identifier: MIT
+# Fork: PureCAD's quick checks on every pull request and push to main, on
+# GitHub's Linux runners (free for a public repository):
+#
+# - Rust: the model, solver, sketcher and importers with their test suites
+#   (the whole Rust workspace but the two crates that bridge to C++ and
+#   OCCT, which need the full build). MitCad's model tests use a mock
+#   kernel, so no OCCT is needed here.
+# - Branding: branding.json reads and generates its files (cmake/
+#   Branding.cmake), and the icon files it names are there.
+# - The command layout and branding JSON files parse.
+#
+# The full application build is the Windows workflow's.
+name: Checks
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+concurrency:
+  group: checks-${{ github.ref }}
+  cancel-in-progress: true
+
+permissions:
+  contents: read
+
+jobs:
+  rust:
+    name: Rust tests
+    runs-on: ubuntu-24.04
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v4
+      - name: Rust toolchain (rust-toolchain.toml)
+        run: |
+          rustup show active-toolchain || rustup toolchain install
+          rustc --version
+          cargo --version
+      - name: Cache cargo and the build
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: core -> target
+      - name: Build the tests
+        working-directory: core
+        run: cargo test --workspace --exclude mitcad-ffi --exclude mitcad-ffi-bridges --no-run --locked
+      - name: Run the tests
+        working-directory: core
+        run: cargo test --workspace --exclude mitcad-ffi --exclude mitcad-ffi-bridges --locked
+
+  branding:
+    name: Branding and layout files
+    runs-on: ubuntu-24.04
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - name: JSON files parse
+        run: |
+          python3 -c "import json; json.load(open('branding.json'))"
+          python3 -c "import json; json.load(open('app/resources/layout/default.json'))"
+      - name: branding.json generates its files
+        run: |
+          mkdir -p build-branding
+          cat > build-branding/run.cmake <<'EOF'
+          set(CMAKE_SOURCE_DIR "${CMAKE_CURRENT_LIST_DIR}/..")
+          get_filename_component(CMAKE_SOURCE_DIR "${CMAKE_SOURCE_DIR}" ABSOLUTE)
+          set(PROJECT_SOURCE_DIR "${CMAKE_SOURCE_DIR}")
+          set(CMAKE_BINARY_DIR "${CMAKE_CURRENT_LIST_DIR}/out")
+          set(WIN32 1)
+          set(PROJECT_VERSION 0.0.0)
+          set(PROJECT_VERSION_MAJOR 0)
+          set(PROJECT_VERSION_MINOR 0)
+          set(PROJECT_VERSION_PATCH 0)
+          macro(include_directories)
+          endmacro()
+          macro(set_property)
+          endmacro()
+          include("${CMAKE_SOURCE_DIR}/cmake/Branding.cmake")
+          configure_file("${CMAKE_SOURCE_DIR}/cmake/brand.nsh.in" "${BRAND_GENERATED_DIR}/brand.nsh" @ONLY)
+          EOF
+          cmake -P build-branding/run.cmake
+          for f in brand.hpp brand.rc brand.nsh; do test -s "build-branding/out/generated/brand/$f"; done
+          cat build-branding/out/generated/brand/brand.hpp
+      - name: The icon files are there
+        run: |
+          dir=$(python3 -c "import json; print(json.load(open('branding.json'))['iconDir'])")
+          test -s "$dir/icon.ico"
+          for s in 16 20 24 32 40 48 64 96 128 256; do test -s "$dir/png/icon-$s.png"; done
