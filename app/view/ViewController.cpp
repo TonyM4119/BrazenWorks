@@ -31,6 +31,7 @@
 #include <QFont>
 #include <QFontComboBox>
 #include <QGroupBox>
+#include <QMouseEvent>
 #include <QHBoxLayout>
 #include <QHeaderView>
 #include <QJsonArray>
@@ -430,20 +431,22 @@ public:
     if (!section.isEmpty()) {
       const int high = sectionHeight(option.font);
       QFont caps = option.font;
-      caps.setPointSizeF(caps.pointSizeF() * 0.82);
-      caps.setWeight(QFont::DemiBold);
-      caps.setLetterSpacing(QFont::AbsoluteSpacing, 0.6);
+      caps.setPointSizeF(caps.pointSizeF() * 0.84);
+      caps.setBold(true);
+      caps.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
       painter->setFont(caps);
-      painter->setPen(themeColor(ColorRole::TextSecondary, pal));
+      painter->setPen(pal.color(QPalette::WindowText));
       painter->drawText(QRect(row.left() + 10, row.top() + high / 3, row.width() - 10, high * 2 / 3),
                         Qt::AlignLeft | Qt::AlignVCenter, section.toUpper());
       row.setTop(row.top() + high);
     }
     const bool selected = option.state.testFlag(QStyle::State_Selected);
     const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
+    // SolidCraft's: a soft grey pill under the page shown, a fainter one
+    // under the pointer; the name stays in the text's colour.
     if (selected || hovered) {
-      QColor fill = selected ? accentColor(pal) : pal.color(QPalette::WindowText);
-      fill.setAlpha(selected ? (isDarkPalette(pal) ? 60 : 34) : 16);
+      QColor fill = pal.color(QPalette::WindowText);
+      fill.setAlpha(selected ? (isDarkPalette(pal) ? 40 : 22) : 11);
       painter->setPen(Qt::NoPen);
       painter->setBrush(fill);
       painter->drawRoundedRect(QRectF(row).adjusted(1.5, 1.5, -1.5, -1.5), 6, 6);
@@ -455,12 +458,9 @@ public:
                           icon.pixmap(QSize(side, side), painter->device()->devicePixelRatioF()));
     }
     QFont name = option.font;
-    if (selected) {
-      name.setWeight(QFont::DemiBold);
-    }
+    name.setBold(selected);
     painter->setFont(name);
-    painter->setPen(selected ? (isDarkPalette(pal) ? accentColor(pal).lighter(140) : accentColor(pal))
-                             : pal.color(QPalette::WindowText));
+    painter->setPen(pal.color(QPalette::WindowText));
     const QRect text(row.left() + 10 + side + 10, row.top(), row.width() - side - 24, row.height());
     painter->drawText(text, Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(name).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight,
@@ -470,6 +470,55 @@ public:
 
 private:
   static int sectionHeight(const QFont& font) { return QFontMetrics(font).height() + uiRoomSize(16); }
+};
+
+// Fork: a Preferences section's caption, ▾ when open and ▸ when folded.
+constexpr const char* kSectionNameProperty = "purecadSectionName";
+constexpr const char* kSectionFoldedProperty = "purecadSectionFolded";
+
+QString sectionTitle(const QString& name, bool folded) {
+  return (folded ? QStringLiteral("\u25B8  ") : QStringLiteral("\u25BE  ")) + name;
+}
+
+// Fork: a click on a section's caption folds it (its controls hidden) or
+// opens it again, as SolidCraft's sections.
+class PreferenceSectionFold : public QObject {
+public:
+  explicit PreferenceSectionFold(QGroupBox* box) : QObject(box) {}
+
+  static void setFolded(QGroupBox* box, bool folded) {
+    box->setProperty(kSectionFoldedProperty, folded);
+    box->setTitle(sectionTitle(box->property(kSectionNameProperty).toString(), folded));
+    for (QWidget* child : box->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
+      if (folded) {
+        child->setProperty("purecadFoldHidden", !child->isHidden());
+        child->hide();
+      } else if (child->property("purecadFoldHidden").toBool()) {
+        child->show();
+      }
+    }
+  }
+
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    auto* box = static_cast<QGroupBox*>(watched);
+    if (event->type() == QEvent::MouseButtonRelease) {
+      auto* mouse = static_cast<QMouseEvent*>(event);
+      const int captionBottom = QFontMetrics(box->font()).height() + 4;
+      const int captionRight = QFontMetrics(box->font()).horizontalAdvance(box->title()) + 16;
+      if (mouse->button() == Qt::LeftButton && mouse->position().y() <= captionBottom &&
+          mouse->position().x() <= captionRight) {
+        setFolded(box, !box->property(kSectionFoldedProperty).toBool());
+        return true;
+      }
+    } else if (event->type() == QEvent::MouseMove) {
+      auto* mouse = static_cast<QMouseEvent*>(event);
+      const bool onCaption = mouse->position().y() <= QFontMetrics(box->font()).height() + 4 &&
+                             mouse->position().x() <= QFontMetrics(box->font()).horizontalAdvance(box->title()) + 16;
+      box->setCursor(onCaption ? Qt::PointingHandCursor : Qt::ArrowCursor);
+    }
+    return false;
+  }
 };
 
 // Fork: a page's settings box shown as SolidCraft's page: no frame and no
@@ -487,23 +536,44 @@ void stylePreferencesPage(QWidget* page) {
     }
     box->setStyleSheet(QStringLiteral("QGroupBox#%1 { border: none; margin: 0; padding: 0; }").arg(box->objectName()));
   }
+  const QString surface = themeColor(ColorRole::Surface, pal).name(QColor::HexArgb);
+  const QString text = pal.color(QPalette::WindowText).name(QColor::HexArgb);
+  Q_UNUSED(caption);
   for (QGroupBox* inner : page->findChildren<QGroupBox*>()) {
     if (inner->title().isEmpty() || inner->isCheckable()) {
       continue;
     }
-    inner->setTitle(inner->title().toUpper());
+    const QString name = inner->title().toUpper();
+    inner->setProperty(kSectionNameProperty, name);
+    inner->setTitle(sectionTitle(name, false));
     QFont caps = inner->font();
-    caps.setWeight(QFont::DemiBold);
-    caps.setLetterSpacing(QFont::AbsoluteSpacing, 0.6);
+    caps.setBold(true);
+    caps.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
     inner->setFont(caps);
     // The controls inside keep the dialog's font.
     for (QWidget* child : inner->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
       child->setFont(page->font());
     }
-    inner->setStyleSheet(QStringLiteral("QGroupBox { border: none; border-top: 1px solid %1; margin-top: 18px; "
-                                        "padding-top: 12px; } QGroupBox::title { subcontrol-origin: margin; "
-                                        "left: 0px; padding: 0 8px 0 0; color: %2; }")
-                             .arg(line, caption));
+    // The hairline runs through the caption's middle and on to the right;
+    // the caption's own background hides it under the words.
+    inner->setStyleSheet(QStringLiteral("QGroupBox { border: none; border-top: 1px solid %1; margin-top: 0.7em; "
+                                        "padding-top: 14px; margin-bottom: 6px; } QGroupBox::title { "
+                                        "subcontrol-origin: margin; subcontrol-position: top left; left: 0px; "
+                                        "padding: 0 10px 0 0; color: %2; background: %3; }")
+                             .arg(line, text, surface));
+    inner->setCursor(Qt::ArrowCursor);
+    inner->setMouseTracking(true);
+    inner->installEventFilter(new PreferenceSectionFold(inner));
+  }
+}
+
+// Fork: every folded section of a Preferences page opened again (a search
+// shows what it finds).
+void unfoldPreferenceSections(QWidget* root) {
+  for (QGroupBox* box : root->findChildren<QGroupBox*>()) {
+    if (box->property(kSectionFoldedProperty).toBool()) {
+      PreferenceSectionFold::setFolded(box, false);
+    }
   }
 }
 
@@ -4081,7 +4151,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     stack->addWidget(content);
     auto* item = new QListWidgetItem(QCoreApplication::translate("View", entry.name), pages);
     item->setData(Qt::UserRole, QLatin1String(entry.id));
-    item->setIcon(themeIcon(QString::fromLatin1(entry.icon)));
+    item->setIcon(monochromeIcon(themeIcon(QString::fromLatin1(entry.icon))));
     // The section's caption over its first page.
     const QString section = QString::fromLatin1(entry.section);
     if (section != lastSection) {
@@ -4144,7 +4214,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   headerRow->setContentsMargins(18, 14, 16, 10);
   headerRow->setSpacing(10);
   auto* gear = new QLabel;
-  gear->setPixmap(themeIcon(QStringLiteral("settings"))
+  gear->setPixmap(monochromeIcon(themeIcon(QStringLiteral("settings")))
                       .pixmap(QSize(uiIconSize(18), uiIconSize(18)), dialog->devicePixelRatioF()));
   auto* title = new QLabel(tr("Preferences"));
   {
@@ -4156,7 +4226,36 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   headerRow->addWidget(gear);
   headerRow->addWidget(title);
   headerRow->addStretch(1);
-  search->setMinimumWidth(uiRoomSize(280));
+  search->setMinimumWidth(uiRoomSize(300));
+  // SolidCraft's search: rounded, the magnifier at the left and the
+  // shortcut at the right; a search opens the folded sections.
+  search->addAction(monochromeIcon(themeIcon(QStringLiteral("search"))), QLineEdit::LeadingPosition);
+  search->setObjectName(QStringLiteral("preferencesSearch"));
+  search->setStyleSheet(QStringLiteral("QLineEdit#preferencesSearch { border: 1px solid %1; border-radius: 7px; "
+                                       "padding: 4px 6px; background: %2; }")
+                            .arg(themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb),
+                                 themeColor(ColorRole::Surface, dialogPalette).name(QColor::HexArgb)));
+  {
+    auto* hint = new QLabel(QKeySequence(QKeySequence::Find).toString(QKeySequence::NativeText).replace(
+                                QLatin1Char('+'), QLatin1Char(' ')),
+                            search);
+    hint->setObjectName(QStringLiteral("preferencesSearchHint"));
+    hint->setAttribute(Qt::WA_TransparentForMouseEvents);
+    hint->setStyleSheet(QStringLiteral("QLabel#preferencesSearchHint { color: %1; border: 1px solid %2; "
+                                       "border-radius: 4px; padding: 0 5px; font-size: 8pt; background: %3; }")
+                            .arg(themeColor(ColorRole::TextSecondary, dialogPalette).name(QColor::HexArgb),
+                                 themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb),
+                                 dialogPalette.color(QPalette::Window).name(QColor::HexArgb)));
+    auto* hintRow = new QHBoxLayout(search);
+    hintRow->setContentsMargins(0, 0, 7, 0);
+    hintRow->addStretch(1);
+    hintRow->addWidget(hint, 0, Qt::AlignVCenter);
+    search->setTextMargins(0, 0, hint->sizeHint().width() + 8, 0);
+    connect(search, &QLineEdit::textChanged, hint, [hint](const QString& text) { hint->setVisible(text.isEmpty()); });
+  }
+  connect(search, &QLineEdit::textChanged, stack, [stack](const QString& text) {
+    if (!text.isEmpty()) unfoldPreferenceSections(stack);
+  });
   headerRow->addWidget(search);
   // Ctrl+F (Cmd+F) takes the search, its text chosen.
   auto* find = new QShortcut(QKeySequence::Find, dialog.get());
