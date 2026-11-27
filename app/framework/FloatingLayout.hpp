@@ -275,6 +275,7 @@ private:
   QString m_loggedSplits;
 
   GlassCard* m_band = nullptr; // the message band's card (mitcad#1042)
+  bool m_bandQuiet = false;    // Fork: hints held back (showOnlyCards)
   MessageBand* m_bandContent = nullptr;
   QRect m_bandRow; // the row it keeps, from the last layout
   QString m_loggedBand;

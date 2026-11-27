@@ -298,7 +298,7 @@ const QColor kSidebarTop(0x22, 0x61, 0xc4);
 const QColor kSidebarBottom(0x1d, 0x56, 0xb0);
 constexpr int kSidebarWidth = 300;
 // The width a New card needs to show its title and line whole.
-constexpr int kNewCardWidth = 290;
+constexpr int kNewCardWidth = 360;
 
 class StartSidebar : public QWidget {
 public:

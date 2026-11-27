@@ -439,6 +439,10 @@ void FloatingLayout::showOnlyCards(const QStringList& names) {
       entry.card->setSuppressed(!names.isEmpty() && !names.contains(entry.card->objectName()));
     }
   }
+  // Fork: the message band too, unless it shows a warning or an error (the
+  // start page shows no hints over its foot, as SolidCraft's).
+  m_bandQuiet = !names.isEmpty() && !names.contains(QStringLiteral("messageBandCard"));
+  updateBand();
   requestLayout();
 }
 
@@ -557,7 +561,7 @@ void FloatingLayout::updateBand() {
   if (m_band == nullptr) {
     return;
   }
-  const bool wanted = m_bandContent->hasMessage();
+  const bool wanted = m_bandContent->hasMessage() && (!m_bandQuiet || m_bandContent->showsProblem()); // Fork
   if (wanted != m_band->isShown()) {
     m_band->setVisible(wanted);
   }
