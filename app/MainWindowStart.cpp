@@ -150,6 +150,10 @@ void MainWindow::createStartPage() {
   host.back = [this] { leaveStartPageForDesign(); };
   host.documentName = [this] { return m_noDesign ? QString() : documentName(); };
   host.about = [this] { showAboutDialog(this); };
+  host.commandEnabled = [this](const QString& id) {
+    const QAction* action = m_registry->action(id);
+    return action != nullptr && action->isEnabled();
+  };
   host.openUrl = [](const QString& url) { openExternalUrl(QUrl(url)); };
   // The workspace tabs, or the toolbar that holds them: the Floating
   // toolbar panel on Windows and Linux (mitcad#1990), the Docked toolbar

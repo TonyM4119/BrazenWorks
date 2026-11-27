@@ -17,6 +17,8 @@
 #include <QEvent>
 #include <QFileInfo>
 #include <QFont>
+#include <QFontDatabase>
+#include <QLocale>
 #include <QFontMetrics>
 #include <QGridLayout>
 #include <QHBoxLayout>
@@ -292,9 +294,9 @@ private:
 // Fork: the start page's sidebar (SolidCraft's start page): a blue panel
 // down the page's left, rounded as the backdrop, with the File commands,
 // the resources and the settings as rows of white text.
-const QColor kSidebarTop(0x2f, 0x7b, 0xe5);
-const QColor kSidebarBottom(0x3a, 0x8e, 0xf2);
-constexpr int kSidebarWidth = 280;
+const QColor kSidebarTop(0x22, 0x61, 0xc4);
+const QColor kSidebarBottom(0x1d, 0x56, 0xb0);
+constexpr int kSidebarWidth = 300;
 // The width a New card needs to show its title and line whole.
 constexpr int kNewCardWidth = 290;
 
@@ -314,7 +316,7 @@ protected:
     fill.setColorAt(1.0, kSidebarBottom);
     painter.setPen(Qt::NoPen);
     painter.setBrush(fill);
-    painter.drawRoundedRect(QRectF(rect()), kRadius, kRadius);
+    painter.drawRect(rect()); // flush with the page's edges, as SolidCraft's
   }
 };
 
@@ -355,15 +357,15 @@ protected:
   void paintEvent(QPaintEvent*) override {
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
-    const QRectF box = QRectF(rect()).adjusted(0.5, 2.5, -0.5, -2.5);
+    const QRectF box = QRectF(rect());
     const bool hovered = (underMouse() || hasFocus()) && isEnabled();
     if (m_current || hovered || isDown()) {
       painter.setPen(Qt::NoPen);
       painter.setBrush(QColor(255, 255, 255, m_current ? 56 : (isDown() ? 46 : 30)));
-      painter.drawRoundedRect(box, kControlRadius + 2, kControlRadius + 2);
+      painter.drawRect(box); // a full-width band, as SolidCraft's
     }
-    const QColor ink(255, 255, 255, isEnabled() ? 255 : 115);
-    int left = 14;
+    const QColor ink(255, 255, 255, isEnabled() ? 255 : 90);
+    int left = 22;
     if (m_back) {
       // A chevron pointing left.
       painter.setPen(QPen(ink, 1.8, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
@@ -371,7 +373,7 @@ protected:
       painter.drawPolyline(QPolygonF{QPointF(left + 5, cy - 5), QPointF(left, cy), QPointF(left + 5, cy + 5)});
       left += 18;
     }
-    int right = width() - 14;
+    int right = width() - 20;
     const QFont keyFont = scaledFont(this, 0.88, false);
     if (!m_key.isEmpty()) {
       const QFontMetrics keys(keyFont);
@@ -407,6 +409,101 @@ private:
   bool m_back = false;
 };
 
+// Fork: a row of SolidCraft's Recent list: the design's preview (else its
+// type's icon) in a small box, its name, "missing · " and its path in a
+// monospaced font, the day it was opened and its type after a dot.
+class StartRecentRow : public QAbstractButton {
+public:
+  explicit StartRecentRow(const RecentDesign& design, QWidget* parent = nullptr)
+      : QAbstractButton(parent), m_design(design) {
+    setText(design.name);
+    setAccessibleName(design.name);
+    setToolTip(QDir::toNativeSeparators(design.path));
+    setAttribute(Qt::WA_Hover);
+    setCursor(Qt::PointingHandCursor);
+    setFocusPolicy(Qt::StrongFocus);
+    setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+    if (!design.preview.isEmpty()) {
+      m_preview = QPixmap(design.preview);
+    }
+  }
+  const RecentDesign& design() const { return m_design; }
+  QSize sizeHint() const override { return QSize(600, 60); }
+  QSize minimumSizeHint() const override { return QSize(300, 60); }
+
+protected:
+  bool event(QEvent* event) override {
+    hoverRepaint(this, event);
+    return QAbstractButton::event(event);
+  }
+
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QRectF box = QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5);
+    painter.setPen(QPen(hasFocus() ? accentColor(palette()) : roleColor(ColorRole::Line, this), 1));
+    painter.setBrush(roleColor(ColorRole::Raised, this));
+    painter.drawRoundedRect(box, kRadius, kRadius);
+    if (underMouse() || isDown()) {
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(roleColor(ColorRole::HoverFill, this));
+      painter.drawRoundedRect(box, kRadius, kRadius);
+    }
+    // The preview's box.
+    const QRect thumb(16, (height() - 40) / 2, 40, 40);
+    painter.setPen(QPen(roleColor(ColorRole::Line, this), 1));
+    painter.setBrush(roleColor(ColorRole::Surface, this));
+    painter.drawRoundedRect(QRectF(thumb).adjusted(0.5, 0.5, -0.5, -0.5), kControlRadius, kControlRadius);
+    if (!m_preview.isNull()) {
+      const QPixmap shown = m_preview.scaled(thumb.size() - QSize(6, 6) * 1, Qt::KeepAspectRatio,
+                                             Qt::SmoothTransformation);
+      painter.drawPixmap(thumb.center() - QPoint(shown.width() / 2, shown.height() / 2), shown);
+    } else {
+      themeIcon(QStringLiteral("new-design")).paint(&painter, thumb.adjusted(9, 9, -9, -9));
+    }
+    const int w = width();
+    // The columns: name, path, date, type (as SolidCraft's row).
+    const QRect name(thumb.right() + 18, 0, int(w * 0.30) - thumb.right() - 18, height());
+    const QRect path(int(w * 0.42), 0, int(w * 0.38), height());
+    const QRect day(int(w * 0.80), 0, int(w * 0.08), height());
+    const QRect type(int(w * 0.89), 0, w - int(w * 0.89) - 12, height());
+    const QFont bold = scaledFont(this, 1.0, true);
+    painter.setFont(bold);
+    painter.setPen(roleColor(ColorRole::Text, this));
+    painter.drawText(name, Qt::AlignLeft | Qt::AlignVCenter,
+                     QFontMetrics(bold).elidedText(m_design.name, Qt::ElideRight, name.width()));
+    QFont mono = QFontDatabase::systemFont(QFontDatabase::FixedFont);
+    mono.setPointSizeF(font().pointSizeF() * 0.95);
+    painter.setFont(mono);
+    painter.setPen(roleColor(ColorRole::TextSecondary, this));
+    QString where = QDir::toNativeSeparators(m_design.path);
+    const QString home = QDir::toNativeSeparators(QDir::homePath());
+    if (where.startsWith(home, Qt::CaseInsensitive)) {
+      where = QStringLiteral("~") + where.mid(home.size());
+    }
+    if (m_design.missing) {
+      where = QCoreApplication::translate("StartPage", "missing") + QStringLiteral(" · ") + where;
+    }
+    painter.drawText(path, Qt::AlignLeft | Qt::AlignVCenter,
+                     QFontMetrics(mono).elidedText(where, Qt::ElideMiddle, path.width()));
+    painter.setFont(font());
+    painter.setPen(roleColor(ColorRole::Text, this));
+    if (m_design.opened.isValid()) {
+      painter.drawText(day, Qt::AlignLeft | Qt::AlignVCenter, QLocale().toString(m_design.opened.date(), QStringLiteral("d MMM")));
+    }
+    // The type after a dot in the accent's colour.
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(accentColor(palette()));
+    painter.drawEllipse(QPointF(type.left() + 4, height() / 2.0), 3.5, 3.5);
+    painter.setPen(roleColor(ColorRole::Text, this));
+    painter.drawText(type.adjusted(14, 0, 0, 0), Qt::AlignLeft | Qt::AlignVCenter, m_design.type);
+  }
+
+private:
+  RecentDesign m_design;
+  QPixmap m_preview;
+};
+
 // A thin line between the sidebar's groups.
 class StartSideRule : public QWidget {
 public:
@@ -419,7 +516,7 @@ protected:
   void paintEvent(QPaintEvent*) override {
     QPainter painter(this);
     painter.setPen(QPen(QColor(255, 255, 255, 70), 1));
-    painter.drawLine(QPointF(14, height() / 2.0 + 0.5), QPointF(width() - 14, height() / 2.0 + 0.5));
+    painter.drawLine(QPointF(22, height() / 2.0 + 0.5), QPointF(width() - 20, height() / 2.0 + 0.5));
   }
 };
 
@@ -900,13 +997,11 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   auto* centred = new QHBoxLayout(content);
   centred->setContentsMargins(0, 0, 0, 0);
   auto* body = new QWidget;
-  body->setMaximumWidth(1280);
-  centred->addStretch(1);
-  centred->addWidget(body, 100);
-  centred->addStretch(1);
+  // Fork: the content from the sidebar's right, as SolidCraft's start page.
+  centred->addWidget(body, 1);
   auto* column = new QVBoxLayout(body);
-  column->setContentsMargins(8, 8, 8, 8);
-  column->setSpacing(18);
+  column->setContentsMargins(36, 28, 36, 28);
+  column->setSpacing(16);
 
   // The welcome and What's New in X.Y.
   auto* header = new QHBoxLayout;
@@ -914,7 +1009,7 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   titles->setSpacing(2);
   // Fork: SolidCraft's start page: Start, and what it is for.
   titles->addWidget(heading(tr("Start"), 1.9, QStringLiteral("startPageTitle")));
-  auto* subtitle = new QLabel(tr("Create a design, open a recent file, or start a tutorial."));
+  auto* subtitle = new QLabel(tr("Create a design or open a recent file."));
   subtitle->setObjectName(QStringLiteral("startPageSubtitle"));
   subtitle->setFont(scaledFont(subtitle, 1.1, false));
   setRoleStyleSheet(subtitle, ColorRole::TextSecondary);
@@ -934,6 +1029,7 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   connect(m_whatsNew, &QAbstractButton::clicked, this,
           [this] { choose(QStringLiteral("What's New"), [this] { m_host.openUrl(m_host.releaseUrl); }); });
   header->addWidget(m_whatsNew, 0, Qt::AlignTop);
+  m_whatsNew->hide(); // Fork: not on SolidCraft's start page
   column->addLayout(header);
 
   // The quick actions. Fork: under a New heading, as SolidCraft's start
@@ -993,6 +1089,13 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   column->addWidget(m_newCards);
   // Fork: the designs' browser under a Recent heading.
   column->addWidget(heading(tr("Recent"), 1.25, QStringLiteral("startPageRecentHeading")));
+  // Fork: SolidCraft's Recent: one row per recent design (rebuildRecentRows).
+  m_recentRows = new QWidget;
+  m_recentRows->setObjectName(QStringLiteral("startPageRecentRows"));
+  m_recentRowsLayout = new QVBoxLayout(m_recentRows);
+  m_recentRowsLayout->setContentsMargins(0, 0, 0, 0);
+  m_recentRowsLayout->setSpacing(8);
+  column->addWidget(m_recentRows);
 
   // The designs' browser (mitcad#1301), or the tutorials (mitcad#2346,
   // showTutorials), and Resources side by side.
@@ -1245,13 +1348,20 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   middle->addWidget(recentPanel, 3);
 
   // Fork: the resources are rows of the sidebar (below).
-  column->addLayout(middle);
+  // Fork: MitCad's designs' browser stays built but out of the page; its
+  // place shows only for the tutorials (showTutorials), which use it.
+  m_browserHost = new QWidget;
+  m_browserHost->setObjectName(QStringLiteral("startPageBrowserHost"));
+  middle->setContentsMargins(0, 0, 0, 0);
+  m_browserHost->setLayout(middle);
+  m_browserHost->hide();
+  column->addWidget(m_browserHost, 1);
   column->addStretch(1);
   // Fork: the sidebar at the left of the page's content (SolidCraft's
   // start page), made below.
   auto* split = new QHBoxLayout;
   split->setContentsMargins(0, 0, 0, 0);
-  split->setSpacing(20);
+  split->setSpacing(0);
   split->addWidget(m_scroll, 1);
   m_column->addLayout(split, 1);
 
@@ -1266,7 +1376,7 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   // Its rows scroll in a window too short for them (a 1366 x 768 screen);
   // Show start page at launch stays at its foot.
   auto* sideOuter = new QVBoxLayout(sidebar);
-  sideOuter->setContentsMargins(12, 12, 12, 14);
+  sideOuter->setContentsMargins(0, 14, 0, 14);
   sideOuter->setSpacing(6);
   auto* sideScroll = new QScrollArea;
   sideScroll->setObjectName(QStringLiteral("startPageSidebarScroll"));
@@ -1314,28 +1424,23 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
     side->addWidget(row);
     return row;
   };
+  // SolidCraft's rows: the File commands, a rule, Save, Save As, Export
+  // and Design properties (dimmed while they cannot run), a rule, then
+  // Preferences, Keyboard shortcuts, Crash reports and About.
   command(tr("New"), QStringLiteral("file.new_design"));
   command(tr("Open"), QStringLiteral("file.open"));
-  command(tr("Open Project"), QStringLiteral("file.open_project"));
   command(tr("Recover"), QStringLiteral("file.recover"));
   side->addWidget(new StartSideRule);
-  command(tr("Save"), QStringLiteral("file.save"));
-  command(tr("Save As"), QStringLiteral("file.save_as"));
-  command(tr("Export"), QStringLiteral("file.export"));
-  command(tr("Design Properties"), QStringLiteral("file.design_properties"));
-  side->addWidget(new StartSideRule);
-  // The resources, under the names and commands the Resources panel had.
-  if (m_host.tutorials) {
-    command(tr("Tutorials"), QStringLiteral("help.tutorials"), QStringLiteral("startPageResource_help.tutorials"));
+  for (const auto& [text, id] : {std::pair<QString, QString>{tr("Save"), QStringLiteral("file.save")},
+                                 {tr("Save As"), QStringLiteral("file.save_as")},
+                                 {tr("Export"), QStringLiteral("file.export")},
+                                 {tr("Design properties"), QStringLiteral("file.design_properties")}}) {
+    m_documentRows.append(qMakePair(QPointer<QAbstractButton>(command(text, id)), id));
   }
-  command(tr("Component Libraries"), QStringLiteral("insert.library_component"),
-          QStringLiteral("startPageResource_insert.library_component"));
-  command(tr("User Guide"), QStringLiteral("help.user_guide"), QStringLiteral("startPageResource_help.user_guide"));
-  command(tr("Keyboard Shortcuts"), QStringLiteral("help.shortcuts"), QStringLiteral("startPageResource_help.shortcuts"));
-  command(tr("Connect AI Assistant"), QStringLiteral("help.connect_assistant"),
-          QStringLiteral("startPageResource_help.connect_assistant"));
   side->addWidget(new StartSideRule);
   command(tr("Preferences"), QStringLiteral("tools.preferences"), QStringLiteral("startPagePreferences"));
+  command(tr("Keyboard shortcuts"), QStringLiteral("help.shortcuts"), QStringLiteral("startPageResource_help.shortcuts"));
+  command(tr("Crash reports"), QStringLiteral("help.diagnostics"));
   auto* about = new StartSideItem(tr("About %1").arg(QString::fromUtf8(brand::kDisplayName)));
   about->setObjectName(QStringLiteral("startPageAbout"));
   connect(about, &QAbstractButton::clicked, this, [this] {
@@ -1346,12 +1451,6 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
     });
   });
   side->addWidget(about);
-  auto* report = new StartSideItem(tr("Report an Issue"));
-  report->setObjectName(QStringLiteral("startPageReport"));
-  report->setToolTip(tr("Opens the issue list in the web browser"));
-  connect(report, &QAbstractButton::clicked, this,
-          [this] { choose(QStringLiteral("Report an Issue"), [this] { m_host.openUrl(m_host.issuesUrl); }); });
-  side->addWidget(report);
   side->addStretch(1);
   m_atLaunch = new QCheckBox(tr("Show start page at launch"));
   m_atLaunch->setObjectName(QStringLiteral("startPageAtLaunch"));
@@ -1457,6 +1556,14 @@ void StartPage::refresh() {
   m_back->setAccessibleName(m_back->text());
   m_designs = recent::load();
   rebuildList();
+  rebuildRecentRows(); // Fork
+  // Fork: Save, Save As, Export and Design properties dimmed while they
+  // cannot run.
+  for (const auto& row : std::as_const(m_documentRows)) {
+    if (row.first) {
+      row.first->setEnabled(!m_host.commandEnabled || m_host.commandEnabled(row.second));
+    }
+  }
   // The projects again (a design saved, a project added or synced).
   loadProjects();
 }
@@ -1491,8 +1598,9 @@ void StartPage::place() {
     m_backdropBelow = below;
     update();
   }
-  const QMargins margins = start::backdropMargins(kBackdropInset, top, below, kBackdropGap) +
-                           QMargins(kBackdropPadding, kBackdropPadding, kBackdropPadding, kBackdropPadding);
+  // Fork: flush with the view's edges below the rows over it, the sidebar
+  // down the left, as SolidCraft's start page (no inset backdrop).
+  const QMargins margins(0, top, 0, below);
   if (m_column->contentsMargins() != margins) {
     m_column->setContentsMargins(margins);
     qDebug().noquote() << QStringLiteral("Start page margins: top %1, bottom %2").arg(margins.top()).arg(margins.bottom());
@@ -2092,6 +2200,8 @@ void StartPage::showTutorials() {
   setDropActive(false);
   m_designsPanel->hide();
   m_tutorialsPanel->show();
+  m_browserHost->show(); // Fork: the tutorials in the Recent list's place
+  m_recentRows->hide();
   // Every choice is logged, also one that changes nothing.
   qInfo().noquote() << QStringLiteral("Start page section: tutorials");
   logPlaces();
@@ -2103,6 +2213,8 @@ void StartPage::showDesigns() {
     m_tutorialsPanel->hide();
   }
   m_designsPanel->show();
+  m_browserHost->hide(); // Fork: the Recent list again
+  m_recentRows->show();
   qInfo().noquote() << QStringLiteral("Start page section: designs");
   // The designs' list as it is now (a tutorial may have saved one).
   m_loggedList.clear();
@@ -2209,6 +2321,45 @@ void StartPage::logPlaces() {
   });
 }
 
+void StartPage::rebuildRecentRows() {
+  // Fork: one row per recent design, newest first (the pinned ones that
+  // dropped out of the list too), as SolidCraft's Recent.
+  QLayoutItem* item = nullptr;
+  while ((item = m_recentRowsLayout->takeAt(0)) != nullptr) {
+    if (item->widget() != nullptr) {
+      item->widget()->deleteLater();
+    }
+    delete item;
+  }
+  if (m_designs.isEmpty()) {
+    auto* none = new QLabel(tr("No recent designs yet: designs you open or save show here."));
+    none->setObjectName(QStringLiteral("startPageRecentNone"));
+    setRoleStyleSheet(none, ColorRole::TextSecondary);
+    m_recentRowsLayout->addWidget(none);
+    return;
+  }
+  for (const RecentDesign& design : std::as_const(m_designs)) {
+    auto* row = new StartRecentRow(design);
+    row->setObjectName(QStringLiteral("startPageRecentRow_") + design.name);
+    const QString path = design.path;
+    connect(row, &QAbstractButton::clicked, this, [this, path] {
+      choose(QStringLiteral("Recent %1").arg(QFileInfo(path).fileName()), [this, path] { m_host.open(path); });
+    });
+    row->setContextMenuPolicy(Qt::CustomContextMenu);
+    connect(row, &QWidget::customContextMenuRequested, this, [this, row, path](const QPoint& at) {
+      QMenu menu(row);
+      menu.addAction(tr("Open"), this, [this, path] { m_host.open(path); });
+      menu.addAction(tr("Remove from Recent"), this, [this, path] {
+        recent::remove(path);
+        qInfo().noquote() << QStringLiteral("Start page removed: %1").arg(path);
+        refresh();
+      });
+      menu.exec(row->mapToGlobal(at));
+    });
+    m_recentRowsLayout->addWidget(row);
+  }
+}
+
 void StartPage::layoutNewCards() {
   // Fork: four in a row where each card has kNewCardWidth, else two by two.
   const int width = m_newCards->width() > 0 ? m_newCards->width() : m_newCards->sizeHint().width();
@@ -2280,21 +2431,12 @@ bool StartPage::eventFilter(QObject* watched, QEvent* event) {
 }
 
 void StartPage::paintEvent(QPaintEvent*) {
-  // A rounded surface with every card's radius on all four corners
-  // (kCardRadius, mitcad#1990) inset from the view's edges (mitcad#1439), the view's
-  // background around it: the page paints all of itself, so nothing the GL
-  // view under it drew last shows at its corners, in either layout.
+  // Fork: one plain surface edge to edge, as SolidCraft's start page (the
+  // upstream's inset rounded backdrop, start::paintBackdrop, is not drawn):
+  // the page paints all of itself, so nothing the GL view under it drew
+  // last shows through.
   QPainter painter(this);
-  start::Backdrop backdrop;
-  // The cards' surface (cardFillColor's, opaque): the panels and the
-  // content are painted on it (mitcad#1990).
-  backdrop.fill = palette().color(QPalette::Window);
-  backdrop.border = roleColor(ColorRole::Line, this);
-  m_viewer->backgroundColors(backdrop.viewTop, backdrop.viewBottom);
-  backdrop.radius = start::kBackdropRadius;
-  start::paintBackdrop(painter, size(),
-                       start::backdropRect(size(), kBackdropInset, m_backdropTop, m_backdropBelow, kBackdropGap),
-                       backdrop);
+  painter.fillRect(rect(), palette().color(QPalette::Window));
 }
 
 void StartPage::changeEvent(QEvent* event) {

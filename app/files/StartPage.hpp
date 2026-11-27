@@ -149,6 +149,8 @@ public:
     std::function<void()> back;
     std::function<QString()> documentName;
     std::function<void()> about;
+    // Whether a command can run now (Save, Export…: the sidebar dims them).
+    std::function<bool(const QString& id)> commandEnabled;
     // An address in the browser (logged instead in UI tests).
     std::function<void(const QString& url)> openUrl;
     // The workspace tabs: the page's content starts below them where they
@@ -255,6 +257,13 @@ private:
   QGridLayout* m_newGrid = nullptr;
   QList<QWidget*> m_newTiles;
   int m_newColumns = 0;
+  // Fork: SolidCraft's Recent rows, the hidden designs' browser's host, and
+  // the sidebar's rows that need a design's command.
+  void rebuildRecentRows();
+  QWidget* m_recentRows = nullptr;
+  QVBoxLayout* m_recentRowsLayout = nullptr;
+  QWidget* m_browserHost = nullptr;
+  QList<QPair<QPointer<QAbstractButton>, QString>> m_documentRows;
   QAbstractButton* m_whatsNew = nullptr;
   QAbstractButton* m_recentRow = nullptr;
   QAbstractButton* m_pinnedRow = nullptr;
