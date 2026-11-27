@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "BoostButton.hpp"
+#include <brand.hpp>  // Fork: kUpstreamCommunityLinks
 
 #include <algorithm>
 #include <utility>
@@ -50,7 +51,12 @@ QPixmap tinted(const QIcon& icon, int side, qreal ratio, const QColor& color) {
 
 QString BoostSettings::visibleKey() { return QStringLiteral("appearance/boostButton"); }
 
-bool BoostSettings::loadVisible() { return QSettings().value(visibleKey(), true).toBool(); }
+bool BoostSettings::loadVisible() {
+  if (!brand::kUpstreamCommunityLinks) {
+    return false;  // Fork: the upstream's community links are off (branding.json)
+  }
+  return QSettings().value(visibleKey(), true).toBool();
+}
 
 bool BoostSettings::saveVisible(bool visible) {
   if (loadVisible() == visible) {

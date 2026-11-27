@@ -770,9 +770,13 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   const QString release = version.segmentCount() >= 2
                               ? QStringLiteral("%1.%2").arg(version.majorVersion()).arg(version.minorVersion())
                               : m_host.version;
-  m_whatsNew = new StartLink(tr("What's New in %1").arg(release));
+  // Fork: the link opens the upstream's release notes (MainWindowStart.cpp),
+  // so it names the upstream; the name is an argument, which BrandTranslator
+  // does not swap.
+  m_whatsNew = new StartLink(tr("What's New in %1 %2").arg(QString::fromUtf8(brand::kUpstreamName), release));
   m_whatsNew->setObjectName(QStringLiteral("startPageWhatsNew"));
-  m_whatsNew->setToolTip(tr("Opens this version's release page in the web browser"));
+  m_whatsNew->setToolTip(tr("Opens the release notes of %1 %2, which this version is based on, in the web browser")
+                             .arg(QString::fromUtf8(brand::kUpstreamName), m_host.version));
   connect(m_whatsNew, &QAbstractButton::clicked, this,
           [this] { choose(QStringLiteral("What's New"), [this] { m_host.openUrl(m_host.releaseUrl); }); });
   header->addWidget(m_whatsNew, 0, Qt::AlignTop);

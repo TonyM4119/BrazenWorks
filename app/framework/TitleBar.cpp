@@ -22,6 +22,7 @@
 #include <QtGlobal>
 #include <QtLogging>
 
+#include "AppSettings.hpp"  // Fork: programVersion()
 #include "GlassCard.hpp"
 #include "MenuBarReveal.hpp"
 #include "QuickAccessGroup.hpp"
@@ -619,7 +620,7 @@ void TitleBar::setRowControls(const RowControls& controls) {
   }
   row->addWidget(m_settings);
   addPart(m_settings);
-  const QString version = QCoreApplication::applicationVersion();
+  const QString version = programVersion();  // Fork: branding.json
   m_version = new QLabel(QStringLiteral("v%1").arg(version), this);
   m_version->setObjectName(QStringLiteral("titleVersion"));
   m_version->setAlignment(Qt::AlignCenter);

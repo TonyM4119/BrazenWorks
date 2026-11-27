@@ -1,0 +1,17 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- PureCAD application icon for small sizes (48 px and under): flat colours, bolder edges:
+     an isometric cube with its front corner chamfered, on a dark teal tile.
+     PNG and ICO files: tools/make-brand-icons.sh. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f4650"/><stop offset="1" stop-color="#0a1b21"/></linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#tile)"/>
+  <rect x="8.75" y="8.75" width="238.5" height="238.5" rx="51.25" fill="none" stroke="#4f8590" stroke-opacity="0.5" stroke-width="1.5"/>
+  <g stroke="#ffffff" stroke-opacity="0.55" stroke-width="3" stroke-linejoin="round">
+    <polygon points="128.0,34.0 214.6,84.0 167.0,111.5 89.0,111.5 41.4,84.0" fill="#d8f6fa"/>
+    <polygon points="41.4,84.0 89.0,111.5 128.0,179.0 128.0,234.0 41.4,184.0" fill="#3cc4d1"/>
+    <polygon points="167.0,111.5 214.6,84.0 214.6,184.0 128.0,234.0 128.0,179.0" fill="#168797"/>
+    <polygon points="89.0,111.5 167.0,111.5 128.0,179.0" fill="#ff8a3d"/>
+  </g>
+</svg>

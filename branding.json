@@ -1,0 +1,14 @@
+{
+  "comment": "The product's name and identity, in one place. CMake reads this file (cmake/Branding.cmake) and generates brand.hpp for the code; change a value here and rebuild. This app is based on MitCad (MIT licence): upstreamName is the name the MitCad code and its texts use, swapped for displayName in the interface at run time.",
+  "displayName": "PureCAD",
+  "storedName": "PureCAD",
+  "version": "0.1.0",
+  "slug": "purecad",
+  "iconDir": "branding/icon",
+  "organizationDomain": "tonym4119.github.io",
+  "repositoryUrl": "https://github.com/TonyM4119/BrazenWorks",
+  "upstreamName": "MitCad",
+  "upstreamUrl": "https://github.com/mitcad/Mitcad",
+  "upstreamUpdateChecks": false,
+  "upstreamCommunityLinks": false
+}

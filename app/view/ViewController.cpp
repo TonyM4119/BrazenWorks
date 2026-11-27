@@ -2947,7 +2947,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // Windows and Linux, the Docked toolbar), beside Show the menu bar where
   // that is offered too (Preferences fits a 768 px high screen).
   QCheckBox* boostShown = nullptr;
-  if (chromeStyle() == ChromeStyle::Docked || floatingTopCards()) {
+  if (brand::kUpstreamCommunityLinks && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
     boostShown = new QCheckBox(tr("Show the Boost development button"));
     boostShown->setObjectName(QStringLiteral("boostVisible"));
     boostShown->setChecked(BoostSettings::loadVisible());
@@ -2979,7 +2979,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // × apart from Boost development; offered where the window has it, on
   // Show the Boost development button's row.
   QCheckBox* discordShown = nullptr;
-  if (chromeStyle() == ChromeStyle::Docked || floatingTopCards()) {
+  if (brand::kUpstreamCommunityLinks && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
     discordShown = new QCheckBox(tr("Show the Discord button"));
     discordShown->setObjectName(QStringLiteral("discordVisible"));
     discordShown->setChecked(DiscordSettings::loadVisible());

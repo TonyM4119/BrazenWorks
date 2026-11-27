@@ -75,7 +75,7 @@ VersionWatermark::VersionWatermark(OcctViewer* viewer) : QWidget(viewer), m_view
 }
 
 QString VersionWatermark::text() {
-  return QStringLiteral("%1 %2").arg(programName(), QCoreApplication::applicationVersion());
+  return QStringLiteral("%1 %2").arg(programName(), programVersion());  // Fork
 }
 
 void VersionWatermark::setArea(QWidget* area) {

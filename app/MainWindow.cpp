@@ -9795,7 +9795,7 @@ void MainWindow::updateWindowTitle() {
                             : m_inPlaceHolder ? tr("%1 in place in %2")
                                                     .arg(QFileInfo(m_inPlaceFile).fileName(), documentName())
                                               : documentName();
-  setWindowTitle(QStringLiteral("%1[*] - MitCad %2").arg(titleName, QApplication::applicationVersion()));
+  setWindowTitle(QStringLiteral("%1[*] - %2 %3").arg(titleName, programName(), programVersion()));
   const bool modified = isModified();
   setWindowModified(modified);
   // Save follows the mark (its enabled() reads it), also after a save that

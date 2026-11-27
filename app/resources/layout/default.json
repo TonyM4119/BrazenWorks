@@ -1150,9 +1150,7 @@
         "help.connect_assistant",
         "help.diagnostics",
         "help.open_log_folder",
-        "help.check_updates",
         "help.send_feedback",
-        "help.discord",
         "-",
         {"extra": "about"},
         {"extra": "about_qt"}

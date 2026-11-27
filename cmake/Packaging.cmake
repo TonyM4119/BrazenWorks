@@ -146,14 +146,16 @@ install(FILES "${mitcad_render_install}/oidn/share/doc/OpenImageDenoise/LICENSE.
 # "Mitcad", which the updater and the uninstaller look for; the vendor's key
 # Software\<vendor> is the same key in either spelling (the registry ignores
 # case).
-set(CPACK_PACKAGE_NAME "MitCad")
-set(CPACK_PACKAGE_VENDOR "MitCad developers")
-set(CPACK_PACKAGE_CONTACT "MitCad developers <devs@mitcad.org>")
+# Fork: the product's own names (branding.json), its own install folder and
+# uninstall entry, apart from an installed MitCad.
+set(CPACK_PACKAGE_NAME "${BRAND_DISPLAY_NAME}")
+set(CPACK_PACKAGE_VENDOR "${BRAND_DISPLAY_NAME}")
+set(CPACK_PACKAGE_CONTACT "${BRAND_REPOSITORY_URL}")
 set(CPACK_PACKAGE_DESCRIPTION_SUMMARY "${PROJECT_DESCRIPTION}")
-set(CPACK_PACKAGE_VERSION "${PROJECT_VERSION}")
-set(mitcad_package_name "mitcad-${PROJECT_VERSION}-windows-x64")
+set(CPACK_PACKAGE_VERSION "${BRAND_VERSION}")
+set(mitcad_package_name "${BRAND_SLUG}-${BRAND_VERSION}-windows-x64")
 set(CPACK_PACKAGE_FILE_NAME "${mitcad_package_name}")
-set(CPACK_PACKAGE_INSTALL_DIRECTORY "Mitcad")
+set(CPACK_PACKAGE_INSTALL_DIRECTORY "${BRAND_STORED_NAME}")
 set(CPACK_RESOURCE_FILE_LICENSE "${PROJECT_SOURCE_DIR}/LICENSE")
 set(CPACK_GENERATOR "NSIS;ZIP")
 set(CPACK_ARCHIVE_COMPONENT_INSTALL OFF)
@@ -167,16 +169,20 @@ set(CPACK_STRIP_FILES OFF)
 # the .mitcad file type and an uninstall of an earlier version in the same
 # scope before the new one is put in.
 set(CPACK_MODULE_PATH "${PROJECT_SOURCE_DIR}/packaging/windows" ${CMAKE_MODULE_PATH})
-set(CPACK_NSIS_DISPLAY_NAME "MitCad ${PROJECT_VERSION}")
-set(CPACK_NSIS_PACKAGE_NAME "MitCad")
-set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\mitcad.exe")
-set(CPACK_PACKAGE_EXECUTABLES "mitcad" "MitCad")
+set(CPACK_NSIS_DISPLAY_NAME "${BRAND_DISPLAY_NAME} ${BRAND_VERSION}")
+set(CPACK_NSIS_PACKAGE_NAME "${BRAND_DISPLAY_NAME}")
+set(CPACK_NSIS_INSTALLED_ICON_NAME "bin\\\\${BRAND_EXE}")
+set(CPACK_PACKAGE_EXECUTABLES "${BRAND_SLUG}" "${BRAND_DISPLAY_NAME}")
 # NSIS wants backslashes; CPackConfig.cmake is parsed again, so they are doubled.
 string(REPLACE "/" "\\\\" mitcad_nsis_filetype "${PROJECT_SOURCE_DIR}/packaging/windows/filetype.nsh")
-string(REPLACE "/" "\\\\" mitcad_nsis_icon "${PROJECT_SOURCE_DIR}/app/branding/mitcad.ico")
+string(REPLACE "/" "\\\\" mitcad_nsis_icon "${BRAND_ICON_DIR}/icon.ico")
 set(CPACK_NSIS_MUI_ICON "${mitcad_nsis_icon}")
 set(CPACK_NSIS_MUI_UNIICON "${mitcad_nsis_icon}")
-set(CPACK_NSIS_DEFINES "!include '${mitcad_nsis_filetype}'")
+# Fork: the names the installer scripts use (NSIS.template.in, filetype.nsh),
+# in brand.nsh, which includes filetype.nsh.
+configure_file("${PROJECT_SOURCE_DIR}/cmake/brand.nsh.in" "${BRAND_GENERATED_DIR}/brand.nsh" @ONLY)
+string(REPLACE "/" "\\\\" mitcad_nsis_brand "${BRAND_GENERATED_DIR}/brand.nsh")
+set(CPACK_NSIS_DEFINES "!include '${mitcad_nsis_brand}'")
 # A thumbnail handler Explorer still holds is moved aside before the files
 # are put in place (mitcad#1695, filetype.nsh).
 set(CPACK_NSIS_EXTRA_PREINSTALL_COMMANDS "!insertmacro MitcadThumbnailsMoveAside")
