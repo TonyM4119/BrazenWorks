@@ -43,6 +43,7 @@
 #include <QPointer>
 #include <QPushButton>
 #include <QRegion>
+#include <QScreen>
 #include <QScrollArea>
 #include <QScopedValueRollback>
 #include <QScrollBar>
@@ -2224,6 +2225,156 @@ QIcon commandButtonIcon(const QToolButton* button) {
                                                          : button->icon();
 }
 
+namespace {
+
+// Fork: a command's card under its toolbar button: the name in bold with
+// its shortcut in a key cap at the right, and what the command does under
+// it, on a rounded light card with a soft shadow (SolidCraft's tooltip).
+class CommandTipCard : public QWidget {
+public:
+  static CommandTipCard& instance() {
+    static QPointer<CommandTipCard> card;
+    if (card == nullptr) card = new CommandTipCard;
+    return *card;
+  }
+
+  void showFor(QToolButton* button) {
+    QAction* action = button->defaultAction();
+    if (action == nullptr) return;
+    QString name = action->text();
+    name.remove(QLatin1Char('&'));
+    while (name.endsWith(QChar(0x2026)) || name.endsWith(QLatin1Char('.'))) name.chop(1);
+    QString tip = action->toolTip();
+    QString key;
+    const QKeySequence shortcut = action->shortcut();
+    if (!shortcut.isEmpty()) {
+      key = shortcut.toString(QKeySequence::NativeText);
+      const QString tail = QStringLiteral(" (%1)").arg(key);
+      if (tip.endsWith(tail)) tip.chop(tail.size());
+    }
+    QString about;
+    if (tip.startsWith(name + QStringLiteral(": "))) {
+      about = tip.mid(name.size() + 2);
+    } else if (tip != name && tip != action->text()) {
+      about = tip;
+    }
+    if (!about.isEmpty() && about.at(0).isLower()) about[0] = about.at(0).toUpper();
+    if (!about.isEmpty() && !about.endsWith(QLatin1Char('.')) && !about.endsWith(QLatin1Char(')'))) {
+      about += QLatin1Char('.');
+    }
+    m_title->setText(name);
+    m_key->setText(key);
+    m_key->setVisible(!key.isEmpty());
+    m_about->setText(about);
+    m_about->setVisible(!about.isEmpty());
+    m_owner = button;
+    restyle(button->palette());
+    adjustSize();
+    // Under the button, its left edges aligned, kept on the screen.
+    QPoint at = button->mapToGlobal(QPoint(-kShadow, button->height() + 4 - kShadow));
+    if (const QScreen* screen = button->screen()) {
+      const QRect room = screen->availableGeometry();
+      at.setX(std::clamp(at.x(), room.left(), std::max(room.left(), room.right() - width())));
+      if (at.y() + height() > room.bottom()) at.setY(button->mapToGlobal(QPoint(0, 0)).y() - height() - 4 + kShadow);
+    }
+    move(at);
+    show();
+    raise();
+  }
+
+  void hideFor(const QWidget* button) {
+    if (m_owner == button || button == nullptr) hide();
+  }
+
+protected:
+  void paintEvent(QPaintEvent*) override {
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    const QPalette pal = palette();
+    const QRectF card = QRectF(rect()).adjusted(kShadow, kShadow, -kShadow, -kShadow);
+    for (int i = kShadow; i > 0; --i) {
+      QColor shadow(0, 0, 0, isDarkPalette(pal) ? 10 : 6);
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(shadow);
+      painter.drawRoundedRect(card.adjusted(-i + 1, -i + 3, i - 1, i - 1), 10 + i, 10 + i);
+    }
+    painter.setPen(QPen(themeColor(ColorRole::Line, pal), 1));
+    painter.setBrush(pal.color(QPalette::Base));
+    painter.drawRoundedRect(card.adjusted(0.5, 0.5, -0.5, -0.5), 10, 10);
+  }
+
+private:
+  static constexpr int kShadow = 8;
+
+  CommandTipCard() : QWidget(nullptr, Qt::ToolTip | Qt::FramelessWindowHint | Qt::NoDropShadowWindowHint) {
+    setObjectName(QStringLiteral("commandTipCard"));
+    setAttribute(Qt::WA_TranslucentBackground);
+    setAttribute(Qt::WA_ShowWithoutActivating);
+    setAttribute(Qt::WA_TransparentForMouseEvents);
+    auto* column = new QVBoxLayout(this);
+    column->setContentsMargins(kShadow + 14, kShadow + 10, kShadow + 14, kShadow + 12);
+    column->setSpacing(6);
+    auto* top = new QHBoxLayout;
+    top->setSpacing(16);
+    m_title = new QLabel;
+    QFont bold = m_title->font();
+    bold.setBold(true);
+    bold.setPointSizeF(bold.pointSizeF() * 1.08);
+    m_title->setFont(bold);
+    m_key = new QLabel;
+    m_key->setObjectName(QStringLiteral("commandTipKey"));
+    m_key->setAlignment(Qt::AlignCenter);
+    top->addWidget(m_title);
+    top->addStretch(1);
+    top->addWidget(m_key, 0, Qt::AlignTop);
+    column->addLayout(top);
+    m_about = new QLabel;
+    m_about->setWordWrap(true);
+    m_about->setFixedWidth(uiRoomSize(300));
+    column->addWidget(m_about);
+  }
+
+  void restyle(const QPalette& pal) {
+    setPalette(pal);
+    const QColor text = pal.color(QPalette::WindowText);
+    QColor soft = text;
+    soft.setAlphaF(0.82f);
+    m_title->setStyleSheet(QStringLiteral("color: %1;").arg(text.name(QColor::HexArgb)));
+    m_about->setStyleSheet(QStringLiteral("color: %1;").arg(soft.name(QColor::HexArgb)));
+    m_key->setStyleSheet(QStringLiteral("QLabel#commandTipKey { color: %1; border: 1px solid %2; border-radius: 5px; "
+                                        "padding: 1px 7px; background: %3; }")
+                             .arg(soft.name(QColor::HexArgb), themeColor(ColorRole::Line, pal).name(QColor::HexArgb),
+                                  pal.color(QPalette::Window).name(QColor::HexArgb)));
+  }
+
+  QLabel* m_title = nullptr;
+  QLabel* m_key = nullptr;
+  QLabel* m_about = nullptr;
+  QPointer<QWidget> m_owner;
+};
+
+} // namespace
+
+bool RibbonButton::event(QEvent* event) {
+  switch (event->type()) {
+  case QEvent::ToolTip:
+    if (defaultAction() != nullptr && !defaultAction()->toolTip().isEmpty()) {
+      CommandTipCard::instance().showFor(this);
+      return true;
+    }
+    break;
+  case QEvent::Leave:
+  case QEvent::Hide:
+  case QEvent::MouseButtonPress:
+  case QEvent::WindowDeactivate:
+    CommandTipCard::instance().hideFor(this);
+    break;
+  default:
+    break;
+  }
+  return QToolButton::event(event);
+}
+
 RibbonButton::RibbonButton(QAction* action, int iconSize, QWidget* parent)
     : QToolButton(parent), m_iconSize(iconSize) {
   setDefaultAction(action);
@@ -2351,8 +2502,10 @@ void RibbonButton::paintEvent(QPaintEvent*) {
              hover > 0.0 && active) {
     // Fork: the hover highlight at its faded level (fadeHover); none once the
     // pointer left without a leave event (the button hidden under it).
-    painter.setBrush(textTint(pal, qRound(20 * hover)));
-    painter.drawRoundedRect(box, kControlRadius, kControlRadius);
+    // Fork: a clear grey square behind the hovered button, as Fusion's and
+    // SolidCraft's toolbars light up.
+    painter.setBrush(textTint(pal, qRound(34 * hover)));
+    painter.drawRoundedRect(box, kControlRadius + 1, kControlRadius + 1);
   }
   if (isChecked() && active) {
     painter.setPen(QPen(accentColor(pal), 1));

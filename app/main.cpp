@@ -638,9 +638,8 @@ int runApplication(int argc, char* argv[]) {
   // their icons unless the user chose Icons only (mitcad#1990, the owner's
   // choice for the panel layout), in both layouts (mitcad#2082: the Docked
   // layout has the same panel).
-  // Fork: icons only by default, as Fusion's toolbar; the UI tests keep
-  // MitCad's labels, which their places were taken with.
-  if (!nativeUiRequested && mitcad::floatingTopCards() && qEnvironmentVariableIsSet("MITCAD_TEST_INPUT")) {
+  // Fork: labels under the icons, as SolidCraft's toolbar (and MitCad's).
+  if (!nativeUiRequested && mitcad::floatingTopCards()) {
     mitcad::setDefaultRibbonLabels(mitcad::RibbonLabels::UnderIcons);
   }
   // Windows 10's dark app mode (mitcad#1282): Qt's own style with a dark palette
