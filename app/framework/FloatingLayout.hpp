@@ -132,7 +132,9 @@ public:
   void addTopRow(QWidget* row, RowCards cards = {}, const QList<QWidget*>& parts = {});
   // A top row as a bar (the title row of Windows and Linux, mitcad#1990):
   // flush with the view's top and sides, without the margins; the next row
-  // starts kGap below it. Call it before the row's addTopRow.
+  // starts kGap below it. Call it before the row's addTopRow. Fork: more
+  // than one row can be a bar (the toolbar panel under the title row, as in
+  // Fusion); a bar right after a bar starts at its bottom, without a gap.
   void setFlushRow(QWidget* row);
   // A top row hidden by the user (mitcad#2426: View › Toolbar Panel hides
   // the toolbar panel's row): not shown whatever its parts are, the rows,
@@ -248,7 +250,7 @@ private:
   QWidget* m_header;
   std::vector<Entry> m_entries;
   std::vector<Row> m_rows; // addTopRow
-  QPointer<QWidget> m_flushRow; // setFlushRow
+  QList<QPointer<QWidget>> m_flushRows; // setFlushRow
   bool m_layoutQueued = false;
   bool m_inLayout = false;
   bool m_windowed; // the cards are windows (native glass)

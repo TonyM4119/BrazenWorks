@@ -595,6 +595,9 @@ void TitleBar::setRowControls(const RowControls& controls) {
   // The document tabs (hostDocumentTabs) right after the group.
   m_documents = capsule("titleTabs");
   m_documentsRow = static_cast<QHBoxLayout*>(m_documents->layout());
+  // Fork: the tabs' group as high as the row, so that the shown design's
+  // tab reaches its foot (hostDocumentTabs).
+  m_documents->setFixedHeight(height());
   const int afterGroup = m_quickAccess != nullptr ? row->indexOf(m_quickAccess.data()) + 1 : 1;
   row->insertWidget(afterGroup, m_documents);
   addPart(m_documents);
@@ -645,15 +648,19 @@ void TitleBar::hostDocumentTabs(QTabBar* tabs) {
     return;
   }
   if (tabs->parentWidget() != m_documents) {
-    // Taken from the frame or from another design's row.
-    m_documentsRow->insertWidget(0, tabs, 0, Qt::AlignVCenter);
+    // Taken from the frame or from another design's row. Fork: on the
+    // Floating row at its foot, so that the shown design's tab meets the
+    // toolbar panel under the row (Fusion's look).
+    m_documentsRow->insertWidget(0, tabs, 0, m_floatingRow ? Qt::AlignBottom : Qt::AlignVCenter);
   }
   if (m_documentTabs != tabs) {
     m_documentTabs = tabs;
     tabs->installEventFilter(this);
   }
-  // As high as the buttons beside them.
-  tabs->setFixedHeight(m_history->maximumHeight());
+  // As high as the buttons beside them; Fork: on the Floating row from 4 px
+  // under its top to its foot.
+  tabs->setFixedHeight(m_floatingRow ? std::max(m_history->maximumHeight(), height() - 4)
+                                     : m_history->maximumHeight());
   updateRowMask();
   scheduleQuickFold();
 }

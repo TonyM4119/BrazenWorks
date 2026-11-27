@@ -79,7 +79,9 @@ protected:
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = m_bar->palette();
     const bool shown = tabIndex() == m_bar->currentIndex();
-    const QColor onAccent = themeColor(ColorRole::AccentText, pal);
+    // Fork: the shown design's tab is the toolbar's surface (Fusion's
+    // look), its × in the text colour as the others'.
+    const QColor onAccent = themeColor(ColorRole::Text, pal);
     if (underMouse() || isDown()) {
       QColor fill = shown ? onAccent : themeColor(ColorRole::Text, pal);
       fill.setAlpha(isDown() ? 70 : 40);
@@ -236,19 +238,26 @@ protected:
       const QRect tab = tabRect(i);
       const QRectF block = rowBlock(tab);
       const bool selected = i == currentIndex();
-      if (selected || (i == hovered && isEnabled())) {
-        // The shown design a flat block of the accent (the chosen tab of
-        // docs/ui-conventions.md), no line round it; a hovered one on the
-        // chrome's hover fill.
+      if (selected) {
+        // Fork: the shown design as Fusion's: a tab of the toolbar panel's
+        // surface, rounded at the top and open at the foot, down to the
+        // bar's bottom, where the panel goes on under it.
+        const QRectF open(block.left(), block.top(), block.width(), height() - block.top() + kControlRadius);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(selected ? accentColor(pal) : themeColor(ColorRole::HoverFill, pal));
+        painter.setBrush(themeColor(ColorRole::Surface, pal));
+        painter.setClipRect(QRectF(0, 0, width(), height()));
+        painter.drawRoundedRect(open, kControlRadius + 2, kControlRadius + 2);
+        painter.setClipping(false);
+      } else if (i == hovered && isEnabled()) {
+        // A hovered one on the chrome's hover fill.
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(themeColor(ColorRole::HoverFill, pal));
         painter.drawRoundedRect(block, kControlRadius, kControlRadius);
       }
-      // The name left of the close button, elided in the middle; on the
-      // accent in the color for text on it.
+      // The name left of the close button, elided in the middle.
       const QRect name = nameRect(i);
       painter.setFont(nameFont(selected));
-      painter.setPen(selected ? themeColor(ColorRole::AccentText, pal) : quiet);
+      painter.setPen(selected ? text : quiet);
       const QString elided = shownName(i);
       painter.drawText(name, Qt::AlignVCenter | Qt::AlignLeft, elided);
       shown.append(elided);
