@@ -1480,6 +1480,16 @@ surface colour with a line at its foot; no cards. Its parts:
   workspace works on the same design, and the list is locked while a
   sketch is open.
 
+- **Fuller groups**: the Solid tab's groups show most of their main
+  commands as buttons, as Fusion's (Create seven, Modify seven, Assemble
+  four, Inspect three); the tabs are spaced wide (20 px each side of a
+  name); the workspace block is a framed button (the window's colour in a
+  hairline frame, 8 px in from the panel's edges), at least 120 px wide.
+- **The view cube** (`ViewCube.cpp`): solid faces, light grey lighter at
+  the top (dark greys on a dark background), a grey line round each face,
+  the names in plain grey without a halo, the bevels a shade darker, and
+  thin coloured axes along the cube's edges.
+
 Where the points below say otherwise (cards, the 84 px block with its
 icon, the accent rectangle, 30 px icons, labels by default), these win.
 

@@ -598,7 +598,7 @@ protected:
     // seven tabs and the + of their menu in a window of about 1000 px. The
     // panel's: 11 px, a workspace's few tabs (mitcad#1990).
     return m_panelStyle ? QSize(QFontMetrics(capitalsFont(font(), 0.9, QFont::Normal)).horizontalAdvance(tabText(index).toUpper()) +
-                                    24 + arrowRoom(index),
+                                    40 + arrowRoom(index), // Fork: Fusion's wide tabs
                                 panelTabHeight(font()))
                         : QSize(fontMetrics().horizontalAdvance(tabText(index)) + 16, tabHeight(font()));
   }
@@ -1130,7 +1130,7 @@ public:
   QFont titleFont() const { return capitalsFont(font(), 1.05); }
   QSize sizeHint() const override {
     const int name = QFontMetrics(titleFont()).horizontalAdvance(m_title.toUpper());
-    return QSize(std::max(name + 6 + 8 + 32, uiRoomSize(96)), compactHeight());
+    return QSize(std::max(name + 6 + 8 + 40, uiRoomSize(120)), compactHeight());
   }
   QSize minimumSizeHint() const override { return sizeHint(); }
 
@@ -1146,12 +1146,13 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = palette();
-    const QRectF box = QRectF(rect()).adjusted(4.5, 6.5, -4.5, -6.5);
-    painter.setPen(Qt::NoPen);
-    if (isEnabled() && (isDown() || underMouse())) {
-      painter.setBrush(textTint(pal, isDown() ? 32 : 18));
-      painter.drawRoundedRect(box, kControlRadius, kControlRadius);
-    }
+    // Fork: a framed button as Fusion's workspace switch: the window's
+    // colour in a hairline frame, darker while hovered or pressed.
+    const QRectF box = QRectF(rect()).adjusted(8.5, 8.5, -8.5, -8.5);
+    painter.setPen(QPen(textTint(pal, 60), 1));
+    painter.setBrush(isEnabled() && (isDown() || underMouse()) ? textTint(pal, isDown() ? 32 : 18)
+                                                               : themeColor(ColorRole::Window, pal));
+    painter.drawRoundedRect(box, kControlRadius, kControlRadius);
     const QColor text = isEnabled() ? pal.color(QPalette::WindowText) : textTint(pal, 110);
     const QFont title = titleFont();
     const QString name = m_title.toUpper();
