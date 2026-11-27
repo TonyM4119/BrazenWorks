@@ -907,10 +907,10 @@
               "submenu": "Lines",
               "entries": [
                 {"command": "sketch.line", "button": true},
-                "sketch.line_midpoint"
+                "sketch.line_midpoint",
+                "sketch.point"
               ]
             },
-            {"command": "sketch.point", "button": true},
             {
               "submenu": "Rectangles",
               "entries": [
@@ -931,14 +931,9 @@
                 "sketch.circle_3tangent"
               ]
             },
-            {
-              "submenu": "Arcs",
-              "entries": [
-                {"command": "sketch.arc", "button": true},
-                "sketch.arc_center",
-                "sketch.arc_tangent"
-              ]
-            },
+            {"command": "sketch.spline", "button": true},
+            {"command": "sketch.mirror", "button": true},
+            {"submenu": "Arcs", "entries": ["sketch.arc", "sketch.arc_center", "sketch.arc_tangent"]},
             {
               "submenu": "Other Geometry",
               "entries": [
@@ -952,7 +947,7 @@
                 "sketch.slot_center",
                 "sketch.slot_arc",
                 "sketch.slot_arc_center",
-                {"command": "sketch.spline", "button": true},
+                "sketch.spline",
                 "sketch.spline_control",
                 "sketch.equation_curve"
               ]
@@ -961,7 +956,7 @@
             {"submenu": "Blocks", "entries": ["sketch.insert_block", "sketch.create_block"]},
             {
               "submenu": "Patterns",
-              "entries": ["sketch.rectangular_pattern", "sketch.circular_pattern", {"command": "sketch.mirror", "button": true}]
+              "entries": ["sketch.rectangular_pattern", "sketch.circular_pattern", "sketch.mirror"]
             },
             {
               "submenu": "References",
@@ -998,13 +993,13 @@
             "sketch.edit_block",
             "sketch.explode_block",
             "sketch.finish_block",
-            "sketch.cancel_block",
-            "sketch.parameters"
+            "sketch.cancel_block"
           ]
         },
         {
           "group": "CONSTRAINTS",
           "entries": [
+            {"command": "sketch.auto_constrain", "button": true},
             {"command": "sketch.constraint.horizontal_vertical", "button": true},
             {"command": "sketch.constraint.coincident", "button": true},
             {"command": "sketch.constraint.tangent", "button": true},
@@ -1018,22 +1013,30 @@
             {"command": "sketch.constraint.symmetric", "button": true},
             "sketch.constraint.smooth",
             "sketch.equal_spacing",
-            {"command": "sketch.auto_constrain", "button": true},
             "sketch.show_unconstrained"
+          ]
+        },
+        {
+          "group": "CONFIGURE",
+          "entries": [
+            {"command": "sketch.parameters", "button": true},
+            {"command": "manage.favorite_parameters", "button": true, "repeat": true},
+            {"command": "solid.configurations", "button": true, "repeat": true}
           ]
         },
         {
           "group": "INSPECT",
           "entries": [
-            {"command": "inspect.measure", "button": true, "repeat": true}
+            {"command": "inspect.measure", "button": true, "repeat": true},
+            {"command": "inspect.curvature_comb", "button": true, "repeat": true}
           ]
         },
         {
           "group": "INSERT",
           "entries": [
             {"command": "sketch.insert_dxf", "button": true},
-            "sketch.insert_svg",
-            "sketch.insert_points"
+            {"command": "sketch.insert_svg", "button": true},
+            {"command": "sketch.insert_points", "button": true}
           ]
         },
         {
