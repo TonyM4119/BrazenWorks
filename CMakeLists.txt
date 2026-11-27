@@ -53,6 +53,8 @@ project(Mitcad
   DESCRIPTION "Open source parametric desktop CAD"
   LANGUAGES CXX)
 mitcad_vcpkg_compiler_cache_done()
+# Fork: the product's name from branding.json (brand.hpp).
+include(cmake/Branding.cmake)
 # A changed overlay port (OCCT's patches) makes the next build configure
 # again and so run vcpkg's install, also without a configure step first.
 include(cmake/VcpkgPortDepends.cmake)

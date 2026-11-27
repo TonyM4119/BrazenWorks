@@ -1,274 +1,95 @@
-# MitCad
+# PureCAD
 
-MitCad is an open-source parametric desktop CAD application. It runs on
-Windows, Linux and macOS (Apple Silicon, macOS 14.4 or newer). Its license
-is the [MIT license](LICENSE).
+PureCAD is a free, open-source parametric CAD/CAM application for makers
+and shops, with a Fusion 360-style workflow. It is built on
+[MitCad](https://github.com/mitcad/Mitcad) and keeps everything MitCad
+does, then adds its own look, workflow and extras. Its license is the
+[MIT license](LICENSE).
 
-- **Parametric modeling with a history.** You draw sketches with
-  constraints and dimensions. Features go on a timeline. Parameters hold
-  expressions. When you change a dimension or edit a feature, MitCad
-  rebuilds the model.
-- **Visual workflow.** The window has a tabbed toolbar, command panels
-  with a live preview and drag handles, the Browser, the Timeline and a
-  command search.
-- **Many CAD formats.** FreeCAD, `.f3d`, SolidCraft and `.ipt` files open
-  with their history. IFC and `.rvt` building models open with their
-  storeys and elements. DWG drawings open with their 3D solids and
-  blocks, `.3dm` models with their polysurfaces, meshes and blocks.
-  MitCad imports and exports STEP, IGES, BRep, STL, OBJ, DXF and
-  3MF, imports SVG, and exports USDZ, web pages and drawings (PDF, SVG,
-  DXF, DWG).
-  The full table is in the user guide:
+- **Parametric modeling with a history.** Draw sketches with constraints
+  and dimensions; features go on a timeline; parameters hold expressions.
+  Change a dimension and the model rebuilds.
+- **A familiar workflow.** A tabbed toolbar, command panels with a live
+  preview and drag handles, the Browser, the Timeline and a command
+  search, moving towards Fusion 360's layout.
+- **Many CAD formats.** Opens FreeCAD, `.f3d`, SolidCraft and `.ipt` files
+  with their history; imports and exports STEP, IGES, BRep, STL, OBJ, DXF
+  and 3MF; exports drawings (PDF, SVG, DXF, DWG). The full table:
   [File formats](docs/user-guide.md#file-formats).
-- **3D printing.** MitCad sends bodies directly to a slicer (Bambu
-  Studio, OrcaSlicer, PrusaSlicer, UltiMaker Cura).
+- **Making things.** Sheet metal with flat patterns, CAM tooling, and
+  sending bodies straight to a slicer (Bambu Studio, OrcaSlicer,
+  PrusaSlicer, UltiMaker Cura).
 
-How to install and use MitCad: [the user guide](docs/user-guide.md).
-Website: [mitcad.org](https://mitcad.org/). Downloads:
-[the releases](https://github.com/mitcad/Mitcad/releases).
+## What PureCAD adds
 
-[![A pillow block modeled in MitCad from an empty design, then a dimension changed: watch the demo on mitcad.org](https://mitcad.org/assets/video/mitcad-demo-poster.webp)](https://mitcad.org/#showcase)
+- **Its own identity:** the PureCAD name, version (0.1.0), icon, program
+  file (`purecad.exe`) and installer, all set in one file,
+  [`branding.json`](branding.json) ([docs/branding.md](docs/branding.md)).
+- **Smoother rendering and motion:** a Smoothness setting for rounder
+  curves and an Anti-aliasing setting (Preferences › Display); camera
+  moves that ease in and out, including into and out of sketches; fading
+  hovers and command panels.
+- **A SolidCraft-style start page** with New Design in inches first.
+- In progress, one step at a time: a Fusion 360-style theme and toolbar,
+  a customizable right-click menu, and SolidCraft's extra tools.
 
-<table>
-  <tr>
-    <td><img src="https://mitcad.org/assets/shots/sketch-constraints.webp" alt="Sketch mode: a fully constrained profile with driving dimensions and the sketch palette"></td>
-    <td><img src="https://mitcad.org/assets/shots/feature-edit.webp" alt="Editing an extrude: the command panel, drag handles and parameter labels, the timeline rolled back"></td>
-    <td><img src="https://mitcad.org/assets/shots/rendered-view.webp" alt="The rendered view: the assembly path traced with soft shadows inside the application"></td>
-  </tr>
-  <tr>
-    <td><b>Sketch.</b> MitCad solves constraints and driving dimensions as you draw.</td>
-    <td><b>Edit.</b> Roll back the timeline and change a feature. The model follows.</td>
-    <td><b>Render.</b> A path-traced view of the design, in the window.</td>
-  </tr>
-</table>
+MitCad's own update checks, Ko-fi and Discord links are switched off:
+PureCAD is a separate project and offers its own builds.
 
-## Why
+## Building on Windows
 
-The world did not have a CAD application that is easy to use, imports
-many file formats and also runs on Linux. MitCad was started to be that
-application. It is free to use, change and share under the MIT license.
+Requirements: Windows 10 or 11 with Visual Studio 2022 or newer and its
+C++ desktop tools. Clone the repository to a short path, such as
+`C:\dev\src\PureCAD`, then in PowerShell run as administrator:
 
-If a file does not import correctly, please
-[open an issue](https://github.com/mitcad/Mitcad/issues).
-
-## Status
-
-MitCad is under active development. Each release has a Windows installer,
-a Linux AppImage and a macOS disk image. Solid modeling, sketches,
-assemblies with joints that move their components, analysis, the file
-formats of the user guide and the version history of projects work.
-
-Known gaps: direct modeling without a history, and some loft
-combinations.
-
-## Updates
-
-Once a day, MitCad checks for a signed release and offers to install it
-(the Windows installation, a per-user AppImage, the macOS application).
-The user or an administrator can set the checks to off
-([docs/updates.md](docs/updates.md)).
-
-## Building
-
-MitCad is C++17 (Qt 6 Widgets, Open CASCADE Technology) and Rust (the
-model, the solver and the file import), built with CMake and Ninja;
-Corrosion builds the Rust crates and CXX bridges the two languages.
-Versions used in development: Qt 6.12 LTS, OCCT 8.0.1 (built by vcpkg
-with a few patches of MitCad's that speed up booleans and the shape checker
-on faces with many edges, let fillets run over faces narrower than they
-are, fix other failures and crashes of the fillet, and make an allocation
-that fails throw instead of crashing:
-[third_party/vcpkg-ports](third_party/vcpkg-ports/README.md)), the Rust
-toolchain pinned in [rust-toolchain.toml](rust-toolchain.toml).
-
-The configure presets in [CMakePresets.json](CMakePresets.json)
-(`linux-debug`, `linux-release`, `macos-debug`, `macos-release`,
-`windows-release`; no Windows Debug build, as the render worker links
-release builds of its libraries) take
-vcpkg and Qt from the environment variables `VCPKG_ROOT` and
-`QT_ROOT_DIR`. The setup scripts below write a local
-`CMakeUserPresets.json` (not under version control) with a `dev` preset
-that sets them.
-
-Build and test in an isolated environment (dependency build scripts run
-third-party code): [docs/development.md](docs/development.md).
-
-### Linux
-
-Requirements: GCC 13+ or Clang, CMake 3.25+, Ninja, Rust, vcpkg and Qt
-6.8+. On Ubuntu 24.04 the scripts install everything with pinned
-versions:
-
-```bash
-sudo tools/dev-env/install-packages.sh
-tools/dev-env/setup-user.sh
-cmake --preset dev && cmake --build --preset dev && ctest --preset dev
+```powershell
+$env:MITCAD_RENDER_CUDA = "0"   # no CUDA renderer build (optional)
+powershell -ExecutionPolicy Bypass -File tools\dev-env\setup-windows.ps1 -Repo C:\dev\src\PureCAD
 ```
 
-The first configure builds OCCT and the renderer's libraries with vcpkg
-(about 30 minutes). The
-application is `build/dev/app/mitcad`; use a release build
-(`linux-release`) for performance measurements. Packaging as an
-AppImage: [docs/development.md](docs/development.md#linux-appimage).
+It installs Git, CMake, Ninja, Rust, Python, NSIS, vcpkg and Qt 6.12, and
+writes a local `CMakeUserPresets.json`. Then, in a normal PowerShell:
 
-Every build has the rendered view (a prototype with Cycles on the CPU,
-or an NVIDIA GPU with Cycles' CUDA device on Linux and Windows, Metal on
-macOS): the setup scripts run `tools/dev-env/build-cycles.sh --cuda`
-(`build-cycles.ps1 -Cuda` on Windows, `build-cycles-macos.sh` on macOS)
-once, which builds Cycles, its GPU kernels and Open Image Denoise from
-pinned sources outside the build folders
-([docs/rendering.md](docs/rendering.md#building));
-`MITCAD_RENDER_CUDA=0` leaves out the CUDA kernels' build on a
-development machine. Without the prefix the configure stops and names the
-script. The renderer is the
-executable `mitcad-render` next to `mitcad` (only it links the renderer's
-libraries), and View › Visual Style › Rendered appears whenever it is there, with View
-› Render Environment for the design's light (with lights of one's own),
-background, ground and exposure, and Render Image (and `mitcad-cli render`) for a final
-image file at a chosen size and quality; the AppImage, the Windows
-installer and the macOS bundle include it.
-
-### Windows
-
-Requirements: Visual Studio 2022 or newer with the C++ desktop tools.
-`setup-windows.ps1` installs Git, CMake, Ninja, ccache, Rust, Python, NSIS,
-cargo-deny, vcpkg and Qt (run it as an administrator), builds the
-renderer's libraries (`build-cycles.ps1 -Cuda`) and writes
-`CMakeUserPresets.json`; `msvc.cmd` runs a command in the MSVC
-environment:
-
-```bat
-powershell -ExecutionPolicy Bypass -File tools\dev-env\setup-windows.ps1 -Repo <checkout>
+```powershell
 tools\dev-env\msvc.cmd cmake --preset dev
 tools\dev-env\msvc.cmd cmake --build --preset dev
-tools\dev-env\msvc.cmd ctest --preset dev
+.\build\dev\purecad.exe
 ```
 
-The application is `build\dev\mitcad.exe` (with Qt's `bin` on `PATH`)
-and needs OpenGL 2.1+. Without a GPU, build Mesa's llvmpipe with
-`tools/dev-env/setup-mesa-windows.ps1` and configure with
-`-DMITCAD_MESA_DIR=<dir>/bin` ([docs/development.md](docs/development.md#windows-the-build-vm)).
+The first build takes a while (vcpkg builds OCCT and the libraries);
+later builds are quick. Run `purecad.exe` with Qt's `bin` folder on
+`PATH` (`C:\dev\Qt\6.12.0\msvc2022_64\bin`). It needs OpenGL 2.1 or newer.
 
-### macOS
+Linux and macOS build as MitCad does: see
+[MitCad's README](docs/mitcad-readme.md#building) and
+[docs/development.md](docs/development.md). (The program file is renamed
+on Windows only so far.)
 
-Requirements: Apple Silicon, macOS 14.4 or newer, the Xcode Command Line
-Tools and OpenGL 4.1 core (deprecated by Apple but present). In the build
-VM, `setup-macos.sh` installs CMake, Ninja, Rust, cargo-deny, vcpkg and Qt
-in the user's home directory, builds the renderer's libraries
-(`build-cycles-macos.sh`) and writes `CMakeUserPresets.json`:
+## Staying up to date with MitCad
 
-```bash
-tools/dev-env/sync-to-mac.sh
-ssh <user>@<guest> "~/src/mitcad/tools/dev-env/setup-macos.sh"
-ssh <user>@<guest> "cd ~/src/mitcad && cmake --preset dev && cmake --build --preset dev && ctest --preset dev"
+PureCAD is a thin fork: its changes are kept small and marked `Fork:` in
+the code, so MitCad's releases merge in cleanly:
+
+```sh
+git remote add upstream https://github.com/mitcad/Mitcad.git   # once
+git fetch upstream main
+git merge upstream/main
 ```
 
-The application is `build/dev/app/mitcad.app`. Packaging as a disk image:
-[docs/development.md](docs/development.md#macos-bundle-and-ui).
-macOS uses the same Qt interface as Linux and Windows; what stays native
-there (the Metal renderer, the system menu bar, the Settings window, system
-keys, trackpad navigation) and the macOS release check:
-[macOS with the shared Qt UI](docs/macos-shared-qt.md). The AppKit frontend
-is paused and not built ([native macOS UI](docs/native-macos-ui.md)).
+That is why MitCad's internal names stay in the source (file and crate
+names, `MITCAD_*` settings, its changelog and design notes): renaming them
+would make every update conflict. Everything the user sees says PureCAD.
 
-## Tests
+## Credits
 
-```bash
-tools/check-all.sh
-```
-
-runs the warning-free build, `cargo fmt`/`clippy`, dependency checks, and
-the ctests, corpus tests and UI tests (on a hidden Xvfb display) whose
-sources changed; `tools/check-all.sh --full`, the check before a release
-build, runs every test. Details, the Windows and macOS tests and the
-corpus setup: [docs/development.md](docs/development.md#the-check-script).
-
-## Repository layout
-
-| Directory | Contents |
-|---|---|
-| `core/model` | Rust model: document, timeline, features, sketches, naming, recompute, design file, JSON API ([commands.md](core/model-api/src/commands.md)) |
-| `core/solver` | 2D sketch constraint solver |
-| `core/vec3` | The `[f64; 3]` helpers shared by the model, the solver and the readers |
-| `core/f3d`, `core/f3d-design`, `core/f3d-decode`, `core/f3d-file`, `core/f3d-names`, `core/asm`, `core/dump`, `core/freecad`, `core/import`, `core/zip` | `.f3d` and FreeCAD readers (the ASM B-rep reader in `core/asm`, the dump IR in `core/dump`) and the history import |
-| `core/expr`, `core/print-keys` | Parameter expressions with units; the print settings' key map (both re-exported by the model) |
-| `core/ipt` | `.ipt` reader: compound file, property sets, segments, the bodies |
-| `core/solidcraft` | `.sc` and `.solidcraft` reader: the JSON design or its container, upgraded to one format; a `.sc` file only by its format key |
-| `core/3dm` | `.3dm` reader: the archive's chunks, layers, blocks and objects, and their conversion to the neutral B-rep model |
-| `core/dxf`, `core/3mf`, `core/usdz` | DXF, 3MF and USDZ |
-| `core/vcs`, `core/update` | Version history in git; automatic updates |
-| `core/ffi`, `core/cpp` | CXX bridges between Rust and C++ |
-| `core/ffi-staticlib` | The bridges' static library that the application links |
-| `geometry` | C++ facade over OCCT |
-| `app` | Qt application ([app/COMMANDS.md](app/COMMANDS.md)) |
-| `tools` | `mitcad-cli`, UI tests, dev environment scripts, FreeCAD export macros, macOS packaging |
-| `docs` | [Architecture](docs/architecture.md), [development](docs/development.md), [user guide](docs/user-guide.md), [updates](docs/updates.md), [rendering](docs/rendering.md), [UI conventions](docs/ui-conventions.md) |
-| `third_party` | Third-party files with their own licenses |
-
-## Contributions
-
-For the time being, we don't merge pull requests in this repository.
-Changes come in as a continuous stream of commits, and our development
-pipeline works best when they all flow in one direction. It is shaped
-like a tree: changes enter at its outer edges and converge, stage by
-stage, into a release. This GitHub repository sits at the trunk, where
-only finished releases arrive, one snapshot commit each. We intend to
-develop this further, but to keep the current pace, every change has to
-go through that pipeline for now. A pull request is therefore closed,
-and its change may be taken over internally. Issues are welcome and are
-the way to propose a change; a fix can be included in the issue as a
-diff.
-
-## AI agent policy
-
-Issues made entirely by an AI agent are welcome, with these conditions:
-
-- An agent that writes issues (or a fix in one) uses at least Claude
-  Opus 5.5 or GPT-6.1 Sol, with medium reasoning effort. High reasoning
-  effort is preferred. Lighter models and lower effort levels are not
-  accepted for this work.
-- Before writing an issue, the agent finds the code the issue concerns
-  and refers to it in the issue (files, functions, the current
-  behavior). This confirms that it has understood the context and the
-  target correctly; an issue written without looking at the code is not
-  accepted.
-
-## FAQ
-
-### Can RTX cards render faster? Can MitCad use OptiX?
-
-MitCad does not ship OptiX, but you can build it for your own machine.
-The renderer can use the ray tracing cores of NVIDIA's RTX cards only
-through NVIDIA OptiX, and the OptiX license does not fit open source
-software. The OptiX SDK headers would be compiled into MitCad's renderer.
-NVIDIA's license permits the distribution of such a program only in
-binary form, only for NVIDIA hardware, and only when an enforceable
-agreement binds every recipient to NVIDIA's terms. Open source software
-that anyone can download, build, change and pass on cannot meet those
-terms. Thus MitCad's downloads have no OptiX: NVIDIA cards render with
-Cycles' CUDA device, which needs no such terms but does not use the RT
-cores, so RTX cards render slower than they could
-([docs/rendering.md](docs/rendering.md#devices)).
-
-With the OptiX SDK that you download from NVIDIA yourself, under its
-license, you can build an OptiX render worker for your own machine and
-pick it in Preferences › Display › Render worker; the shipped worker
-stays as the fallback. The build is for your own use: passing it on is
-between you and NVIDIA's license
-([Building an OptiX worker yourself](docs/rendering.md#building-an-optix-worker-yourself)).
+PureCAD is built on [MitCad](https://github.com/mitcad/Mitcad) by the
+MitCad contributors, and borrows ideas from
+[SolidCraft](https://github.com/tangency-labs/solidcraft). MitCad's
+original README, with its full build, test and repository notes, is kept
+in [docs/mitcad-readme.md](docs/mitcad-readme.md).
 
 ## License
 
-MIT ([LICENSE](LICENSE)). Qt and OCCT are LGPL and linked dynamically.
-License policy: [docs/development.md](docs/development.md#licence-policy).
-
-## Model Context Protocol
-
-`mitcad-cli mcp --workspace /absolute/path/to/designs` starts a headless
-MCP server over stdio for a local AI client. The server can make and open
-documents, run native modeling commands and queries, save editable
-`.mitcad` files, and export geometry inside the workspace. Add
-`--read-only` to inspect existing designs. `mitcad-cli mcp --connect`
-connects an agent to the open desktop application instead. Client setup,
-a modeling example, the error rules and the current limits:
-[docs/mcp.md](docs/mcp.md).
+MIT ([LICENSE](LICENSE)), keeping MitCad's copyright notice as the license
+requires. Qt and OCCT are LGPL and linked dynamically. License policy:
+[docs/development.md](docs/development.md#licence-policy).

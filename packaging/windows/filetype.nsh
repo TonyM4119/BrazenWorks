@@ -13,14 +13,14 @@
 ; all users.
 
 !macro MitcadFileTypeRegister
-  WriteRegStr SHCTX "Software\Classes\.mitcad" "" "Mitcad.Project"
-  WriteRegStr SHCTX "Software\Classes\Mitcad.Project" "" "MitCad design"
-  WriteRegStr SHCTX "Software\Classes\Mitcad.Project\shell\open\command" "" \
-    '"$INSTDIR\bin\mitcad.exe" --open "%1"'
+  WriteRegStr SHCTX "Software\Classes\.mitcad" "" "${BRAND_PROGID}.Project"
+  WriteRegStr SHCTX "Software\Classes\${BRAND_PROGID}.Project" "" "${BRAND_NAME} design"
+  WriteRegStr SHCTX "Software\Classes\${BRAND_PROGID}.Project\shell\open\command" "" \
+    '"$INSTDIR\bin\${BRAND_EXE}" --open "%1"'
   ; The files MitCad imports under Open with (below).
-  WriteRegStr SHCTX "Software\Classes\Mitcad.Import" "" "Model for MitCad"
-  WriteRegStr SHCTX "Software\Classes\Mitcad.Import\shell\open\command" "" \
-    '"$INSTDIR\bin\mitcad.exe" --open "%1"'
+  WriteRegStr SHCTX "Software\Classes\${BRAND_PROGID}.Import" "" "Model for ${BRAND_NAME}"
+  WriteRegStr SHCTX "Software\Classes\${BRAND_PROGID}.Import\shell\open\command" "" \
+    '"$INSTDIR\bin\${BRAND_EXE}" --open "%1"'
   !insertmacro MitcadImportExtensions MitcadOpenWithRegister
   ; Explorer's thumbnails of designs (below).
   !insertmacro MitcadThumbnailsRegister
@@ -32,9 +32,9 @@
   !insertmacro MitcadThumbnailsUnregister
   !insertmacro MitcadThumbnailsMoveAside
   !insertmacro MitcadImportExtensions MitcadOpenWithUnregister
-  DeleteRegKey SHCTX "Software\Classes\Mitcad.Import"
+  DeleteRegKey SHCTX "Software\Classes\${BRAND_PROGID}.Import"
   DeleteRegKey SHCTX "Software\Classes\.mitcad"
-  DeleteRegKey SHCTX "Software\Classes\Mitcad.Project"
+  DeleteRegKey SHCTX "Software\Classes\${BRAND_PROGID}.Project"
   System::Call 'shell32::SHChangeNotify(i 0x08000000, i 0, p 0, p 0)'
 !macroend
 
@@ -50,11 +50,11 @@
 ; "!insertmacro ${OPERATION} <extension>" line each, and checks every
 ; value after the install and the uninstall (mitcad#2555).
 !macro MitcadOpenWithRegister EXT
-  WriteRegStr SHCTX "Software\Classes\.${EXT}\OpenWithProgids" "Mitcad.Import" ""
+  WriteRegStr SHCTX "Software\Classes\.${EXT}\OpenWithProgids" "${BRAND_PROGID}.Import" ""
 !macroend
 
 !macro MitcadOpenWithUnregister EXT
-  DeleteRegValue SHCTX "Software\Classes\.${EXT}\OpenWithProgids" "Mitcad.Import"
+  DeleteRegValue SHCTX "Software\Classes\.${EXT}\OpenWithProgids" "${BRAND_PROGID}.Import"
 !macroend
 
 !macro MitcadImportExtensions OPERATION
@@ -105,7 +105,7 @@
 
 !macro MitcadThumbnailsRegister
   SetRegView 64
-  WriteRegStr SHCTX "Software\Classes\CLSID\${MITCAD_THUMBNAIL_CLSID}" "" "MitCad design thumbnails"
+  WriteRegStr SHCTX "Software\Classes\CLSID\${MITCAD_THUMBNAIL_CLSID}" "" "${BRAND_NAME} design thumbnails"
   WriteRegStr SHCTX "Software\Classes\CLSID\${MITCAD_THUMBNAIL_CLSID}\InprocServer32" "" \
     "$INSTDIR\bin\${MITCAD_THUMBNAIL_DLL}"
   WriteRegStr SHCTX "Software\Classes\CLSID\${MITCAD_THUMBNAIL_CLSID}\InprocServer32" "ThreadingModel" "Apartment"

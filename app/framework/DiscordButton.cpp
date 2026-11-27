@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "DiscordButton.hpp"
+#include <brand.hpp>  // Fork: kUpstreamCommunityLinks
 
 #include <algorithm>
 #include <cmath>
@@ -65,7 +66,12 @@ QUrl discordUrl() { return QUrl(QStringLiteral("https://mitcad.org/discord")); }
 
 QString DiscordSettings::visibleKey() { return QStringLiteral("appearance/discordButton"); }
 
-bool DiscordSettings::loadVisible() { return QSettings().value(visibleKey(), true).toBool(); }
+bool DiscordSettings::loadVisible() {
+  if (!brand::kUpstreamCommunityLinks) {
+    return false;  // Fork: the upstream's community links are off (branding.json)
+  }
+  return QSettings().value(visibleKey(), true).toBool();
+}
 
 bool DiscordSettings::saveVisible(bool visible) {
   if (loadVisible() == visible) {

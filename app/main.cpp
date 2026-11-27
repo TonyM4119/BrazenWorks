@@ -29,6 +29,7 @@
 #include <utility>
 #include <vector>
 
+#include "framework/Brand.hpp"
 #include "MainWindow.hpp"
 #include "WindowManager.hpp"
 #include "DocumentFrame.hpp"
@@ -123,7 +124,7 @@ void useStoredSettings() {
 #ifdef MITCAD_3DXWARE_PREVIEW
   const QString kOrganizationDomain = QStringLiteral("3dxware-test.mitcad.org");
 #else
-  const QString kOrganizationDomain = QStringLiteral("nocodo.fi");
+  const QString kOrganizationDomain = QString::fromUtf8(brand::kOrganizationDomain);  // Fork
 #endif
   QCoreApplication::setOrganizationDomain(kOrganizationDomain);
 #endif
@@ -382,7 +383,7 @@ int runApplication(int argc, char* argv[]) {
     const QString text = QString::fromStdString(problem);
     qCritical().noquote() << "Mixed installation:" << text;
     if (!mitcad::headlessUiTest()) {
-      QMessageBox::critical(nullptr, QStringLiteral("MitCad"), text);
+      QMessageBox::critical(nullptr, QString::fromUtf8(brand::kDisplayName), text);  // Fork
     }
     return 3;
   }
@@ -390,11 +391,11 @@ int runApplication(int argc, char* argv[]) {
   // one drawn for them (the small ones are simplified).
   QIcon appIcon;
   for (const int size : {16, 20, 24, 32, 40, 48, 64, 96, 128, 256}) {
-    appIcon.addFile(QStringLiteral(":/branding/png/mitcad-%1.png").arg(size), QSize(size, size));
+    appIcon.addFile(QStringLiteral(":/brand/png/icon-%1.png").arg(size), QSize(size, size));
   }
   QApplication::setWindowIcon(appIcon);
   // The desktop file whose icon the desktop shows (packaging/linux).
-  QGuiApplication::setDesktopFileName(QStringLiteral("mitcad"));
+  QGuiApplication::setDesktopFileName(QString::fromUtf8(brand::kSlug));  // Fork: branding.json
   mitcad::integrateDesktop();
   // The component browser's downloads that an earlier run left behind (a
   // crash, a run killed): no running MitCad holds them (mitcad#1579).
@@ -564,6 +565,7 @@ int runApplication(int argc, char* argv[]) {
   // The interface language (mitcad#1460): its catalogues installed before
   // any window or command definition takes its texts.
   mitcad::startInterfaceLanguage(parser.value(languageOption));
+  mitcad::installBrandTranslator();  // Fork: the product's name in the interface texts
 
   if (parser.isSet(uiOption)) {
     const QString ui = parser.value(uiOption);
@@ -977,12 +979,18 @@ int runApplication(int argc, char* argv[]) {
 } // namespace
 
 int main(int argc, char* argv[]) {
+  // Fork: the upstream's update checks offer MitCad's own releases,
+  // which would replace this build (branding.json upstreamUpdateChecks).
+  if (!brand::kUpstreamUpdateChecks && qEnvironmentVariableIsEmpty("MITCAD_NO_UPDATE_CHECK")) {
+    qputenv("MITCAD_NO_UPDATE_CHECK", "1");
+  }
   // --version answers before any window, display or log is set up (a run
   // without a display, as in the release's build root, and its output
   // reaches a pipe even if a later teardown would crash).
   for (int index = 1; index < argc; ++index) {
     if (std::strcmp(argv[index], "--version") == 0 || std::strcmp(argv[index], "-v") == 0) {
-      std::printf("%s %s\n", qPrintable(mitcad::programName()), MITCAD_VERSION);
+      std::printf("%s %s (based on %s %s)\n", qPrintable(mitcad::programName()), brand::kVersion,  // Fork
+                  brand::kUpstreamName, MITCAD_VERSION);
       std::fflush(stdout);
       return 0;
     }

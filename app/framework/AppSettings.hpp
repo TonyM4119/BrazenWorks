@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #pragma once
 
+#include <brand.hpp>
 #include <optional>
 
 #include <QString>
@@ -19,7 +20,8 @@ inline QString storedApplicationName() {
 #ifdef MITCAD_3DXWARE_PREVIEW
   return QStringLiteral("MitCad 3DxWare Test");
 #else
-  return QStringLiteral("Mitcad");
+  // Fork: branding.json (its own settings, apart from MitCad's).
+  return QString::fromUtf8(brand::kStoredName);
 #endif
 }
 
@@ -29,9 +31,14 @@ inline QString programName() {
 #ifdef MITCAD_3DXWARE_PREVIEW
   return storedApplicationName();
 #else
-  return QStringLiteral("MitCad");
+  return QString::fromUtf8(brand::kDisplayName);  // Fork: branding.json
 #endif
 }
+
+// Fork: the product's own version as people read it (branding.json): the
+// title, About, the title bar and --version. QApplication's version stays
+// the upstream's (MITCAD_VERSION), which designs and settings record.
+inline QString programVersion() { return QString::fromUtf8(brand::kVersion); }
 
 // The application's general settings (Preferences, General), kept in the
 // user's settings (autosave/enabled, autosave/minutes). Minutes, like every

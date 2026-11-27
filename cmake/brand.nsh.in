@@ -1,0 +1,8 @@
+; SPDX-License-Identifier: MIT
+; Fork: the product's names for the installer scripts, generated from
+; branding.json by cmake/Packaging.cmake (CPACK_NSIS_DEFINES), then the
+; upstream's file type script, which uses them.
+!define BRAND_NAME "@BRAND_DISPLAY_NAME@"
+!define BRAND_EXE "@BRAND_EXE@"
+!define BRAND_PROGID "@BRAND_STORED_NAME@"
+!include "@PROJECT_SOURCE_DIR@/packaging/windows/filetype.nsh"

@@ -1,0 +1,26 @@
+<!-- SPDX-License-Identifier: MIT -->
+<!-- PureCAD application icon, 64 px and up:
+     an isometric cube with its front corner chamfered, on a dark teal tile.
+     PNG and ICO files: tools/make-brand-icons.sh. -->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 256 256">
+  <defs>
+    <linearGradient id="tile" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#1f4650"/><stop offset="1" stop-color="#0a1b21"/></linearGradient>
+    <linearGradient id="top" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#f2fdff"/><stop offset="1" stop-color="#b9ecf3"/></linearGradient>
+    <linearGradient id="facet" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="#ffb066"/><stop offset="1" stop-color="#ff7a2e"/></linearGradient>
+  </defs>
+  <rect x="8" y="8" width="240" height="240" rx="52" fill="url(#tile)"/>
+  <rect x="8.75" y="8.75" width="238.5" height="238.5" rx="51.25" fill="none" stroke="#4f8590" stroke-opacity="0.5" stroke-width="1.5"/>
+  <!-- Construction lines along the cube's outline, past its corners. -->
+  <g stroke="#7fe3ee" stroke-opacity="0.35" stroke-width="1.2" stroke-linecap="round">
+    <line x1="128.0" y1="36.0" x2="128.0" y2="52.0"/>
+    <line x1="128.0" y1="220.0" x2="128.0" y2="234.0"/>
+    <line x1="41.3" y1="170.0" x2="41.3" y2="86.0" stroke-dasharray="4 5"/>
+    <line x1="214.7" y1="170.0" x2="214.7" y2="86.0" stroke-dasharray="4 5"/>
+  </g>
+  <g stroke="#ffffff" stroke-opacity="0.35" stroke-width="1.5" stroke-linejoin="round">
+    <polygon points="128.0,52.0 200.7,94.0 155.6,120.0 100.4,120.0 55.3,94.0" fill="url(#top)"/>
+    <polygon points="55.3,94.0 100.4,120.0 128.0,167.9 128.0,220.0 55.3,178.0" fill="#3cc4d1"/>
+    <polygon points="155.6,120.0 200.7,94.0 200.7,178.0 128.0,220.0 128.0,167.9" fill="#168797"/>
+    <polygon points="100.4,120.0 155.6,120.0 128.0,167.9" fill="url(#facet)"/>
+  </g>
+</svg>

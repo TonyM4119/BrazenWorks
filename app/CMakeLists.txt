@@ -399,10 +399,12 @@ qt_add_resources(mitcad icons PREFIX / FILES ${MITCAD_ICONS})
 # The application icon (branding/mitcad.svg, rendered by tools/make-icons.sh):
 # the window's icon from the PNG files, Explorer's and the taskbar's from
 # mitcad.ico in the executable's resources.
-file(GLOB MITCAD_APP_ICONS RELATIVE "${CMAKE_CURRENT_SOURCE_DIR}" CONFIGURE_DEPENDS branding/png/*.png)
-qt_add_resources(mitcad branding PREFIX / FILES ${MITCAD_APP_ICONS})
+# Fork: the product's icon from branding.json's iconDir (cmake/Branding.cmake),
+# at :/brand/png/icon-<size>.png, and the generated brand.rc.
+file(GLOB MITCAD_APP_ICONS CONFIGURE_DEPENDS "${BRAND_ICON_DIR}/png/*.png")
+qt_add_resources(mitcad branding PREFIX /brand BASE "${BRAND_ICON_DIR}" FILES ${MITCAD_APP_ICONS})
 if(WIN32)
-  target_sources(mitcad PRIVATE branding/mitcad.rc)
+  target_sources(mitcad PRIVATE "${BRAND_GENERATED_DIR}/brand.rc")
 endif()
 # Narrow strings as UTF-8 on Windows too: the paths the application hands
 # the bridge and the geometry as std::string (cmake/Utf8CodePage.cmake).
@@ -607,6 +609,11 @@ if(APPLE)
 endif()
 
 set_target_properties(mitcad PROPERTIES WIN32_EXECUTABLE ON)
+# Fork: the program file is <slug>.exe on Windows (branding.json); the
+# target keeps the upstream's name, so $<TARGET_FILE:mitcad> follows it.
+if(WIN32)
+  set_target_properties(mitcad PROPERTIES OUTPUT_NAME "${BRAND_SLUG}")
+endif()
 
 # Automatic updates (mitcad#9, docs/updates.md). The requests go through Qt
 # Network (its TLS backends are Qt's plugins: no TLS library of Mitcad's
@@ -693,6 +700,11 @@ endif()
 # it. The default is the issue page README.md names.
 set(MITCAD_ISSUE_URL "https://github.com/mitcad/Mitcad/issues" CACHE STRING
     "The issue tracker feedback and error reports open (an issue list's address, or a template with {title} and {body})")
+# Fork: feedback and reports go to this project's issues (branding.json's
+# repositoryUrl), also in a build folder that cached the upstream's default.
+if(MITCAD_ISSUE_URL STREQUAL "https://github.com/mitcad/Mitcad/issues")
+  set(MITCAD_ISSUE_URL "${BRAND_REPOSITORY_URL}/issues")
+endif()
 target_compile_definitions(mitcad PRIVATE MITCAD_ISSUE_URL="${MITCAD_ISSUE_URL}")
 # Help › User Guide (mitcad#1032) opens docs/user-guide.md in the public
 # repository README.md names, at the release's tag v<version>. main never

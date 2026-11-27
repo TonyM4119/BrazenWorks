@@ -28,7 +28,10 @@ void showAboutDialog(QWidget* parent) {
       QStringLiteral("<p>%1</p>")
           .arg(QObject::tr("A parametric desktop CAD application with a history-based modeling workflow.")) +
       QStringLiteral("<p>%1</p>")
-          .arg(QObject::tr("Licensed under the MIT license. Copyright (c) 2026 MitCad contributors.")) +
+          // Fork: the upstream's copyright notice, which the MIT licence keeps; the
+          // name is an argument, so BrandTranslator does not swap it.
+          .arg(QObject::tr("Licensed under the MIT license. Copyright (c) 2026 %1 contributors.")
+                   .arg(QString::fromUtf8(brand::kUpstreamName))) +
       QStringLiteral("<p>%1</p><ul>").arg(QObject::tr("Built with:")) +
       QStringLiteral("<li>%1</li>")
           .arg(QObject::tr("Open CASCADE Technology %1 (LGPL-2.1 with the Open CASCADE exception)")
@@ -57,7 +60,11 @@ void showAboutDialog(QWidget* parent) {
   return;
 #else
   const QString text =
-      QStringLiteral("<h3>%1 %2</h3>").arg(name.toHtmlEscaped(), QApplication::applicationVersion().toHtmlEscaped()) +
+      QStringLiteral("<h3>%1 %2</h3>").arg(name.toHtmlEscaped(), programVersion().toHtmlEscaped()) +
+      // Fork: the upstream release this build is based on.
+      QStringLiteral("<p>Based on %1 %2 (<a href=\"%3\">%3</a>)</p>")
+          .arg(QString::fromUtf8(brand::kUpstreamName), QApplication::applicationVersion().toHtmlEscaped(),
+               QString::fromUtf8(brand::kUpstreamUrl)) +
       body;
   QMessageBox::about(parent, QObject::tr("About %1").arg(name), text);
 #endif
