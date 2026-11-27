@@ -136,7 +136,10 @@ ColorRole statusRole(QRgb source) {
 
 QRgb roleRgb(ColorRole role, bool dark) { return themeColor(role, dark).rgb() & 0xffffff; }
 
-Paint rolePaint(IconRole role, bool dark, bool stroke, QRgb source) {
+// MitCad's one-colour family: the outline's navy, white and its tints for
+// the faces. Fork: kept for disabled icons (disabledPaint); rolePaint draws
+// the colours below.
+Paint monoPaint(IconRole role, bool dark, bool stroke, QRgb source) {
   const QRgb outline = dark ? 0xc9d8ee : 0x34507a;
   const QRgb blue = roleRgb(ColorRole::Action, dark); // the icons' action blue (mitcad#230)
   const QRgb amber = dark ? 0xd6b46a : 0xb07800;
@@ -176,10 +179,57 @@ Paint rolePaint(IconRole role, bool dark, bool stroke, QRgb source) {
   return {dark ? readableOnDark(source) : source, 1.0};
 }
 
-// A disabled icon: every role in the outline colour at its own opacity; the
-// white of the light theme's faces stays white (it carries no hue).
+// Fork: PureCAD's colour family, in the manner of Fusion's icons (drawn
+// anew, docs/ui-conventions.md "Icons"): shaded blue solids (a lit top, a
+// mid side, a deeper far side), amber planes, yellow worked faces (the
+// Pencil role's fill) and orange actions, under a slate outline. Opaque on
+// the light theme; on the dark theme the faces are deeper and the lines
+// lighter, so that both read on their surface.
+Paint colourPaint(IconRole role, bool dark, bool stroke, QRgb source) {
+  const QRgb outline = dark ? 0xcbd7e8 : 0x3a4a5e;
+  const QRgb amber = dark ? 0xe2b45e : 0xc98a1c;
+  switch (role) {
+  case IconRole::Outline:
+    return {outline, 1.0};
+  case IconRole::TopFace:
+    return {dark ? 0xa9c7eeu : 0xdce9f8u, 1.0};
+  case IconRole::SideFace:
+    return {dark ? 0x7099cfu : 0xa3c2e8u, 1.0};
+  case IconRole::FarSide:
+    return {dark ? 0x4b72a8u : 0x6f97ccu, 1.0};
+  case IconRole::PaleSurface:
+    return dark ? Paint{0xbcd0ee, 0.20} : Paint{0xe4edf8, 1.0};
+  case IconRole::Hollow:
+    return dark ? Paint{0xf0f6ff, 0.14} : Paint{0xffffff, 1.0};
+  case IconRole::ConstructionNear:
+    return stroke ? Paint{amber, 1.0} : dark ? Paint{amber, 0.42} : Paint{0xf5c46e, 0.78};
+  case IconRole::ConstructionFar:
+    return stroke ? Paint{amber, 1.0} : dark ? Paint{amber, 0.22} : Paint{0xf7d9a6, 0.62};
+  case IconRole::ConstructionLine:
+    return {amber, 1.0};
+  case IconRole::Action:
+    return {dark ? 0xff9a3cu : 0xef7d16u, 1.0};
+  case IconRole::Sketch:
+    return {dark ? 0x6ea8ffu : 0x1f6bd6u, 1.0};
+  case IconRole::Pencil:
+    return stroke ? Paint{outline, 1.0} : Paint{dark ? 0xf2c14eu : 0xf6c445u, 1.0};
+  case IconRole::Muted:
+    return {outline, 0.5};
+  case IconRole::Status:
+    break;
+  }
+  return monoPaint(role, dark, stroke, source);
+}
+
+Paint rolePaint(IconRole role, bool dark, bool stroke, QRgb source) {
+  return colourPaint(role, dark, stroke, source);
+}
+
+// A disabled icon: every role in the outline colour at the one-colour
+// family's opacity; the white of the light theme's faces stays white (it
+// carries no hue).
 Paint disabledPaint(IconRole role, bool dark, bool stroke, QRgb source) {
-  Paint paint = rolePaint(role, dark, stroke, source);
+  Paint paint = monoPaint(role, dark, stroke, source);
   if (paint.rgb != 0xffffff) {
     paint.rgb = rolePaint(IconRole::Outline, dark, stroke, source).rgb;
   }
@@ -190,10 +240,10 @@ Paint disabledPaint(IconRole role, bool dark, bool stroke, QRgb source) {
 // device pixel ratio it is asked for.
 class SvgIconEngine : public QIconEngine {
 public:
-  SvgIconEngine(QByteArray svg, IconBackdrop backdrop, double outlineWeight)
-      : m_svg(std::move(svg)), m_backdrop(backdrop), m_outlineWeight(outlineWeight) {}
+  SvgIconEngine(QByteArray svg, IconBackdrop backdrop, double outlineWeight, bool mono = false)
+      : m_svg(std::move(svg)), m_backdrop(backdrop), m_outlineWeight(outlineWeight), m_mono(mono) {}
 
-  QIconEngine* clone() const override { return new SvgIconEngine(m_svg, m_backdrop, m_outlineWeight); }
+  QIconEngine* clone() const override { return new SvgIconEngine(m_svg, m_backdrop, m_outlineWeight, m_mono); }
 
   QString key() const override { return QStringLiteral("mitcad-svg"); }
 
@@ -226,9 +276,12 @@ public:
     if (cached != m_cache.cend()) {
       return cached.value();
     }
-    QByteArray& themed = m_themed[(dark ? 2 : 0) + (disabled ? 1 : 0)];
+    // Fork: a one-colour icon (monochromeIcon) in the disabled colours at
+    // full opacity.
+    const bool oneColour = disabled || m_mono;
+    QByteArray& themed = m_themed[(dark ? 2 : 0) + (oneColour ? 1 : 0)];
     if (themed.isEmpty()) {
-      themed = themedIconSvg(m_svg, dark, disabled, m_outlineWeight);
+      themed = themedIconSvg(m_svg, dark, oneColour, m_outlineWeight);
     }
     QSvgRenderer renderer(themed);
     renderer.setAspectRatioMode(Qt::KeepAspectRatio);
@@ -276,6 +329,7 @@ private:
   std::array<QByteArray, 4> m_themed;
   IconBackdrop m_backdrop;
   double m_outlineWeight;
+  bool m_mono = false; // Fork: monochromeIcon
   QHash<QString, QPixmap> m_cache;
 };
 
@@ -454,6 +508,26 @@ QIcon withOutlineWeight(const QIcon& icon, double outlineWeight) {
     return icon;
   }
   return themeIcon(origin->name, origin->backdrop, outlineWeight);
+}
+
+QIcon monochromeIcon(const QIcon& icon) {
+  const auto origin = iconOrigins().constFind(icon.cacheKey());
+  if (icon.isNull() || origin == iconOrigins().cend()) {
+    return icon;
+  }
+  static QHash<QString, QIcon> cache;
+  const QString key = QStringLiteral("%1:%2").arg(int(origin->backdrop)).arg(origin->name);
+  const auto cached = cache.constFind(key);
+  if (cached != cache.cend()) {
+    return cached.value();
+  }
+  QFile file(QStringLiteral(":/icons/%1.svg").arg(origin->name));
+  QIcon mono = icon;
+  if (file.open(QIODevice::ReadOnly)) {
+    mono = QIcon(new SvgIconEngine(file.readAll(), origin->backdrop, 1.0, true));
+  }
+  cache.insert(key, mono);
+  return mono;
 }
 
 QIcon swatchIcon(const QColor& color) {

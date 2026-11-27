@@ -2871,6 +2871,9 @@ void MainWindow::createFloatingPanels() {
     m_floating->setFlushRow(m_titleRow);
     m_floating->addTopRow(m_titleRow, [row = m_titleRow] { return row->rowParts(); });
     connect(m_titleRow, &TitleBar::rowPartsChanged, m_floating, &FloatingLayout::requestLayout);
+    // Fork: the toolbar panel a bar too, right under the title row, as in
+    // Fusion (docs/ui-conventions.md "The toolbar panel").
+    m_floating->setFlushRow(m_ribbon);
     m_floating->addTopRow(m_ribbon, [ribbon = m_ribbon] { return ribbon->panelParts(); }, m_ribbon->panelRowParts());
     connect(m_ribbon, &Ribbon::groupCardsChanged, m_floating, &FloatingLayout::requestLayout);
   }
@@ -9835,6 +9838,10 @@ void MainWindow::updateWindowTitle() {
                                                     .arg(QFileInfo(m_inPlaceFile).fileName(), documentName())
                                               : documentName();
   setWindowTitle(QStringLiteral("%1[*] - %2 %3").arg(titleName, programName(), programVersion()));
+  // Fork: the Browser's root row shows the design's name, as Fusion's.
+  if (m_controller != nullptr && m_controller->browser() != nullptr) {
+    m_controller->browser()->setDesignName(m_noDesign ? QString() : documentName());
+  }
   const bool modified = isModified();
   setWindowModified(modified);
   // Save follows the mark (its enabled() reads it), also after a save that

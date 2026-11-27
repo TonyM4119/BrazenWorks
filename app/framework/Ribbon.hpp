@@ -744,6 +744,9 @@ private:
 // button its icon. The action keeps its icon for the menus and the command
 // search.
 QIcon commandButtonIcon(const QToolButton* button);
+// Fork: a widget whose command buttons draw their icons in one colour
+// (monochromeIcon): the Floating top bar, as Fusion's.
+inline constexpr const char* kMonochromeIconsProperty = "pureCadMonochromeIcons";
 
 // A rounded panel in the palette's material (the group capsules, the Undo and
 // Redo pair): fill, hairline border and a faint shadow below.

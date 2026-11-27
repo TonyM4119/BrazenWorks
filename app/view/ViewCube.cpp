@@ -69,8 +69,12 @@ constexpr double kBaseSize = 70.0;
 // the edges and corners about twice as easy to hit), the faces a little
 // smaller and the cube a tenth larger across (1.44 against 1.3 times the
 // size), still inside the arrows and below the Home button.
-constexpr double kFaceShare = 0.86;
-constexpr double kBevelShare = 0.29;
+// Fork: as Fusion's cube, crisp: the faces most of it and thin bevels, the
+// cube as large across as MitCad's (1.24 + 2 x 0.10 = 1.44 times the size;
+// MitCad: 0.86 and 0.29). The edges and corners keep their picking's extra
+// sensitivity (ComputeSelection).
+constexpr double kFaceShare = 1.24;
+constexpr double kBevelShare = 0.10;
 // The faces' textures: about four texels to a pixel of a face at 2x.
 constexpr int kTexture = 512;
 // The cube's own perspective (mitcad#774): the tangent of half its field of
@@ -99,10 +103,13 @@ struct Glass {
 // OCCT blends in linear light: a little of a light ground behind lightens
 // dark glass a lot, so the dark glass is only for a dark background and the
 // frosted light glass for a light one (setViewCubeBackdrop).
-const Glass kDarkGlass{QColor(0x2b, 0x31, 0x39), QColor(0x18, 0x1c, 0x22), 217, QColor(0xee, 0xf1, 0xf5),
-                       QColor(0, 0, 0), 0.55, QColor(0x6b, 0x77, 0x86), 0.10};
-const Glass kLightGlass{QColor(0xfa, 0xfb, 0xfd), QColor(0xe4, 0xe8, 0xee), 225, QColor(0x2a, 0x30, 0x38),
-                        QColor(255, 255, 255), 0.75, QColor(0xa8, 0xb2, 0xbf), 0.12};
+// Fork: Fusion's cube: solid, light grey faces lighter at the top, their
+// names in a quiet grey without a halo, the bevels a shade darker, a grey
+// line round each face; on a dark background the same in dark greys.
+const Glass kDarkGlass{QColor(0x46, 0x4a, 0x50), QColor(0x34, 0x37, 0x3c), 255, QColor(0xc4, 0xc9, 0xd0),
+                       QColor(0, 0, 0), 0.0, QColor(0x6a, 0x70, 0x78), 0.0};
+const Glass kLightGlass{QColor(0xf6, 0xf6, 0xf7), QColor(0xdd, 0xde, 0xe0), 255, QColor(0x6c, 0x6f, 0x75),
+                        QColor(255, 255, 255), 0.0, QColor(0xa4, 0xa7, 0xad), 0.0};
 
 const Glass& glassFor(bool dark) { return dark ? kDarkGlass : kLightGlass; }
 
@@ -201,13 +208,9 @@ QImage faceImage(const QString& label, const Glass& glass) {
     body.setColorAt(0.0, top);
     body.setColorAt(1.0, bottom);
     painter.fillRect(image.rect(), body);
-    QLinearGradient sheen(0, 0, n * 0.55, n);
-    sheen.setColorAt(0.0, QColor(255, 255, 255, 30));
-    sheen.setColorAt(0.30, QColor(255, 255, 255, 12));
-    sheen.setColorAt(0.55, QColor(255, 255, 255, 0));
-    painter.fillRect(image.rect(), sheen);
-    const double w = n * 0.012;
-    painter.setPen(QPen(QColor(255, 255, 255, 46), w));
+    // Fork: a grey line round the face, as Fusion's cube (no sheen).
+    const double w = n * 0.014;
+    painter.setPen(QPen(glass.label.lighter(glass.label.lightness() > 128 ? 70 : 135), w));
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(QRectF(w / 2, w / 2, n - w, n - w));
   }
@@ -217,11 +220,11 @@ QImage faceImage(const QString& label, const Glass& glass) {
   font.setFamilies({QStringLiteral("Segoe UI"), QStringLiteral("Helvetica Neue"), QStringLiteral("Inter"),
                     QStringLiteral("DejaVu Sans")});
   font.setStyleHint(QFont::SansSerif);
-  font.setWeight(QFont::Bold);
+  font.setWeight(QFont::Normal); // Fork: Fusion's plain names (MitCad: Bold)
   font.setLetterSpacing(QFont::PercentageSpacing, 106);
   // Of the face: as large on the screen as on AIS_ViewCube's larger face
   // (0.17 of it; kFaceShare), and the widest names a little wider on it.
-  constexpr double kLetters = 0.20;
+  constexpr double kLetters = 0.15; // Fork: the face larger, the names as large on the screen
   font.setPixelSize(qRound(n * kLetters));
   QPainterPath path;
   path.addText(0, 0, font, label);
@@ -250,7 +253,9 @@ QImage faceImage(const QString& label, const Glass& glass) {
       mask[static_cast<std::size_t>(y * n + x)] = row[x] / 255.0f;
     }
   }
-  paintOver(image, blurred(mask, n, n / 64), glass.halo, glass.haloOpacity);
+  if (glass.haloOpacity > 0.0) {
+    paintOver(image, blurred(mask, n, n / 64), glass.halo, glass.haloOpacity);
+  }
   paintOver(image, mask, glass.label, 1.0);
   return image;
 }
@@ -620,7 +625,7 @@ void sizeViewCube(AIS_ViewCube& cube, double size) {
   cube.SetBoxEdgeGap(0.0);
   cube.SetBoxEdgeMinSize(bevel);
   cube.SetBoxCornerMinSize(bevel);
-  cube.SetAxesPadding(size * 0.1);
+  cube.SetAxesPadding(size * 0.03); // Fork: the axes along the cube's edges, as Fusion's
   if (auto* glass = dynamic_cast<GlassViewCube*>(&cube)) {
     glass->m_nominal = size;
   }
@@ -634,9 +639,10 @@ double viewCubeSize(const AIS_ViewCube& cube) {
 
 void scaleViewCube(AIS_ViewCube& cube) {
   const double scale = viewCubeSize(cube) / kBaseSize;
-  cube.SetAxesRadius(0.9 * scale);
-  cube.SetAxesConeRadius(2.4 * scale);
-  cube.SetAxesSphereRadius(2.2 * scale);
+  // Fork: thin axes, as Fusion's lines.
+  cube.SetAxesRadius(0.6 * scale);
+  cube.SetAxesConeRadius(1.8 * scale);
+  cube.SetAxesSphereRadius(1.6 * scale);
   const occ::handle<Prs3d_DatumAspect>& datum = cube.Attributes()->DatumAspect();
   for (const Prs3d_DatumParts part : {Prs3d_DatumParts_XAxis, Prs3d_DatumParts_YAxis, Prs3d_DatumParts_ZAxis}) {
     datum->TextAspect(part)->SetHeight(12.0 * scale);

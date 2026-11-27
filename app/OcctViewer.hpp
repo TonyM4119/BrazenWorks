@@ -1883,6 +1883,9 @@ private:
   // Fork: the plane ruler's grid and labels for this frame's camera.
   void updatePlaneRuler();
   void paintPlaneRuler(QPainter& painter);
+  // Fork: the root origin planes' names (XY, XZ, YZ) written on each plane
+  // drawn, lying in it, as Fusion's (a paint layer over the view).
+  void paintPlaneNames(QPainter& painter);
   void remove(const occ::handle<AIS_Shape>& object);
   void activatePicking(const occ::handle<AIS_Shape>& object);
   void activateAllPicking();
@@ -2438,6 +2441,7 @@ private:
   gp_Ax3 m_rulerFrame;
   occ::handle<PlaneRulerAxes> m_rulerAxes3d;
   QPointer<ViewPaintLayer> m_rulerLabels;
+  QPointer<ViewPaintLayer> m_planeNames; // Fork: paintPlaneNames
   struct RulerAxis {
     gp_Dir direction;
     double min = 0.0; // mm along it the plane reaches

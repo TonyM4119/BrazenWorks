@@ -79,7 +79,9 @@ protected:
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = m_bar->palette();
     const bool shown = tabIndex() == m_bar->currentIndex();
-    const QColor onAccent = themeColor(ColorRole::AccentText, pal);
+    // Fork: the shown design's tab is the toolbar's surface (Fusion's
+    // look), its × in the text colour as the others'.
+    const QColor onAccent = themeColor(ColorRole::Text, pal);
     if (underMouse() || isDown()) {
       QColor fill = shown ? onAccent : themeColor(ColorRole::Text, pal);
       fill.setAlpha(isDown() ? 70 : 40);
@@ -206,8 +208,12 @@ protected:
   }
   int closeRoom(int index) const {
     const QWidget* close = tabButton(index, QTabBar::RightSide);
-    return close != nullptr ? close->sizeHint().width() + 6 : 0;
+    // Fork: with the design's icon before the name (iconRoom), in every
+    // width of the tab.
+    return (close != nullptr ? close->sizeHint().width() + 6 : 0) + iconRoom();
   }
+  // Fork: the design's icon before its name, as Fusion's tabs.
+  int iconRoom() const { return m_rowStyle ? uiIconSize(16) + 6 : 0; }
   int squeezedWidth(int index) const {
     return std::min(std::min(nameRoom(index), 240) + closeRoom(index), 64 + closeRoom(index));
   }
@@ -236,19 +242,30 @@ protected:
       const QRect tab = tabRect(i);
       const QRectF block = rowBlock(tab);
       const bool selected = i == currentIndex();
-      if (selected || (i == hovered && isEnabled())) {
-        // The shown design a flat block of the accent (the chosen tab of
-        // docs/ui-conventions.md), no line round it; a hovered one on the
-        // chrome's hover fill.
+      if (selected) {
+        // Fork: the shown design as Fusion's: a tab of the toolbar panel's
+        // surface, rounded at the top and open at the foot, down to the
+        // bar's bottom, where the panel goes on under it.
+        const QRectF open(block.left(), block.top(), block.width(), height() - block.top() + kControlRadius);
         painter.setPen(Qt::NoPen);
-        painter.setBrush(selected ? accentColor(pal) : themeColor(ColorRole::HoverFill, pal));
+        painter.setBrush(themeColor(ColorRole::Surface, pal));
+        painter.setClipRect(QRectF(0, 0, width(), height()));
+        painter.drawRoundedRect(open, kControlRadius + 2, kControlRadius + 2);
+        painter.setClipping(false);
+      } else if (i == hovered && isEnabled()) {
+        // A hovered one on the chrome's hover fill.
+        painter.setPen(Qt::NoPen);
+        painter.setBrush(themeColor(ColorRole::HoverFill, pal));
         painter.drawRoundedRect(block, kControlRadius, kControlRadius);
       }
-      // The name left of the close button, elided in the middle; on the
-      // accent in the color for text on it.
+      // Fork: the design's icon before its name.
+      const int side = uiIconSize(16);
+      const QPixmap icon = themeIcon(QStringLiteral("component")).pixmap(QSize(side, side), devicePixelRatioF());
+      painter.drawPixmap(QPointF(tab.left() + 12, tab.top() + (tab.height() - side) / 2.0 + 1), icon);
+      // The name left of the close button, elided in the middle.
       const QRect name = nameRect(i);
       painter.setFont(nameFont(selected));
-      painter.setPen(selected ? themeColor(ColorRole::AccentText, pal) : quiet);
+      painter.setPen(selected ? text : quiet);
       const QString elided = shownName(i);
       painter.drawText(name, Qt::AlignVCenter | Qt::AlignLeft, elided);
       shown.append(elided);
@@ -281,7 +298,8 @@ protected:
     const QRect tab = tabRect(index);
     const QWidget* close = tabButton(index, QTabBar::RightSide);
     const int right = close != nullptr && !close->isHidden() ? close->geometry().left() - 4 : tab.right() - 10;
-    return QRect(tab.left() + 12, tab.top(), std::max(0, right - tab.left() - 12), tab.height());
+    const int left = tab.left() + 12 + iconRoom();
+    return QRect(left, tab.top(), std::max(0, right - left), tab.height());
   }
   // A tab inserted in the row gets the row's × too; also once the tab bar
   // is done with it, should it add the style's button after this.

@@ -14,8 +14,8 @@
             "-",
             {"command": "solid.extrude", "button": true},
             {"command": "solid.revolve", "button": true},
-            "solid.sweep",
-            "solid.loft",
+            {"command": "solid.sweep", "button": true},
+            {"command": "solid.loft", "button": true},
             "solid.rib",
             "solid.web",
             "solid.emboss",
@@ -36,7 +36,7 @@
               "submenu": "Pattern",
               "entries": ["solid.rectangular_pattern", "solid.circular_pattern", "solid.path_pattern", "solid.pattern_at_points"]
             },
-            "solid.mirror",
+            {"command": "solid.mirror", "button": true},
             {"command": "surface.thicken", "repeat": true},
             "solid.boundary_fill",
             "-",
@@ -72,8 +72,8 @@
             "solid.split_face",
             "solid.delete_face",
             "-",
-            "solid.combine",
-            "solid.split_body",
+            {"command": "solid.combine", "button": true},
+            {"command": "solid.split_body", "button": true},
             "solid.panelize",
             "solid.scale",
             "solid.convert_mesh",
@@ -82,7 +82,7 @@
               "entries": ["solid.mesh_section", "solid.mesh_repair", "solid.mesh_decimate", "solid.mesh_remove", "solid.mesh_segment", "solid.mesh_fit_surface", "solid.mesh_smooth", "solid.mesh_combine", "solid.mesh_offset", "solid.mesh_align", "solid.mesh_plane_cut"]
             },
             "-",
-            "solid.move",
+            {"command": "solid.move", "button": true},
             "solid.align",
             "-",
             {
@@ -100,7 +100,7 @@
             {"command": "solid.new_component", "button": true},
             "-",
             {"command": "assemble.joint", "button": true},
-            "assemble.as_built_joint",
+            {"command": "assemble.as_built_joint", "button": true},
             "assemble.joint_origin",
             "assemble.rigid_group",
             {"command": "assemble.constraint_one", "button": true},
@@ -154,7 +154,7 @@
           "group": "INSPECT",
           "entries": [
             {"command": "inspect.measure", "button": true},
-            "inspect.interference",
+            {"command": "inspect.interference", "button": true},
             {"command": "inspect.section", "button": true},
             {"command": "inspect.print_analysis", "repeat": true},
             "inspect.draft_analysis",
@@ -207,9 +207,9 @@
             {"command": "sketch.create", "button": true, "repeat": true},
             "-",
             {"command": "surface.extrude", "button": true},
-            "surface.revolve",
-            "surface.sweep",
-            "surface.loft",
+            {"command": "surface.revolve", "button": true},
+            {"command": "surface.sweep", "button": true},
+            {"command": "surface.loft", "button": true},
             "surface.helix",
             "-",
             {"command": "surface.patch", "button": true},
@@ -224,11 +224,11 @@
           "group": "MODIFY",
           "entries": [
             {"command": "surface.trim", "button": true},
-            "surface.untrim",
-            "surface.extend",
+            {"command": "surface.untrim", "button": true},
+            {"command": "surface.extend", "button": true},
             "-",
-            "surface.stitch",
-            "surface.unstitch",
+            {"command": "surface.stitch", "button": true},
+            {"command": "surface.unstitch", "button": true},
             "surface.reverse_normal",
             "-",
             "surface.match",
@@ -236,6 +236,14 @@
             "-",
             {"command": "surface.thicken", "button": true},
             {"command": "solid.boundary_fill", "repeat": true}
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
           ]
         },
         {
@@ -275,10 +283,155 @@
           ]
         },
         {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {
           "group": "SELECT",
           "entries": [
             {"extra": "solid.selection"}
           ]
+        }
+      ]
+    },
+    {
+      "tab": "ASSEMBLY",
+      "groups": [
+        {
+          "group": "COMPONENTS",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "insert.component", "button": true},
+            "insert.library_component"
+          ]
+        },
+        {
+          "group": "JOINTS",
+          "entries": [
+            {"command": "assemble.joint", "button": true},
+            {"command": "assemble.as_built_joint", "button": true},
+            {"command": "assemble.joint_origin", "button": true},
+            {"command": "assemble.rigid_group", "button": true},
+            "-",
+            {"command": "assemble.constraint_one", "button": true},
+            "assemble.constraint"
+          ]
+        },
+        {
+          "group": "POSITION",
+          "entries": [
+            {"command": "solid.move", "button": true},
+            {"command": "solid.align", "button": true},
+            {"command": "assemble.flex_hang", "button": true}
+          ]
+        },
+        {
+          "group": "MOTION",
+          "entries": [
+            {"command": "assemble.drive_joint", "button": true},
+            {"command": "assemble.motion_link", "button": true},
+            {"command": "assemble.motion_study", "button": true},
+            {"command": "assemble.animate_joint", "button": true}
+          ]
+        },
+        {
+          "group": "CONTACT",
+          "entries": [
+            {"command": "assemble.contact_set", "button": true},
+            {"command": "inspect.interference", "button": true}
+          ]
+        },
+        {
+          "group": "EXPLODE",
+          "entries": [{"command": "assemble.explode", "button": true}]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]}
+      ]
+    },
+    {
+      "tab": "MESH",
+      "groups": [
+        {
+          "group": "CREATE",
+          "entries": [
+            {"command": "insert.mesh", "button": true},
+            {"command": "solid.mesh_section", "button": true},
+            "file.import"
+          ]
+        },
+        {
+          "group": "PREPARE",
+          "entries": [
+            {"command": "solid.mesh_repair", "button": true},
+            {"command": "solid.mesh_segment", "button": true},
+            {"command": "solid.mesh_align", "button": true}
+          ]
+        },
+        {
+          "group": "MODIFY",
+          "entries": [
+            {"command": "solid.mesh_remove", "button": true},
+            {"command": "solid.mesh_decimate", "button": true},
+            {"command": "solid.mesh_smooth", "button": true},
+            {"command": "solid.mesh_plane_cut", "button": true},
+            {"command": "solid.mesh_offset", "button": true},
+            {"command": "solid.mesh_combine", "button": true},
+            {"command": "solid.move", "button": true}
+          ]
+        },
+        {
+          "group": "CONVERT",
+          "entries": [
+            {"command": "solid.convert_mesh", "button": true},
+            {"command": "solid.mesh_fit_surface", "button": true}
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
+          ]
+        },
+        {
+          "group": "CONSTRUCT",
+          "entries": [
+            {"command": "construct.offset_plane", "button": true},
+            {"command": "construct.plane_angle", "button": true},
+            {"command": "construct.midplane", "button": true},
+            "construct.axis_two_points",
+            "construct.point_vertex"
+          ]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]},
+        {
+          "group": "EXPORT",
+          "entries": [{"command": "file.export", "button": true}]
         }
       ]
     },
@@ -292,7 +445,7 @@
             "-",
             {"command": "sheet.face", "button": true},
             {"command": "sheet.flange", "button": true},
-            "sheet.hem",
+            {"command": "sheet.hem", "button": true},
             "sheet.convert",
             "sheet.lofted_flange",
             "-",
@@ -303,7 +456,7 @@
         {
           "group": "MODIFY",
           "entries": [
-            "sheet.cut",
+            {"command": "sheet.cut", "button": true},
             "sheet.perforate",
             "-",
             "sheet.corner_relief",
@@ -311,11 +464,11 @@
             "sheet.corner_chamfer",
             "-",
             {"command": "sheet.unfold", "button": true},
-            "sheet.refold",
+            {"command": "sheet.refold", "button": true},
             {"command": "sheet.flat_pattern", "button": true},
             "sheet.show_flat",
             "-",
-            {"command": "sheet.export_dxf", "repeat": true},
+            {"command": "sheet.export_dxf", "repeat": true, "button": true},
             "sheet.flat_pattern_drawing",
             {"command": "sheet.export_bend_table", "repeat": true}
           ]
@@ -338,6 +491,14 @@
             "sheet.glue_flap",
             "sheet.standard_box",
             "sheet.export_die_line"
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
           ]
         },
         {
@@ -374,11 +535,87 @@
           ]
         },
         {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {
           "group": "SELECT",
           "entries": [
             {"extra": "solid.selection"}
           ]
         }
+      ]
+    },
+    {
+      "tab": "PLASTIC",
+      "groups": [
+        {
+          "group": "CREATE",
+          "entries": [
+            {"command": "sketch.create", "button": true},
+            {"command": "solid.extrude", "button": true},
+            {"command": "solid.revolve", "button": true},
+            {"command": "solid.plastic", "button": true},
+            {"command": "solid.rib", "button": true},
+            {"command": "solid.web", "button": true},
+            {"command": "solid.emboss", "button": true},
+            "-",
+            "solid.hole",
+            "solid.mirror"
+          ]
+        },
+        {
+          "group": "MODIFY",
+          "entries": [
+            {"command": "solid.press_pull", "button": true},
+            {"command": "solid.fillet", "button": true},
+            {"command": "solid.shell", "button": true},
+            {"command": "solid.draft", "button": true},
+            {"command": "solid.combine", "button": true},
+            {"command": "solid.move", "button": true},
+            "solid.chamfer",
+            "solid.split_body"
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
+          ]
+        },
+        {
+          "group": "CONSTRUCT",
+          "entries": [
+            {"command": "construct.offset_plane", "button": true},
+            {"command": "construct.plane_angle", "button": true},
+            {"command": "construct.midplane", "button": true},
+            "construct.axis_two_points",
+            "construct.point_vertex"
+          ]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {"group": "SELECT", "entries": [{"extra": "solid.selection"}]}
       ]
     },
     {
@@ -715,7 +952,7 @@
                 "sketch.slot_center",
                 "sketch.slot_arc",
                 "sketch.slot_arc_center",
-                "sketch.spline",
+                {"command": "sketch.spline", "button": true},
                 "sketch.spline_control",
                 "sketch.equation_curve"
               ]
@@ -724,7 +961,7 @@
             {"submenu": "Blocks", "entries": ["sketch.insert_block", "sketch.create_block"]},
             {
               "submenu": "Patterns",
-              "entries": ["sketch.rectangular_pattern", "sketch.circular_pattern", "sketch.mirror"]
+              "entries": ["sketch.rectangular_pattern", "sketch.circular_pattern", {"command": "sketch.mirror", "button": true}]
             },
             {
               "submenu": "References",
@@ -746,7 +983,7 @@
             "sketch.blend_curve",
             "sketch.chamfer",
             {"command": "sketch.trim", "button": true},
-            "sketch.extend",
+            {"command": "sketch.extend", "button": true},
             "sketch.extend_to_meet",
             "sketch.break",
             "sketch.split",
@@ -775,10 +1012,10 @@
             {"command": "sketch.constraint.parallel", "button": true},
             {"command": "sketch.constraint.perpendicular", "button": true},
             {"command": "sketch.constraint.fix", "button": true},
-            "sketch.constraint.midpoint",
-            "sketch.constraint.concentric",
-            "sketch.constraint.collinear",
-            "sketch.constraint.symmetric",
+            {"command": "sketch.constraint.midpoint", "button": true},
+            {"command": "sketch.constraint.concentric", "button": true},
+            {"command": "sketch.constraint.collinear", "button": true},
+            {"command": "sketch.constraint.symmetric", "button": true},
             "sketch.constraint.smooth",
             "sketch.equal_spacing",
             {"command": "sketch.auto_constrain", "button": true},
@@ -809,7 +1046,7 @@
           "group": "FINISH SKETCH",
           "entries": [
             {"command": "sketch.finish", "button": true},
-            {"command": "sketch.cancel", "button": true}
+            "sketch.cancel"
           ]
         }
       ]

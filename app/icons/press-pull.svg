@@ -1,9 +1,10 @@
 <!-- SPDX-License-Identifier: MIT -->
-<!-- MitCad icon: 24 x 24, dark outline, blue solids, orange actions. -->
+<!-- PureCAD icon (fork): 24 x 24, isometric shaded solids, yellow worked faces, orange actions. -->
+<!-- Press Pull stays apart from Extrude (mitcad#1660): its two-way arrow runs sideways across the box. -->
 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="#2b3a4a" stroke-width="1.3" stroke-linejoin="round" stroke-linecap="round">
-  <path d="M2 9 L7 6.5 L17 8 L12 10.5 Z" fill="#c9ddf6"/>
-  <path d="M2 9 V18.5 L12 21.5 V10.5" fill="#9cc0ec"/>
-  <path d="M12 21.5 L17 19 V8 L12 10.5" fill="#7aa6dc"/>
-  <path d="M8.5 15 H21.5" stroke="#e07b1a" stroke-width="1.8"/>
-  <path d="M11.5 12 L8.5 15 L11.5 18 M18.5 12 L21.5 15 L18.5 18" stroke="#e07b1a" stroke-width="1.8"/>
+  <path d="M2 8.5 L10.5 4.25 L19 8.5 L10.5 12.75 Z" fill="#c9ddf6"/>
+  <path d="M2 8.5 L10.5 12.75 V21 L2 16.75 Z" fill="#9cc0ec"/>
+  <path d="M10.5 12.75 L19 8.5 V16.75 L10.5 21 Z" fill="#f2c14e"/>
+  <path d="M9 16.5 H23" stroke="#e07b1a" stroke-width="1.8"/>
+  <path d="M12 13.5 L9 16.5 L12 19.5 M20 13.5 L23 16.5 L20 19.5" stroke="#e07b1a" stroke-width="1.8"/>
 </svg>

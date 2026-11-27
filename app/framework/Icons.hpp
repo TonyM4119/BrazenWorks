@@ -83,6 +83,10 @@ constexpr qreal kDisabledIconOpacity = 0.34;
 // platform; the selected mode is the style's. The outline weight as
 // themedIconSvg's.
 QIcon themeIcon(const QString& name, IconBackdrop backdrop = IconBackdrop::Palette, double outlineWeight = 1.0);
+// Fork: an icon of themeIcon's in one colour, the outline's (the disabled
+// colours at full opacity): the top bar's quiet line icons, as Fusion's.
+// Any other icon as it is.
+QIcon monochromeIcon(const QIcon& icon);
 
 // An icon of themeIcon (or a copy of it, an action's) made again with an
 // outline weight; any other icon as it is.

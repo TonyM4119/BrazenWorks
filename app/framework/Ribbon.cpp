@@ -113,6 +113,16 @@ const QString kRender = QStringLiteral("RENDER");
 constexpr int kRenderPage = 10;
 constexpr int kMakeLaserPage = 11;
 constexpr int kMakeCncPage = 12;
+// Fork: Mesh and Plastic tabs of the Design workspace, as Fusion's: MESH
+// after SURFACE, PLASTIC after SHEET METAL.
+const QString kMesh = QStringLiteral("MESH");
+const QString kPlastic = QStringLiteral("PLASTIC");
+constexpr int kMeshPage = 13;
+constexpr int kPlasticPage = 14;
+// Fork: an Assembly tab after SURFACE (SolidCraft's Assemble), its key
+// apart from the Assemble groups' name.
+const QString kAssembly = QStringLiteral("ASSEMBLY");
+constexpr int kAssemblyPage = 15;
 // The tabs of a mode (a sketch, a drawing, the Render workspace): their
 // names in the accent colour.
 bool isModeTab(int page) {
@@ -157,6 +167,12 @@ const QString& tabName(int page) {
     return kManage;
   case kRenderPage:
     return kRender;
+  case kMeshPage:
+    return kMesh;
+  case kPlasticPage:
+    return kPlastic;
+  case kAssemblyPage:
+    return kAssembly;
   default:
     return kSolid;
   }
@@ -187,6 +203,15 @@ int modelPage(const QString& tab) {
   if (tab == kManage) {
     return kManagePage;
   }
+  if (tab == kMesh) {
+    return kMeshPage;
+  }
+  if (tab == kPlastic) {
+    return kPlasticPage;
+  }
+  if (tab == kAssembly) {
+    return kAssemblyPage;
+  }
   return kSolidPage;
 }
 // The Docked buttons' icons (mitcad#2092: 32, was 28).
@@ -195,7 +220,7 @@ constexpr int kIconSize = 32;
 QString key(const QString& tab, const QString& group) { return tab + QLatin1Char('/') + group; }
 
 // The Floating buttons' icons (mitcad#2092: 30, was 26).
-constexpr int kMacIconSize = 30;
+constexpr int kMacIconSize = 32; // Fork: Fusion's toolbar icons (MitCad: 30)
 constexpr int kMacCaptionHeight = 20;
 constexpr int kHeight = 30;
 // The room around a toolbar button's icon (mitcad#2092: 3 pixels, was 5):
@@ -219,6 +244,17 @@ int tabHeight(const QFont& font) { return std::max(kHeight, QFontMetrics(font).h
 // The toolbar panel's tabs and search field (Ribbon::setPanel, mitcad#1990):
 // 26 pixels, higher for a taller font.
 int panelTabHeight(const QFont& font) { return std::max(26, QFontMetrics(font).height() + 10); }
+
+// Fork: the toolbar panel's tab names and group captions in capitals, as
+// Fusion's (docs/ui-conventions.md "The toolbar panel"): a little smaller
+// than the text, DemiBold, spaced a little apart.
+QFont capitalsFont(const QFont& base, qreal scale, QFont::Weight weight = QFont::DemiBold) {
+  QFont font = base;
+  font.setPointSizeF(font.pointSizeF() * scale);
+  font.setWeight(weight);
+  font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
+  return font;
+}
 // The toolbar panel (Ribbon::setPanel, mitcad#1990): the room around its
 // rows, the space between two groups (4 pixels, the one-pixel line, 4
 // pixels), the card's corner radius.
@@ -283,6 +319,22 @@ QColor textTint(const QPalette& palette, int alpha) {
 }
 
 // A small chevron pointing down, centred on `center`.
+// Fork: Fusion's small filled ▾ (the toolbar panel's group captions and
+// the workspace block), centred on `center`.
+void drawDropTriangle(QPainter& painter, const QPointF& center, const QColor& color) {
+  painter.save();
+  painter.setRenderHint(QPainter::Antialiasing);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(color);
+  QPainterPath path;
+  path.moveTo(center.x() - 3.5, center.y() - 1.8);
+  path.lineTo(center.x() + 3.5, center.y() - 1.8);
+  path.lineTo(center.x(), center.y() + 2.2);
+  path.closeSubpath();
+  painter.drawPath(path);
+  painter.restore();
+}
+
 void drawChevron(QPainter& painter, const QPointF& center, const QColor& color) {
   painter.save();
   painter.setRenderHint(QPainter::Antialiasing);
@@ -341,16 +393,14 @@ public:
     updateGeometry();
   }
 
-  // The caption's font (docs/ui-conventions.md §10): 0.92 Regular.
-  static QFont captionFont(const QFont& base) {
-    QFont small = base;
-    small.setPointSizeF(small.pointSizeF() * 0.92);
-    return small;
-  }
+  // The caption's font (docs/ui-conventions.md §10). Fork: in capitals,
+  // 0.85 DemiBold, as Fusion's group names (capitalsFont).
+  static QFont captionFont(const QFont& base) { return capitalsFont(base, 0.85, QFont::Normal); }
 
   QSize sizeHint() const override {
     const QFontMetrics metrics(captionFont(font()));
-    const int text = std::max(metrics.horizontalAdvance(this->text()), metrics.horizontalAdvance(m_widest));
+    const int text =
+        std::max(metrics.horizontalAdvance(this->text().toUpper()), metrics.horizontalAdvance(m_widest.toUpper()));
     return QSize(text + 34, macCaptionHeight(font()));
   }
 
@@ -372,11 +422,12 @@ protected:
     painter.setFont(small);
     const QColor color = textTint(pal, 190);
     painter.setPen(color);
-    const int textWidth = QFontMetrics(small).horizontalAdvance(text());
+    const QString shown = text().toUpper();
+    const int textWidth = QFontMetrics(small).horizontalAdvance(shown);
     const int total = textWidth + 5 + 8;
     const int left = (width() - total) / 2;
-    painter.drawText(QRect(left, 0, textWidth, height()), Qt::AlignVCenter | Qt::AlignLeft, text());
-    drawChevron(painter, QPointF(left + textWidth + 5 + 4, height() / 2.0 + 0.5), color);
+    painter.drawText(QRect(left, 0, textWidth, height()), Qt::AlignVCenter | Qt::AlignLeft, shown);
+    drawDropTriangle(painter, QPointF(left + textWidth + 5 + 4, height() / 2.0 + 0.5), color);
   }
 
 private:
@@ -571,7 +622,8 @@ protected:
     // before the seven model tabs, mitcad#1975): the title row holds the
     // seven tabs and the + of their menu in a window of about 1000 px. The
     // panel's: 11 px, a workspace's few tabs (mitcad#1990).
-    return m_panelStyle ? QSize(fontMetrics().horizontalAdvance(tabText(index)) + 22 + arrowRoom(index),
+    return m_panelStyle ? QSize(QFontMetrics(capitalsFont(font(), 0.9, QFont::Normal)).horizontalAdvance(tabText(index).toUpper()) +
+                                    40 + arrowRoom(index), // Fork: Fusion's wide tabs
                                 panelTabHeight(font()))
                         : QSize(fontMetrics().horizontalAdvance(tabText(index)) + 16, tabHeight(font()));
   }
@@ -671,28 +723,26 @@ private:
         painter.setPen(themeColor(ColorRole::TextSecondary, pal));
         painter.drawText(arrow, Qt::AlignCenter, QStringLiteral("›"));
       }
-      const QRectF box = QRectF(tab).adjusted(1.5, 2.5, -1.5, -2.5);
+      // Fork: as Fusion's tabs: the name in capitals, the shown one in the
+      // accent over a 3 px bar of it at the row's foot, a hovered one in the
+      // full text colour; a mode's tab (SKETCH) in the accent.
       const bool selected = i == currentIndex();
       const bool mode = isModeTab(tabData(i).toInt());
+      const QColor bright = dark ? accent.lighter(135) : accent;
       painter.setPen(Qt::NoPen);
       if (selected) {
-        painter.setBrush(accent);
-        painter.drawRoundedRect(box, kControlRadius, kControlRadius);
-      } else if (i == hovered && isEnabled()) {
-        painter.setBrush(textTint(pal, 20));
-        painter.drawRoundedRect(box, kControlRadius, kControlRadius);
+        painter.setBrush(bright);
+        painter.drawRect(QRectF(tab.left() + 8, tab.bottom() + 1 - 3, tab.width() - 16, 3));
       }
-      QFont f = font();
-      f.setWeight(selected ? QFont::DemiBold : QFont::Medium);
-      painter.setFont(f);
-      QColor text = textTint(pal, 210);
-      if (selected) {
-        text = themeColor(ColorRole::AccentText, pal);
-      } else if (mode) {
-        text = dark ? accent.lighter(135) : accent;
+      painter.setFont(capitalsFont(font(), 0.9, QFont::Normal));
+      QColor text = textTint(pal, 200);
+      if (selected || mode) {
+        text = bright;
+      } else if (i == hovered && isEnabled()) {
+        text = pal.color(QPalette::WindowText);
       }
       painter.setPen(text);
-      painter.drawText(tab, Qt::AlignCenter, tabText(i));
+      painter.drawText(tab.adjusted(0, 0, 0, -2), Qt::AlignCenter, tabText(i).toUpper());
     }
   }
 
@@ -1100,13 +1150,12 @@ public:
     return small;
   }
 
+  // Fork: the workspace's name in capitals with a ▾, as Fusion's
+  // ("DESIGN ▾"), at least 96 px wide.
+  QFont titleFont() const { return capitalsFont(font(), 1.05); }
   QSize sizeHint() const override {
-    QFont bold = font();
-    bold.setWeight(QFont::DemiBold);
-    const int name = QFontMetrics(bold).horizontalAdvance(m_title);
-    const int caption = QFontMetrics(smallFont()).horizontalAdvance(tr("Workspace")) + 12;
-    // The tall block's lines with room around them, at least 84 px.
-    return QSize(std::max({name + 20, caption + 20, uiRoomSize(84)}), compactHeight());
+    const int name = QFontMetrics(titleFont()).horizontalAdvance(m_title.toUpper());
+    return QSize(std::max(name + 6 + 8 + 40, uiRoomSize(120)), compactHeight());
   }
   QSize minimumSizeHint() const override { return sizeHint(); }
 
@@ -1122,55 +1171,23 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = palette();
-    const QRectF box = QRectF(rect()).adjusted(3.5, 3.5, -3.5, -3.5);
-    painter.setPen(Qt::NoPen);
-    if (isEnabled() && (isDown() || underMouse())) {
-      painter.setBrush(textTint(pal, isDown() ? 32 : 18));
-      painter.drawRoundedRect(box, kControlRadius, kControlRadius);
-    }
+    // Fork: a framed button as Fusion's workspace switch: the window's
+    // colour in a hairline frame, darker while hovered or pressed.
+    const QRectF box = QRectF(rect()).adjusted(8.5, 8.5, -8.5, -8.5);
+    painter.setPen(QPen(textTint(pal, 60), 1));
+    painter.setBrush(isEnabled() && (isDown() || underMouse()) ? textTint(pal, isDown() ? 32 : 18)
+                                                               : themeColor(ColorRole::Window, pal));
+    painter.drawRoundedRect(box, kControlRadius, kControlRadius);
     const QColor text = isEnabled() ? pal.color(QPalette::WindowText) : textTint(pal, 110);
-    const QColor quiet = textTint(pal, isEnabled() ? 160 : 90);
-    QFont bold = font();
-    bold.setWeight(QFont::DemiBold);
-    const QFontMetrics boldMetrics(bold);
-    const int side = iconSide();
-    const QIcon::Mode mode = isEnabled() ? QIcon::Normal : QIcon::Disabled;
-    const QPixmap icon = m_icon.pixmap(QSize(side, side), devicePixelRatioF(), mode);
-    if (height() < tallHeight()) {
-      // One line: the icon (where there is room for it), the name, the
-      // chevron.
-      const int nameWidth = boldMetrics.horizontalAdvance(m_title);
-      const int iconRoom = side + 6 + nameWidth + 6 + 8 + 8 <= width() ? side + 6 : 0;
-      const int total = iconRoom + nameWidth + 6 + 8;
-      const int left = std::max(4, (width() - total) / 2);
-      if (iconRoom > 0) {
-        painter.drawPixmap(QPointF(left, (height() - side) / 2.0), icon);
-      }
-      painter.setFont(bold);
-      painter.setPen(text);
-      painter.drawText(QRect(left + iconRoom, 0, nameWidth, height()), Qt::AlignVCenter | Qt::AlignLeft, m_title);
-      drawChevron(painter, QPointF(left + iconRoom + nameWidth + 6 + 4, height() / 2.0 + 0.5), quiet);
-      return;
-    }
-    // The icon, the name and "Workspace ˅", centred as a block.
-    const QFont small = smallFont();
-    const QFontMetrics smallMetrics(small);
-    const int block = side + 4 + boldMetrics.height() + smallMetrics.height();
-    int y = (height() - block) / 2;
-    painter.drawPixmap(QPointF((width() - side) / 2.0, y), icon);
-    y += side + 4;
-    painter.setFont(bold);
+    const QFont title = titleFont();
+    const QString name = m_title.toUpper();
+    const int nameWidth = QFontMetrics(title).horizontalAdvance(name);
+    const int total = nameWidth + 6 + 8;
+    const int left = std::max(4, (width() - total) / 2);
+    painter.setFont(title);
     painter.setPen(text);
-    painter.drawText(QRect(0, y, width(), boldMetrics.height()), Qt::AlignCenter,
-                     boldMetrics.elidedText(m_title, Qt::ElideRight, width() - 8));
-    y += boldMetrics.height();
-    const QString caption = tr("Workspace");
-    const int captionWidth = smallMetrics.horizontalAdvance(caption);
-    const int left = (width() - captionWidth - 12) / 2;
-    painter.setFont(small);
-    painter.setPen(quiet);
-    painter.drawText(QRect(left, y, captionWidth, smallMetrics.height()), Qt::AlignVCenter | Qt::AlignLeft, caption);
-    drawChevron(painter, QPointF(left + captionWidth + 8, y + smallMetrics.height() / 2.0 + 0.5), quiet);
+    painter.drawText(QRect(left, 0, nameWidth, height()), Qt::AlignVCenter | Qt::AlignLeft, name);
+    drawDropTriangle(painter, QPointF(left + nameWidth + 6 + 4, height() / 2.0 + 0.5), text);
   }
 
 private:
@@ -1191,13 +1208,30 @@ private:
 // One workspace of the selector's list (WorkspaceList): its icon, its name
 // ("Current" on a badge by the one shown) and, for a model workspace, its
 // tabs. A click (or Enter while it is the list's current entry) chooses it.
+// Fork: a workspace's colour in the selector's list (its bar and its icon's
+// tile): Design the accent, Make amber, Render a deep red, Drawing teal.
+QColor workspaceColour(const QString& key, const QPalette& pal) {
+  const bool dark = isDarkPalette(pal);
+  if (key == QLatin1String("MAKE")) {
+    return dark ? QColor(0xf0, 0xa8, 0x4a) : QColor(0xd9, 0x82, 0x1a);
+  }
+  if (key == QLatin1String("RENDER")) {
+    return dark ? QColor(0xe8, 0x6a, 0x88) : QColor(0xb8, 0x2e, 0x4e);
+  }
+  if (key == QLatin1String("DRAWING")) {
+    return dark ? QColor(0x5c, 0xc4, 0xc8) : QColor(0x1f, 0x8a, 0x92);
+  }
+  return dark ? accentColor(pal).lighter(130) : accentColor(pal);
+}
+
 class WorkspaceEntry : public QWidget {
   Q_DECLARE_TR_FUNCTIONS(mitcad::Ribbon)
 
 public:
   WorkspaceEntry(const QString& key, const QString& title, const QString& tabs, const QIcon& icon, bool current,
                  QWidget* parent = nullptr)
-      : QWidget(parent), m_key(key), m_title(title), m_tabs(tabs), m_icon(icon), m_current(current) {
+      : QWidget(parent), m_key(key), m_title(title), m_tabs(tabs.isEmpty() ? stages(key) : tabs), m_about(about(key)),
+        m_icon(icon), m_current(current) {
     setObjectName(QStringLiteral("ribbonWorkspaceEntry_") + key);
     setAttribute(Qt::WA_Hover);
     setMouseTracking(true);
@@ -1223,13 +1257,42 @@ public:
   bool isGuided() const { return m_guided; }
   std::function<void(const QString&)> chosen;
 
+  // Fork: what a workspace is for, the entry's second line.
+  static QString about(const QString& key) {
+    if (key == QLatin1String("MAKE")) {
+      return tr("Slice, nest and plan toolpaths for 3D printing, laser and CNC");
+    }
+    if (key == QLatin1String("RENDER")) {
+      return tr("Materials, lighting and rendered images of the design");
+    }
+    if (key == QLatin1String("DRAWING")) {
+      return tr("2D drawings with views, dimensions and a title block");
+    }
+    return tr("Sketch, model, assemble and inspect");
+  }
+  // Fork: the stages of a workspace of one tab (Render, Drawing), its third
+  // line where a model workspace names its tabs.
+  static QString stages(const QString& key) {
+    if (key == QLatin1String("RENDER")) {
+      return tr("Look · Environment · View · Output");
+    }
+    if (key == QLatin1String("DRAWING")) {
+      return tr("Sheet · Views · Dimensions · Export");
+    }
+    return QString();
+  }
+
   QSize sizeHint() const override {
-    const QFontMetrics metrics(font());
+    QFont bold = font();
+    bold.setWeight(QFont::DemiBold);
+    const QFontMetrics metrics(bold);
     const QFontMetrics small(smallFont());
-    // One height for every entry, with or without its line of tabs.
-    const int lines = metrics.height() + small.height();
-    const int text = std::max(metrics.horizontalAdvance(m_title) + 90, small.horizontalAdvance(m_tabs));
-    return QSize(std::max(300, 12 + 36 + 12 + text + 16), lines + 16);
+    // Fork: three lines (the name, what it is for, its tabs) beside the
+    // icon's tile, one height for every entry.
+    const int lines = metrics.height() + 2 * small.height() + 4;
+    const int text = std::max({metrics.horizontalAdvance(m_title) + 90, small.horizontalAdvance(m_about),
+                               small.horizontalAdvance(m_tabs)});
+    return QSize(std::max(440, 18 + tileSide() + 16 + text + 18), std::max(lines, tileSide()) + 22);
   }
 
 protected:
@@ -1255,11 +1318,18 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = palette();
-    const QRectF box = QRectF(rect()).adjusted(4.5, 2.5, -4.5, -2.5);
+    const QRectF box = QRectF(rect()).adjusted(6.5, 2.5, -6.5, -2.5);
+    const QColor colour = workspaceColour(m_key, pal);
     painter.setPen(Qt::NoPen);
     if (m_current || (m_highlighted && isEnabled())) {
-      painter.setBrush(textTint(pal, m_current ? 22 : 14));
-      painter.drawRoundedRect(box, kControlRadius, kControlRadius);
+      // Fork: the shown one on a tint of the accent, a hovered one on the
+      // text's faint tint.
+      QColor fill = m_current ? accentColor(pal) : textTint(pal, 14);
+      if (m_current) {
+        fill.setAlpha(isDarkPalette(pal) ? 50 : 30);
+      }
+      painter.setBrush(fill);
+      painter.drawRoundedRect(box, kControlRadius + 2, kControlRadius + 2);
     }
     if (m_guided) {
       // The guide step's outline (TutorialGuide's colour and weight).
@@ -1268,45 +1338,65 @@ protected:
       painter.drawRoundedRect(QRectF(rect()).adjusted(1.5, 1.0, -1.5, -1.0), kControlRadius + 2, kControlRadius + 2);
       painter.setPen(Qt::NoPen);
     }
-    // The bar at the left: the accent by the one shown, a quiet line by the
-    // others.
-    painter.setBrush(m_current ? accentColor(pal) : textTint(pal, isEnabled() ? 60 : 30));
-    painter.drawRoundedRect(QRectF(box.left() + 2, box.top() + 6, 3, box.height() - 12), 1.5, 1.5);
-    const int side = uiIconSize(24);
+    // Fork: the bar at the left in the workspace's colour, full by the one
+    // shown or hovered, lighter by the others.
+    QColor bar = colour;
+    if (!isEnabled()) {
+      bar = textTint(pal, 30);
+    } else if (!m_current && !m_highlighted) {
+      bar.setAlpha(150);
+    }
+    painter.setBrush(bar);
+    painter.drawRoundedRect(QRectF(box.left() + 4, box.top() + 8, 3.5, box.height() - 16), 1.75, 1.75);
+    // The icon on a tile of the workspace's colour.
+    const int tile = tileSide();
+    const QRectF tileBox(box.left() + 18, box.top() + (box.height() - tile) / 2.0, tile, tile);
+    QColor tint = colour;
+    tint.setAlpha(isDarkPalette(pal) ? 46 : 30);
+    painter.setBrush(tint);
+    painter.drawRoundedRect(tileBox, kControlRadius + 2, kControlRadius + 2);
+    const int side = uiIconSize(26);
     const QIcon::Mode mode = isEnabled() ? QIcon::Normal : QIcon::Disabled;
-    painter.drawPixmap(QPointF(box.left() + 16, box.top() + 10), m_icon.pixmap(QSize(side, side), devicePixelRatioF(), mode));
-    const int left = static_cast<int>(box.left()) + 16 + side + 14;
-    const int right = static_cast<int>(box.right()) - 8;
+    painter.drawPixmap(QPointF(tileBox.center().x() - side / 2.0, tileBox.center().y() - side / 2.0),
+                       m_icon.pixmap(QSize(side, side), devicePixelRatioF(), mode));
+    const int left = static_cast<int>(tileBox.right()) + 16;
+    const int right = static_cast<int>(box.right()) - 10;
     QFont bold = font();
     bold.setWeight(QFont::DemiBold);
     const QFontMetrics boldMetrics(bold);
     const QFont small = smallFont();
     const QFontMetrics smallMetrics(small);
-    // Without a line of tabs the name stands in the middle.
-    int y = m_tabs.isEmpty() ? static_cast<int>(box.center().y()) - boldMetrics.height() / 2
-                             : static_cast<int>(box.top()) + 6;
+    const int block =
+        boldMetrics.height() + 2 + smallMetrics.height() + (m_tabs.isEmpty() ? 0 : 2 + smallMetrics.height());
+    int y = static_cast<int>(box.center().y()) - block / 2;
     const QColor text = isEnabled() ? pal.color(QPalette::WindowText) : textTint(pal, 110);
     painter.setFont(bold);
     painter.setPen(text);
     const int titleWidth = boldMetrics.horizontalAdvance(m_title);
     painter.drawText(QRect(left, y, titleWidth, boldMetrics.height()), Qt::AlignVCenter | Qt::AlignLeft, m_title);
     if (m_current) {
-      // "Current" on a small badge of the accent.
+      // "Current" on a pill of the accent.
       const QString badge = tr("Current");
-      const int badgeWidth = smallMetrics.horizontalAdvance(badge) + 12;
-      const QRectF pill(left + titleWidth + 8, y + (boldMetrics.height() - smallMetrics.height() - 2) / 2.0,
-                        badgeWidth, smallMetrics.height() + 2);
+      const int badgeWidth = smallMetrics.horizontalAdvance(badge) + 16;
+      const qreal badgeHeight = smallMetrics.height() + 4;
+      const QRectF pill(left + titleWidth + 10, y + (boldMetrics.height() - badgeHeight) / 2.0, badgeWidth,
+                        badgeHeight);
       painter.setPen(Qt::NoPen);
       painter.setBrush(accentColor(pal));
-      painter.drawRoundedRect(pill, kControlRadius, kControlRadius);
+      painter.drawRoundedRect(pill, badgeHeight / 2.0, badgeHeight / 2.0);
       painter.setFont(small);
       painter.setPen(themeColor(ColorRole::AccentText, pal));
       painter.drawText(pill, Qt::AlignCenter, badge);
     }
-    y += boldMetrics.height();
+    y += boldMetrics.height() + 2;
+    // What it is for, then its tabs in the quieter text.
+    painter.setFont(small);
+    painter.setPen(text);
+    painter.drawText(QRect(left, y, right - left, smallMetrics.height()), Qt::AlignVCenter | Qt::AlignLeft,
+                     smallMetrics.elidedText(m_about, Qt::ElideRight, right - left));
+    y += smallMetrics.height() + 2;
     if (!m_tabs.isEmpty()) {
-      painter.setFont(small);
-      painter.setPen(textTint(pal, isEnabled() ? 200 : 100));
+      painter.setPen(textTint(pal, isEnabled() ? 170 : 90));
       painter.drawText(QRect(left, y, right - left, smallMetrics.height()), Qt::AlignVCenter | Qt::AlignLeft,
                        smallMetrics.elidedText(m_tabs, Qt::ElideRight, right - left));
     }
@@ -1319,9 +1409,12 @@ private:
     return small;
   }
 
+  int tileSide() const { return uiIconSize(26) + 16; }
+
   QString m_key;
   QString m_title;
   QString m_tabs;
+  QString m_about;
   QIcon m_icon;
   bool m_current = false;
   bool m_highlighted = false;
@@ -1340,14 +1433,12 @@ public:
     setAttribute(Qt::WA_DeleteOnClose);
     setFocusPolicy(Qt::StrongFocus);
     auto* column = new QVBoxLayout(this);
-    column->setContentsMargins(6, 8, 6, 8);
+    column->setContentsMargins(8, 12, 8, 10);
     column->setSpacing(2);
-    auto* heading = new QLabel(tr("Workspace"));
-    QFont small = heading->font();
-    small.setPointSizeF(small.pointSizeF() * 0.85);
-    small.setWeight(QFont::DemiBold);
-    heading->setFont(small);
-    heading->setContentsMargins(10, 0, 10, 4);
+    // Fork: the heading in capitals (the toolbar's capitals font).
+    auto* heading = new QLabel(tr("Workspace").toUpper());
+    heading->setFont(capitalsFont(heading->font(), 0.85));
+    heading->setContentsMargins(12, 0, 12, 6);
     heading->setForegroundRole(QPalette::PlaceholderText);
     column->addWidget(heading);
     m_column = column;
@@ -1361,7 +1452,30 @@ public:
     }
   }
 
-  void finish() { highlight(m_highlighted); }
+  // Fork: after the entries, a line and a note on what a workspace is.
+  void finish() {
+    auto* line = new QFrame;
+    line->setFixedHeight(1);
+    line->setObjectName(QStringLiteral("ribbonWorkspaceMenuLine"));
+    m_column->addSpacing(6);
+    m_column->addWidget(line);
+    auto* note = new QLabel(tr("Every workspace works on the same design, its history and its selection; only the "
+                               "toolbar's tabs change. The list is locked while a sketch is open."));
+    note->setWordWrap(true);
+    QFont small = note->font();
+    small.setPointSizeF(small.pointSizeF() * 0.85);
+    note->setFont(small);
+    note->setForegroundRole(QPalette::PlaceholderText);
+    note->setContentsMargins(12, 6, 12, 2);
+    m_column->addWidget(note);
+    int width = 0;
+    for (const WorkspaceEntry* entry : m_entries) {
+      width = std::max(width, entry->sizeHint().width());
+    }
+    const QMargins margins = m_column->contentsMargins();
+    setFixedWidth(width + margins.left() + margins.right());
+    highlight(m_highlighted);
+  }
 
   const QList<WorkspaceEntry*>& entries() const { return m_entries; }
 
@@ -1370,10 +1484,14 @@ protected:
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = palette();
-    painter.fillRect(rect(), pal.color(QPalette::Window));
+    painter.fillRect(rect(), themeColor(ColorRole::Surface, pal));
     painter.setPen(QPen(cardBorderColor(pal), 1));
     painter.setBrush(Qt::NoBrush);
     painter.drawRect(QRectF(rect()).adjusted(0.5, 0.5, -0.5, -0.5));
+    // Fork: the line above the note (finish).
+    if (const auto* line = findChild<QFrame*>(QStringLiteral("ribbonWorkspaceMenuLine"))) {
+      painter.fillRect(line->geometry().adjusted(12, 0, -12, 0), cardBorderColor(pal));
+    }
   }
 
   void keyPressEvent(QKeyEvent* event) override {
@@ -2016,7 +2134,14 @@ namespace {
     // Sketch blocks (mitcad#2110).
     QT_TRANSLATE_NOOP("RibbonName", "Blocks"),
     // Laser's Nest and the cut sheet's Cutting (mitcad#2553).
-    QT_TRANSLATE_NOOP("RibbonName", "Nest"), QT_TRANSLATE_NOOP("RibbonName", "Cutting")};
+    QT_TRANSLATE_NOOP("RibbonName", "Nest"), QT_TRANSLATE_NOOP("RibbonName", "Cutting"),
+    // Fork: the Plastic tab and the Mesh tab's Convert group.
+    QT_TRANSLATE_NOOP("RibbonName", "Plastic"), QT_TRANSLATE_NOOP("RibbonName", "Convert"),
+    // Fork: the Assembly tab and its groups.
+    QT_TRANSLATE_NOOP("RibbonName", "Assembly"), QT_TRANSLATE_NOOP("RibbonName", "Components"),
+    QT_TRANSLATE_NOOP("RibbonName", "Joints"), QT_TRANSLATE_NOOP("RibbonName", "Position"),
+    QT_TRANSLATE_NOOP("RibbonName", "Motion"), QT_TRANSLATE_NOOP("RibbonName", "Contact"),
+    QT_TRANSLATE_NOOP("RibbonName", "Explode")};
 
 // Subgroups shown by another name than their key, which stays in the
 // layout and the user's layer (a "/" would split a place's path): the
@@ -2088,6 +2213,13 @@ QString displayName(const QString& key) {
 }
 
 QIcon commandButtonIcon(const QToolButton* button) {
+  // Fork: in the top bar (kMonochromeIconsProperty on an ancestor) the
+  // icons in one colour, as Fusion's.
+  for (const QWidget* up = button->parentWidget(); up != nullptr; up = up->parentWidget()) {
+    if (up->property(kMonochromeIconsProperty).toBool()) {
+      return monochromeIcon(button->icon());
+    }
+  }
   return button->property(kThinOutlineProperty).toBool() ? withOutlineWeight(button->icon(), kThinOutlineWeight)
                                                          : button->icon();
 }
@@ -2503,6 +2635,11 @@ void Ribbon::createPages() {
   // into one tab per method), after MAKE_PRINT in the bar.
   m_pages->addWidget(createPage(kMakeLaser));
   m_pages->addWidget(createPage(kMakeCnc));
+  // Fork: MESH and PLASTIC (pages 13 and 14), placed in the bar by the
+  // layout's order (modelTabOrder).
+  m_pages->addWidget(createPage(kMesh));
+  m_pages->addWidget(createPage(kPlastic));
+  m_pages->addWidget(createPage(kAssembly)); // page 15
 }
 
 void Ribbon::rebuild() {
@@ -2570,8 +2707,8 @@ QStringList Ribbon::modelTabOrder() const {
   // (mitcad#375), MAKE_PRINT, MAKE_LASER and MAKE_CNC (mitcad#1049, the
   // owner 18.11.2026) and MANAGE (mitcad#1975) in the layout's order;
   // SKETCH comes after them while sketching, a drawing's tab alone.
-  static const QStringList model = {kStart, kSolid, kSurface, kSheetMetal, kBuild,
-                                    kMakePrint, kMakeLaser, kMakeCnc, kManage};
+  static const QStringList model = {kStart,      kSolid, kSurface,   kAssembly,  kMesh,    kSheetMetal,
+                                    kPlastic,    kBuild, kMakePrint, kMakeLaser, kMakeCnc, kManage};
   // Those the user hid (mitcad#1975) are left out; Start never is.
   QStringList hidden = CommandLayoutStore::instance().userLayer().hiddenTabs;
   hidden.removeAll(kStart);
@@ -2616,6 +2753,9 @@ void Ribbon::addModelTabs() {
              : page == kSurfacePage    ? tr("Surface: surfaces made, trimmed, stitched and thickened")
              : page == kSheetMetalPage ? tr("Sheet Metal: faces, flanges and bends, their rules and flat patterns")
              : page == kManagePage     ? tr("Manage: the design's parameters, configurations, materials and rules")
+             : page == kMeshPage       ? tr("Mesh: meshes inserted, repaired, reduced, cut and turned into bodies")
+             : page == kPlasticPage    ? tr("Plastic: molded parts with bosses, lips, snap fits, ribs and draft")
+             : page == kAssemblyPage   ? tr("Assembly: components, joints, positions, motion and contact")
                                        : tr("Solid modeling"));
     inserted.append(key);
   };
@@ -2632,7 +2772,8 @@ void Ribbon::addModelTabs() {
 }
 
 QStringList Ribbon::hideableTabs() {
-  return {kSolid, kSurface, kSheetMetal, kBuild, kMakePrint, kMakeLaser, kMakeCnc, kManage};
+  return {kSolid,  kSurface, kAssembly,  kMesh,      kSheetMetal, kPlastic,
+          kBuild,  kMakePrint, kMakeLaser, kMakeCnc, kManage};
 }
 
 void Ribbon::setTabContent(const QString& tab, QWidget* leading, QWidget* trailing) {
@@ -4351,7 +4492,7 @@ void Ribbon::fitGroups() {
     // In the toolbar panel the card beside the workspace selector's block
     // (mitcad#1990).
     const int selector =
-        m_panel && m_workspaceButton != nullptr ? m_workspaceButton->sizeHint().width() + kPanelBlockGap : 0;
+        m_panel && m_workspaceButton != nullptr ? m_workspaceButton->sizeHint().width() : 0; // Fork: no gap (setPanel)
     const int available = std::max(0, width() - selector);
     std::vector<int> widths;
     const int total = fitPage(infos, fixed, available, &widths);
@@ -4741,7 +4882,7 @@ void Ribbon::setPanel(QWidget* search) {
   // card of the tab row and the groups.
   auto* outer = new QHBoxLayout;
   outer->setContentsMargins(0, 0, 0, 0);
-  outer->setSpacing(kPanelBlockGap);
+  outer->setSpacing(0); // Fork: one bar, a line between the block and the tabs (paintEvent)
   auto* selector = new WorkspaceButton(this);
   m_workspaceButton = selector;
   connect(selector, &QToolButton::clicked, this, [this] { openWorkspaceMenu(); });
@@ -4758,7 +4899,8 @@ void Ribbon::setPanel(QWidget* search) {
   m_panelTabRow = new QWidget(m_panelBody);
   m_panelTabRow->setObjectName(QStringLiteral("ribbonTabRow"));
   auto* row = new QHBoxLayout(m_panelTabRow);
-  row->setContentsMargins(kPanelPad, 4, kPanelPad, 4);
+  // Fork: the tabs down to the hairline under the row, their underline on it.
+  row->setContentsMargins(kPanelPad, 3, kPanelPad, 0);
   row->setSpacing(4);
   static_cast<SegmentedTabBar*>(m_tabs)->setPanelStyle(true);
   m_tabsButton->setFixedSize(panelTabHeight(font()), panelTabHeight(font()));
@@ -4869,7 +5011,8 @@ QString Ribbon::workspaceOfTab(const QString& tab) {
   if (tab == kMakePrint || tab == kMakeLaser || tab == kMakeCnc) {
     return kMakeWorkspace;
   }
-  if (tab == kSolid || tab == kSurface || tab == kSheetMetal || tab == kBuild || tab == kManage) {
+  if (tab == kSolid || tab == kSurface || tab == kSheetMetal || tab == kBuild || tab == kManage || tab == kMesh ||
+      tab == kPlastic || tab == kAssembly) {
     return kDesignWorkspace;
   }
   return QString();
@@ -5412,23 +5555,20 @@ void Ribbon::paintEvent(QPaintEvent* event) {
     return; // the cards paint themselves; the view shows between them
   }
   if (m_panel) {
-    // The toolbar panel (mitcad#1990): the workspace selector's block and
-    // the card beside it in the cards' material (no accent line on the
-    // block: owner, test build 10); a thin line between two groups of the
-    // shown tab.
+    // Fork: the toolbar panel as one bar across the view, as Fusion's
+    // (docs/ui-conventions.md "The toolbar panel"): the surface colour edge
+    // to edge, a line at its bottom and one right of the workspace block;
+    // a thin line between two groups of the shown tab.
     QPainter painter(this);
     painter.setRenderHint(QPainter::Antialiasing);
     const QPalette pal = palette();
     const qreal hairline = 1.0 / devicePixelRatioF();
-    painter.setPen(QPen(cardBorderColor(pal), hairline));
-    painter.setBrush(cardFillColor(pal));
-    for (const QWidget* card : {static_cast<const QWidget*>(m_workspaceButton), static_cast<const QWidget*>(m_panelBody)}) {
-      if (card == nullptr || card->isHidden()) {
-        continue;
-      }
-      const QRectF box =
-          QRectF(card->geometry()).adjusted(hairline / 2, hairline / 2, -hairline / 2, -hairline / 2);
-      painter.drawRoundedRect(box, kPanelRadius, kPanelRadius);
+    painter.fillRect(rect(), themeColor(ColorRole::Surface, pal));
+    painter.fillRect(QRectF(0, height() - hairline, width(), hairline), themeColor(ColorRole::Line, pal));
+    if (m_workspaceButton != nullptr && !m_workspaceButton->isHidden()) {
+      const QRect block = m_workspaceButton->geometry();
+      painter.fillRect(QRectF(block.right() + 1 - hairline, block.top() + 8, hairline, block.height() - 16),
+                       cardBorderColor(pal));
     }
     // A hairline between the tab row and the groups under it.
     if (m_panelTabRow != nullptr && m_panelBody != nullptr && !m_pages->isHidden()) {
@@ -5936,8 +6076,8 @@ QString Ribbon::workspaceOfName(const QString& name) {
 }
 
 QStringList Ribbon::guideTabs() {
-  return {kStart,    kSolid,   kSurface, kSheetMetal, kBuild,    kMakePrint, kMakeLaser,
-          kMakeCnc,  kManage,  kSketch,  kDrawing,    kCutSheet, kRender};
+  return {kStart,     kSolid,   kSurface, kAssembly, kMesh,    kSheetMetal, kPlastic, kBuild,
+          kMakePrint, kMakeLaser, kMakeCnc, kManage, kSketch, kDrawing,    kCutSheet, kRender};
 }
 
 QString Ribbon::tabOfName(const QString& name) {

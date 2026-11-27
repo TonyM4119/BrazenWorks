@@ -1322,6 +1322,17 @@ so Text size scales them all.
 
 ## 11. Icons
 
+**Fork (PureCAD, owner 27.11.2026): Fusion's look, drawn anew.** The
+icons draw in colour, not in one navy: the sources' roles keep their
+hues (`Icons.cpp` `colourPaint`): shaded blue solids (lit top, mid side,
+deeper far side), amber planes, yellow worked faces (the Pencil role's
+fill), orange actions, sketch blue, under a slate outline, on both
+themes; a disabled icon keeps the one-colour family at its opacity. The
+toolbar's main commands are isometric shaded solids with the face a
+command works on in yellow. Never Autodesk's artwork: every icon is
+PureCAD's own drawing. Where the points below say navy or white faces,
+read these colours.
+
 - Line icons from the SVG sources in `app/icons` (`themeIcon`; MitCad's
   own drawings, MIT): 24 × 24, a dark outline of 1.3, blue solids,
   orange for the action (a plus, a turning arrow), drawn for the
@@ -1360,6 +1371,16 @@ so Text size scales them all.
   × themselves (`TitleButton`).
 
 ## 12. The top bar
+
+**Fork (PureCAD): Fusion's look.** The bar stays as below (36 px, the
+left group, the tabs, the right end), with one change: the shown design's
+tab is a tab of the toolbar panel's surface, rounded at the top and open
+at its foot, from 4 px under the bar's top to its bottom, where the
+toolbar panel goes on under it; its name and × in the text colour. The
+other tabs stay flat. This replaces the accent block described below. Every design tab shows the design's icon (16 px) before its name. The
+bar's command buttons draw their icons in one colour, the outline's
+(`monochromeIcon`), as Fusion's quiet top bar; the toolbar and the menus
+keep the colours.
 
 One flat bar across the window, 36 px high (`kFloatingRowHeight`),
 controls 30 px high, 12 px between its groups and at its ends. Nothing is
@@ -1431,6 +1452,49 @@ tell which design is active, in either theme.
 
 ## 13. The toolbar panel
 
+**Fork (PureCAD): Fusion's look.** In both layouts the panel is one bar
+right under the top bar, edge to edge (the Floating layout: a flush row,
+`FloatingLayout::setFlushRow`, no margins, no gap to the top bar), in the
+surface colour with a line at its foot; no cards. Its parts:
+
+- **The workspace block**: the workspace's name in capitals with a ˅
+  ("DESIGN ˅"), at least 96 px wide, as high as the panel, a line right of
+  it; no icon and no "Workspace" line.
+- **The tabs**: names in capitals (0.9 of the text, Regular, 0.5 px
+  apart); the shown one in the accent over a 3 px bar of it at the tab
+  row's foot, on the line under the row; a hovered one in the full text
+  colour; no filled block.
+- **The groups**: 32 px icons with 3 px around them, **icons only** by
+  default (Preferences › Display › Toolbar labels still offers labels;
+  the UI tests keep labels), each group's caption in capitals (0.85,
+  Regular) with a small filled ▾ (the workspace block's too), thin lines between the groups.
+
+- **The workspace list** (a click on the block): "WORKSPACE" in capitals,
+  then an entry per workspace, at least 440 px wide: a bar at its left and
+  its icon on a tinted tile in the workspace's colour (Design the accent,
+  Make amber, Render deep red, Drawing teal; the bar full by the shown or
+  hovered entry, lighter by the others), its name in DemiBold with a
+  "Current" pill on the shown one, a line on what it is for, and its tabs
+  (Render's and Drawing's stages) in the quieter text; the shown entry on
+  a tint of the accent. Under them a line and a short note: every
+  workspace works on the same design, and the list is locked while a
+  sketch is open.
+
+- **Fuller groups**: the Solid tab's groups show most of their main
+  commands as buttons, as Fusion's (Create seven, Modify seven, Assemble
+  four, Inspect three); the tabs are spaced wide (20 px each side of a
+  name); the workspace block is a framed button (the window's colour in a
+  hairline frame, 8 px in from the panel's edges), at least 120 px wide.
+- **The view cube** (`ViewCube.cpp`): crisp as Fusion's, the faces 1.24
+  of its size and thin bevels of 0.10 a shade darker (the same size across
+  as before), solid faces, light grey lighter at the top (dark greys on a
+  dark background), a grey line round each face,
+  the names in plain grey without a halo, the bevels a shade darker, and
+  thin coloured axes along the cube's edges.
+
+Where the points below say otherwise (cards, the 84 px block with its
+icon, the accent rectangle, 30 px icons, labels by default), these win.
+
 Under the top bar, across the view between the view margins (the
 Docked layout: across the window, above the docks, as far from the
 window's sides and from the bar as the Floating layout has it from the
@@ -1460,7 +1524,8 @@ user's state back. The panel is never moved to another edge of the window
 or floated (declined on GitHub mitcad/Mitcad#571).
 
 The workspaces: **Design** (the
-Solid, Surface, Sheet Metal, Build and Manage tabs), **Make** (a tab per
+Solid, Surface, Assembly, Mesh, Sheet Metal, Plastic, Build and Manage
+tabs; Fork: Assembly, Mesh and Plastic as Fusion's and SolidCraft's), **Make** (a tab per
 manufacturing method: 3D Print, Laser and CNC; its entry in the list
 reads "3D Print · Laser · CNC"), **Render** (its stages) and
 **Drawing** (an open drawing's tab). A model workspace opens on the tab
@@ -1544,6 +1609,13 @@ Docked tab row before the selector came there).
      the row never scrolls: every tab is in sight or in the »'s menu.
 
 ## 14. Cards
+
+**Fork (PureCAD): Fusion's look.** A card's title is in small capitals
+(0.85 of the text, Medium, 0.5 px apart) in the quiet text colour
+("BROWSER", "TIMELINE"). In the Browser the root row shows the design's
+name while the root keeps the model's default name, and the settings row
+reads Document Settings; their paths and logs keep Root and Design
+Settings.
 
 A card (`GlassCard`) floats over the view: card material, card radius,
 a soft shadow. The left column's cards (Browser, Drawings, Render's
@@ -1745,6 +1817,29 @@ on; no second grid is drawn. Over it:
 When the mouse leaves the plane or the pick ends, the axes and numbers go
 and the grid goes back to the plane it was on (a sketch opened on the
 picked plane then puts it on its own plane, as before).
+
+## 18c. Preferences (fork)
+
+The Preferences dialog (Windows and Linux; the macOS Settings window keeps
+its panes) in SolidCraft's look, over the same settings:
+
+- **The header:** the gear icon and "Preferences" (1.15, DemiBold) at the
+  left, the search field ("Search preferences", Ctrl+F) at the right.
+- **The sidebar:** a row per page, its icon (16) and name, the chosen one
+  on a tint of the accent with its name in the accent and DemiBold, a
+  hovered one on a faint tint; the pages by section, each section's caption
+  in small grey capitals over its first page: General alone, then LOOK
+  (Display, Fonts, Textures), WORK (Sketch, Assembly, 3D Print, Suppliers),
+  INPUT (Navigation) and EXTEND (AI Assistants, Cloud, Updates, Cache,
+  Diagnostics).
+- **The page:** in a panel of the surface colour with a hairline and the
+  card radius, its name as a title (1.45, DemiBold) and a line on what it
+  holds under it; the page's settings without a frame or title of their
+  own; a box inside a page is a section, its caption in small grey
+  capitals over a hairline.
+- **The foot:** Restore Defaults, Export Settings and Import Settings at the
+  left; Cancel, Apply and OK at the right, OK on the accent. Apply saves
+  what OK saves and keeps the dialog open.
 
 ## 19. What not to do
 

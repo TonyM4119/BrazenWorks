@@ -274,11 +274,14 @@ GlassCard::GlassCard(QWidget* parent) : QWidget(parent) {
   m_chevron->setToolTip(tr("Collapse or expand"));
   connect(m_chevron, &QToolButton::clicked, this, [this] { setCollapsed(!m_collapsed); });
   m_titleLabel = new QLabel(m_header);
+  // Fork: the title in small capitals, a little apart and quieter, as
+  // Fusion's panel headers ("BROWSER"; MitCad: 0.95 DemiBold).
   QFont font = m_titleLabel->font();
-  font.setWeight(QFont::DemiBold);
-  font.setPointSizeF(font.pointSizeF() * 0.95);
+  font.setWeight(QFont::Medium);
+  font.setPointSizeF(font.pointSizeF() * 0.85);
+  font.setLetterSpacing(QFont::AbsoluteSpacing, 0.5);
   m_titleLabel->setFont(font);
-  m_titleLabel->setForegroundRole(QPalette::WindowText);
+  m_titleLabel->setForegroundRole(QPalette::PlaceholderText);
   m_headerLayout->addWidget(m_chevron);
   m_headerLayout->addWidget(m_titleLabel, 1);
   m_layout->addWidget(m_header);
@@ -299,7 +302,7 @@ GlassCard::~GlassCard() { delete m_shadow; }
 
 void GlassCard::setTitle(const QString& title) {
   m_titleText = title;
-  m_titleLabel->setText(title);
+  m_titleLabel->setText(title.toUpper()); // Fork: capitals, as Fusion's
   updateHeader();
 }
 

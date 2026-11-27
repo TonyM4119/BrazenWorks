@@ -218,7 +218,7 @@ void FloatingLayout::watchContent(QWidget* content) { content->installEventFilte
 void FloatingLayout::addTopRow(QWidget* row, RowCards cards, const QList<QWidget*>& parts) {
   row->setParent(this);
   row->installEventFilter(this);
-  Row entry{row, std::move(cards), {}, row == m_flushRow.data()};
+  Row entry{row, std::move(cards), {}, m_flushRows.contains(QPointer<QWidget>(row))};
   for (QWidget* part : parts) {
     entry.parts.emplace_back(part);
     part->installEventFilter(this); // shown and hidden: the row follows
@@ -231,9 +231,11 @@ void FloatingLayout::addTopRow(QWidget* row, RowCards cards, const QList<QWidget
 }
 
 void FloatingLayout::setFlushRow(QWidget* row) {
-  m_flushRow = row;
+  if (!m_flushRows.contains(QPointer<QWidget>(row))) {
+    m_flushRows.append(row);
+  }
   for (Row& entry : m_rows) {
-    entry.flush = entry.widget == row;
+    entry.flush = entry.flush || entry.widget == row;
   }
   requestLayout();
 }
@@ -665,6 +667,7 @@ void FloatingLayout::layoutCards() {
   // would be, raised over the cards at the end, taking no room.
   QPointer<QWidget> overlayRow;
   QRect overlaySlot;
+  int barRowsBottom = -1; // Fork: the bottom of the bar laid out last, if the last row was one
   for (const Row& row : m_rows) {
     QWidget* widget = row.widget;
     if (widget == nullptr) {
@@ -697,7 +700,9 @@ void FloatingLayout::layoutCards() {
     const int height = card != nullptr && card->content() != nullptr ? card->heightForContent(hinted(card->content()))
                                                                      : hinted(widget);
     // A bar (setFlushRow) from the view's top edge to edge.
-    const QRect slot = row.flush ? QRect(view.left(), rowTop - kMargin, view.width(), height)
+    // Fork: a bar right after a bar starts at its bottom.
+    const int flushTop = barRowsBottom >= 0 ? barRowsBottom : rowTop - kMargin;
+    const QRect slot = row.flush ? QRect(view.left(), flushTop, view.width(), height)
                                  : QRect(view.left() + kMargin, rowTop, std::max(0, view.width() - 2 * kMargin), height);
     if (card != nullptr) {
       card->setSlot(slot);
@@ -714,6 +719,7 @@ void FloatingLayout::layoutCards() {
     }
     rowTop = slot.bottom() + 1 + kGap;
     rowsBottom = slot.bottom() + 1;
+    barRowsBottom = row.flush ? slot.bottom() + 1 : -1;
     if (row.cards && widget->mask().isEmpty()) {
       // A row of parts that is one card (the toolbar panel, mitcad#1990):
       // the view is covered between its parts too.
