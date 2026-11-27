@@ -207,9 +207,9 @@
             {"command": "sketch.create", "button": true, "repeat": true},
             "-",
             {"command": "surface.extrude", "button": true},
-            "surface.revolve",
-            "surface.sweep",
-            "surface.loft",
+            {"command": "surface.revolve", "button": true},
+            {"command": "surface.sweep", "button": true},
+            {"command": "surface.loft", "button": true},
             "surface.helix",
             "-",
             {"command": "surface.patch", "button": true},
@@ -224,11 +224,11 @@
           "group": "MODIFY",
           "entries": [
             {"command": "surface.trim", "button": true},
-            "surface.untrim",
-            "surface.extend",
+            {"command": "surface.untrim", "button": true},
+            {"command": "surface.extend", "button": true},
             "-",
-            "surface.stitch",
-            "surface.unstitch",
+            {"command": "surface.stitch", "button": true},
+            {"command": "surface.unstitch", "button": true},
             "surface.reverse_normal",
             "-",
             "surface.match",
@@ -236,6 +236,14 @@
             "-",
             {"command": "surface.thicken", "button": true},
             {"command": "solid.boundary_fill", "repeat": true}
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
           ]
         },
         {
@@ -275,6 +283,18 @@
           ]
         },
         {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
+          ]
+        },
+        {
           "group": "SELECT",
           "entries": [
             {"extra": "solid.selection"}
@@ -292,7 +312,7 @@
             "-",
             {"command": "sheet.face", "button": true},
             {"command": "sheet.flange", "button": true},
-            "sheet.hem",
+            {"command": "sheet.hem", "button": true},
             "sheet.convert",
             "sheet.lofted_flange",
             "-",
@@ -303,7 +323,7 @@
         {
           "group": "MODIFY",
           "entries": [
-            "sheet.cut",
+            {"command": "sheet.cut", "button": true},
             "sheet.perforate",
             "-",
             "sheet.corner_relief",
@@ -311,11 +331,11 @@
             "sheet.corner_chamfer",
             "-",
             {"command": "sheet.unfold", "button": true},
-            "sheet.refold",
+            {"command": "sheet.refold", "button": true},
             {"command": "sheet.flat_pattern", "button": true},
             "sheet.show_flat",
             "-",
-            {"command": "sheet.export_dxf", "repeat": true},
+            {"command": {"command": "sheet.export_dxf", "button": true}, "repeat": true},
             "sheet.flat_pattern_drawing",
             {"command": "sheet.export_bend_table", "repeat": true}
           ]
@@ -338,6 +358,14 @@
             "sheet.glue_flap",
             "sheet.standard_box",
             "sheet.export_die_line"
+          ]
+        },
+        {
+          "group": "ASSEMBLE",
+          "entries": [
+            {"command": "solid.new_component", "button": true},
+            {"command": "assemble.joint", "button": true},
+            "assemble.as_built_joint"
           ]
         },
         {
@@ -371,6 +399,18 @@
             "construct.point_along_path",
             "-",
             "construct.coordinate_system"
+          ]
+        },
+        {
+          "group": "INSPECT",
+          "entries": [{"command": "inspect.measure", "button": true}, {"command": "inspect.section", "button": true}]
+        },
+        {
+          "group": "INSERT",
+          "entries": [
+            {"command": "insert.component", "button": true},
+            {"command": "insert.mesh", "button": true},
+            {"command": "insert.dxf", "button": true}
           ]
         },
         {
@@ -715,7 +755,7 @@
                 "sketch.slot_center",
                 "sketch.slot_arc",
                 "sketch.slot_arc_center",
-                "sketch.spline",
+                {"command": "sketch.spline", "button": true},
                 "sketch.spline_control",
                 "sketch.equation_curve"
               ]
@@ -724,7 +764,7 @@
             {"submenu": "Blocks", "entries": ["sketch.insert_block", "sketch.create_block"]},
             {
               "submenu": "Patterns",
-              "entries": ["sketch.rectangular_pattern", "sketch.circular_pattern", "sketch.mirror"]
+              "entries": ["sketch.rectangular_pattern", "sketch.circular_pattern", {"command": "sketch.mirror", "button": true}]
             },
             {
               "submenu": "References",
@@ -746,7 +786,7 @@
             "sketch.blend_curve",
             "sketch.chamfer",
             {"command": "sketch.trim", "button": true},
-            "sketch.extend",
+            {"command": "sketch.extend", "button": true},
             "sketch.extend_to_meet",
             "sketch.break",
             "sketch.split",
@@ -775,10 +815,10 @@
             {"command": "sketch.constraint.parallel", "button": true},
             {"command": "sketch.constraint.perpendicular", "button": true},
             {"command": "sketch.constraint.fix", "button": true},
-            "sketch.constraint.midpoint",
-            "sketch.constraint.concentric",
-            "sketch.constraint.collinear",
-            "sketch.constraint.symmetric",
+            {"command": "sketch.constraint.midpoint", "button": true},
+            {"command": "sketch.constraint.concentric", "button": true},
+            {"command": "sketch.constraint.collinear", "button": true},
+            {"command": "sketch.constraint.symmetric", "button": true},
             "sketch.constraint.smooth",
             "sketch.equal_spacing",
             {"command": "sketch.auto_constrain", "button": true},
@@ -809,7 +849,7 @@
           "group": "FINISH SKETCH",
           "entries": [
             {"command": "sketch.finish", "button": true},
-            {"command": "sketch.cancel", "button": true}
+            "sketch.cancel"
           ]
         }
       ]
