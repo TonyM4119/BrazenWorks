@@ -1818,6 +1818,29 @@ When the mouse leaves the plane or the pick ends, the axes and numbers go
 and the grid goes back to the plane it was on (a sketch opened on the
 picked plane then puts it on its own plane, as before).
 
+## 18c. Preferences (fork)
+
+The Preferences dialog (Windows and Linux; the macOS Settings window keeps
+its panes) in SolidCraft's look, over the same settings:
+
+- **The header:** the gear icon and "Preferences" (1.15, DemiBold) at the
+  left, the search field ("Search preferences", Ctrl+F) at the right.
+- **The sidebar:** a row per page, its icon (16) and name, the chosen one
+  on a tint of the accent with its name in the accent and DemiBold, a
+  hovered one on a faint tint; the pages by section, each section's caption
+  in small grey capitals over its first page: General alone, then LOOK
+  (Display, Fonts, Textures), WORK (Sketch, Assembly, 3D Print, Suppliers),
+  INPUT (Navigation) and EXTEND (AI Assistants, Cloud, Updates, Cache,
+  Diagnostics).
+- **The page:** in a panel of the surface colour with a hairline and the
+  card radius, its name as a title (1.45, DemiBold) and a line on what it
+  holds under it; the page's settings without a frame or title of their
+  own; a box inside a page is a section, its caption in small grey
+  capitals over a hairline.
+- **The foot:** Restore Defaults, Export Settings and Import Settings at the
+  left; Cancel, Apply and OK at the right, OK on the accent. Apply saves
+  what OK saves and keeps the dialog open.
+
 ## 19. What not to do
 
 - Two texts for one control by default (a label beside a button that

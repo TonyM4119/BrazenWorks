@@ -51,7 +51,10 @@
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScreen>
+#include <QPainter>
 #include <QScrollArea>
+#include <QShortcut>
+#include <QStyledItemDelegate>
 #include <QSettings>
 #include <QSignalBlocker>
 #include <QSlider>
@@ -304,6 +307,13 @@ struct PreferencePage {
   // that the search finds a phrase ("quick_access_toolbar" for "quick
   // access", mitcad#1189).
   const char* keywords;
+  // Fork: SolidCraft's look of the dialog (docs/ui-conventions.md
+  // "Preferences"): the sidebar's section the page opens (LOOK, WORK, INPUT,
+  // EXTEND; empty: none, General's), a line under the page's title, and
+  // its icon (app/icons).
+  const char* section = "";
+  const char* about = "";
+  const char* icon = "settings";
 };
 
 const PreferencePage kPreferencePages[] = {
@@ -311,36 +321,23 @@ const PreferencePage kPreferencePages[] = {
      "autosave recovery activate component ask picked face units inch new design "
      "browser features used sketches consumed language tolerance import temperature fahrenheit celsius "
      "tabs windows open_designs folder version native macos extrude operation new_body join cut automatic "
-     "save new_design computer project remote remember"},
-    {"navigation", QT_TRANSLATE_NOOP("View", "Navigation"),
-     "mouse orbit pan zoom scheme shortcuts bindings custom trackpad 3d_mouse space speed arrow key step "
-     "orbit_center cursor constrained reverse smooth transitions scroll"},
+     "save new_design computer project remote remember",
+     "", QT_TRANSLATE_NOOP("View", "Design defaults, files, language and saving."), "settings"},
     {"display", QT_TRANSLATE_NOOP("View", "Display"),
      "camera perspective orthographic orientation view cube projection follow background environment render device gpu cuda worker optix ghost inactive components pick priority layout docked floating browser background rows card "
      "focal_length lens field_of_view anaglyph stereo "
      "quick_access_toolbar quick-access toolbar theme dark light mode colour color scheme "
      "menu_bar menus hamburger origin_planes origin planes axes size screen model millimetres corner centred "
      "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
-     "drawings small_circles circles boost navigation_bar"},
-    {"cache", QT_TRANSLATE_NOOP("View", "Cache"), "results memory disk diagnostics clear folder computed"},
-    {"cloud", QT_TRANSLATE_NOOP("View", "Cloud"),
-     "git remote sync push fetch version control author email name mqtt live broker brokers known "
-     "git_program sign_out"},
-    {"updates", QT_TRANSLATE_NOOP("View", "Updates"), "release channel pre-release check start-up startup"},
-    {"print", QT_TRANSLATE_NOOP("View", "3D Print"), "slicer printing open_in program"},
-    // The debug log (mitcad#269).
-    {"diagnostics", QT_TRANSLATE_NOOP("View", "Diagnostics"),
-     "debug log logging trace problem report log_folder privacy"},
+     "drawings small_circles circles boost navigation_bar",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
+    // Folders of font files for sketch text (mitcad#473).
+    {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
     // Texture folders for Edit Appearances (mitcad#315).
     {"textures", QT_TRANSLATE_NOOP("View", "Textures"),
-     "texture folders maps materials appearance images internet online"},
-    // The folders for designs, which AI assistants save to and open from
-    // (mitcad#402).
-    {"agents", QT_TRANSLATE_NOOP("View", "AI Assistants"),
-     "mcp agent agents ai folders save open connection assistant assistants designs codex claude comments resolve "
-     "chat history api key endpoint approvals timeout custom_agent"},
-    // Folders of font files for sketch text (mitcad#473).
-    {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface"},
+     "texture folders maps materials appearance images internet online",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Folders of textures for appearances."), "image-reference"},
     // The first dimension scales the sketch (mitcad#860).
     // Click adds to the selection in sketches (mitcad#1403).
     // Esc leaves an unchanged sketch (mitcad#1623).
@@ -349,15 +346,42 @@ const PreferencePage kPreferencePages[] = {
     {"sketch", QT_TRANSLATE_NOOP("View", "Sketch"),
      "sketch dimension first scale proportion drawn size click select selection add ctrl multiple "
      "esc escape leave exit finish unchanged profile profiles shade shading project edges face "
-     "hide hidden show shown visible visibility used extrude feature eye"},
-    // The suppliers' shops: the region of the product links and the shops
-    // the Supplier filters start with (mitcad#950).
-    {"suppliers", QT_TRANSLATE_NOOP("View", "Suppliers"),
-     "supplier suppliers shop shops region country product link links part number filter buy"},
+     "hide hidden show shown visible visibility used extrude feature eye",
+     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, dimensions and selecting in sketches."), "sketch"},
     // Joints whose picks lie under another component than the active one
     // (mitcad#1856).
     {"assembly", QT_TRANSLATE_NOOP("View", "Assembly"),
-     "assembly joint joints rigid_group constraint component active holds picks ask"},
+     "assembly joint joints rigid_group constraint component active holds picks ask",
+     "WORK", QT_TRANSLATE_NOOP("View", "Joints and the components they hold."), "joint"},
+    {"print", QT_TRANSLATE_NOOP("View", "3D Print"), "slicer printing open_in program",
+     "WORK", QT_TRANSLATE_NOOP("View", "The slicer 3D Print opens."), "print-3d"},
+    // The suppliers' shops: the region of the product links and the shops
+    // the Supplier filters start with (mitcad#950).
+    {"suppliers", QT_TRANSLATE_NOOP("View", "Suppliers"),
+     "supplier suppliers shop shops region country product link links part number filter buy",
+     "WORK", QT_TRANSLATE_NOOP("View", "The shops of part numbers and their region."), "component"},
+    {"navigation", QT_TRANSLATE_NOOP("View", "Navigation"),
+     "mouse orbit pan zoom scheme shortcuts bindings custom trackpad 3d_mouse space speed arrow key step "
+     "orbit_center cursor constrained reverse smooth transitions scroll",
+     "INPUT", QT_TRANSLATE_NOOP("View", "Mouse, trackpad and 3D mouse."), "named-view"},
+    // The folders for designs, which AI assistants save to and open from
+    // (mitcad#402).
+    {"agents", QT_TRANSLATE_NOOP("View", "AI Assistants"),
+     "mcp agent agents ai folders save open connection assistant assistants designs codex claude comments resolve "
+     "chat history api key endpoint approvals timeout custom_agent",
+     "EXTEND", QT_TRANSLATE_NOOP("View", "AI assistants, their folders and chat."), "assistant-chat"},
+    {"cloud", QT_TRANSLATE_NOOP("View", "Cloud"),
+     "git remote sync push fetch version control author email name mqtt live broker brokers known "
+     "git_program sign_out",
+     "EXTEND", QT_TRANSLATE_NOOP("View", "Git projects, sync and live updates."), "cloud"},
+    {"updates", QT_TRANSLATE_NOOP("View", "Updates"), "release channel pre-release check start-up startup",
+     "EXTEND", QT_TRANSLATE_NOOP("View", "Release channel and update checks."), "update"},
+    {"cache", QT_TRANSLATE_NOOP("View", "Cache"), "results memory disk diagnostics clear folder computed",
+     "EXTEND", QT_TRANSLATE_NOOP("View", "Computed results kept in memory and on disk."), "folder"},
+    // The debug log (mitcad#269).
+    {"diagnostics", QT_TRANSLATE_NOOP("View", "Diagnostics"),
+     "debug log logging trace problem report log_folder privacy",
+     "EXTEND", QT_TRANSLATE_NOOP("View", "The debug log and problem reports."), "warning"},
 };
 
 // The pages whose list takes the page's height: the folder lists
@@ -377,6 +401,110 @@ QStringList pageKeywords(const PreferencePage& page) {
     keyword.replace(QLatin1Char('_'), QLatin1Char(' '));
   }
   return keywords;
+}
+
+// Fork: SolidCraft's look of the Preferences dialog (docs/ui-conventions.md
+// "Preferences"). The sidebar's rows: a page's icon and name on a rounded
+// tint when chosen or hovered, and over the first page of a section its
+// caption in small capitals (kSectionRole). One row per page, so that the
+// rows stay the pages' indexes for the stack and the search.
+constexpr int kSectionRole = Qt::UserRole + 40;
+
+class PreferencesSidebarDelegate : public QStyledItemDelegate {
+public:
+  using QStyledItemDelegate::QStyledItemDelegate;
+
+  QSize sizeHint(const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    const QFontMetrics metrics(option.font);
+    const int row = std::max(uiRoomSize(32), metrics.height() + 14);
+    const int width = 10 + uiIconSize(16) + 10 + metrics.horizontalAdvance(index.data(Qt::DisplayRole).toString()) + 14;
+    return QSize(width, row + (index.data(kSectionRole).toString().isEmpty() ? 0 : sectionHeight(option.font)));
+  }
+
+  void paint(QPainter* painter, const QStyleOptionViewItem& option, const QModelIndex& index) const override {
+    painter->save();
+    painter->setRenderHint(QPainter::Antialiasing);
+    const QPalette& pal = option.palette;
+    QRect row = option.rect;
+    const QString section = index.data(kSectionRole).toString();
+    if (!section.isEmpty()) {
+      const int high = sectionHeight(option.font);
+      QFont caps = option.font;
+      caps.setPointSizeF(caps.pointSizeF() * 0.82);
+      caps.setWeight(QFont::DemiBold);
+      caps.setLetterSpacing(QFont::AbsoluteSpacing, 0.6);
+      painter->setFont(caps);
+      painter->setPen(themeColor(ColorRole::TextSecondary, pal));
+      painter->drawText(QRect(row.left() + 10, row.top() + high / 3, row.width() - 10, high * 2 / 3),
+                        Qt::AlignLeft | Qt::AlignVCenter, section.toUpper());
+      row.setTop(row.top() + high);
+    }
+    const bool selected = option.state.testFlag(QStyle::State_Selected);
+    const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
+    if (selected || hovered) {
+      QColor fill = selected ? accentColor(pal) : pal.color(QPalette::WindowText);
+      fill.setAlpha(selected ? (isDarkPalette(pal) ? 60 : 34) : 16);
+      painter->setPen(Qt::NoPen);
+      painter->setBrush(fill);
+      painter->drawRoundedRect(QRectF(row).adjusted(1.5, 1.5, -1.5, -1.5), 6, 6);
+    }
+    const int side = uiIconSize(16);
+    const QIcon icon = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
+    if (!icon.isNull()) {
+      painter->drawPixmap(QPoint(row.left() + 10, row.center().y() - side / 2 + 1),
+                          icon.pixmap(QSize(side, side), painter->device()->devicePixelRatioF()));
+    }
+    QFont name = option.font;
+    if (selected) {
+      name.setWeight(QFont::DemiBold);
+    }
+    painter->setFont(name);
+    painter->setPen(selected ? (isDarkPalette(pal) ? accentColor(pal).lighter(140) : accentColor(pal))
+                             : pal.color(QPalette::WindowText));
+    const QRect text(row.left() + 10 + side + 10, row.top(), row.width() - side - 24, row.height());
+    painter->drawText(text, Qt::AlignLeft | Qt::AlignVCenter,
+                      QFontMetrics(name).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight,
+                                                    text.width()));
+    painter->restore();
+  }
+
+private:
+  static int sectionHeight(const QFont& font) { return QFontMetrics(font).height() + uiRoomSize(16); }
+};
+
+// Fork: a page's settings box shown as SolidCraft's page: no frame and no
+// title of its own (the page's title stands over it), and the boxes inside
+// it as sections, a caption in small capitals over a hairline.
+void stylePreferencesPage(QWidget* page) {
+  const QPalette pal = page->palette();
+  const QString line = themeColor(ColorRole::Line, pal).name(QColor::HexArgb);
+  const QString caption = themeColor(ColorRole::TextSecondary, pal).name(QColor::HexArgb);
+  if (auto* box = qobject_cast<QGroupBox*>(page)) {
+    box->setTitle(QString());
+    box->setFlat(true);
+    if (box->objectName().isEmpty()) {
+      box->setObjectName(QStringLiteral("preferencesPageBox"));
+    }
+    box->setStyleSheet(QStringLiteral("QGroupBox#%1 { border: none; margin: 0; padding: 0; }").arg(box->objectName()));
+  }
+  for (QGroupBox* inner : page->findChildren<QGroupBox*>()) {
+    if (inner->title().isEmpty() || inner->isCheckable()) {
+      continue;
+    }
+    inner->setTitle(inner->title().toUpper());
+    QFont caps = inner->font();
+    caps.setWeight(QFont::DemiBold);
+    caps.setLetterSpacing(QFont::AbsoluteSpacing, 0.6);
+    inner->setFont(caps);
+    // The controls inside keep the dialog's font.
+    for (QWidget* child : inner->findChildren<QWidget*>(QString(), Qt::FindDirectChildrenOnly)) {
+      child->setFont(page->font());
+    }
+    inner->setStyleSheet(QStringLiteral("QGroupBox { border: none; border-top: 1px solid %1; margin-top: 18px; "
+                                        "padding-top: 12px; } QGroupBox::title { subcontrol-origin: margin; "
+                                        "left: 0px; padding: 0 8px 0 0; color: %2; }")
+                             .arg(line, caption));
+  }
 }
 
 // The name of a page of kPreferencePages, in the interface's language.
@@ -3921,29 +4049,65 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     return;
   }
 
+  // Fork: SolidCraft's look (docs/ui-conventions.md "Preferences"): a
+  // header with the gear, the title and the search at the right (Ctrl+F);
+  // the sidebar of the pages by section with their icons; the page shown in
+  // a panel under its title and its line; at the foot Restore Defaults,
+  // Export and Import at the left, Cancel, Apply and OK at the right.
   auto* layout = new QVBoxLayout(dialog.get());
+  layout->setContentsMargins(0, 0, 0, 0);
+  layout->setSpacing(0);
   auto* pages = new QListWidget;
   pages->setObjectName(QStringLiteral("preferencesPages"));
+  pages->setItemDelegate(new PreferencesSidebarDelegate(pages));
+  pages->setFrameShape(QFrame::NoFrame);
+  pages->setMouseTracking(true);
+  pages->viewport()->setAttribute(Qt::WA_Hover);
+  pages->setStyleSheet(QStringLiteral("QListWidget#preferencesPages { background: transparent; }"));
   auto* stack = new QStackedWidget;
-  // The search above the page list (mitcad#2074).
+  // The search in the header (mitcad#2074).
   auto* search = new PreferencesSearchField(pages, [pages](int row) { pages->setCurrentRow(row); });
+  search->setPlaceholderText(tr("Search preferences"));
+  QString lastSection;
   for (const PreferencePage& entry : kPreferencePages) {
+    QWidget* group = groups.value(QLatin1String(entry.id));
+    stylePreferencesPage(group);
     auto* content = new PreferencesPageContent;
     auto* contentLayout = new QVBoxLayout(content);
     contentLayout->setContentsMargins(0, 0, 0, 0);
     const bool fills = pageFills(entry.id);
-    contentLayout->addWidget(groups.value(QLatin1String(entry.id)), fills ? 1 : 0);
+    contentLayout->addWidget(group, fills ? 1 : 0);
     if (!fills) contentLayout->addStretch(1);
     stack->addWidget(content);
     auto* item = new QListWidgetItem(QCoreApplication::translate("View", entry.name), pages);
     item->setData(Qt::UserRole, QLatin1String(entry.id));
+    item->setIcon(themeIcon(QString::fromLatin1(entry.icon)));
+    // The section's caption over its first page.
+    const QString section = QString::fromLatin1(entry.section);
+    if (section != lastSection) {
+      item->setData(kSectionRole, section);
+      lastSection = section;
+    }
     search->addPage(content, QCoreApplication::translate("View", entry.name), pageKeywords(entry));
   }
-  pages->setSpacing(2);
+  pages->setSpacing(1);
+  // The page's title and its line over it.
+  auto* pageTitle = new QLabel;
+  pageTitle->setObjectName(QStringLiteral("preferencesPageTitle"));
+  {
+    QFont font = pageTitle->font();
+    font.setPointSizeF(font.pointSizeF() * 1.45);
+    font.setWeight(QFont::DemiBold);
+    pageTitle->setFont(font);
+  }
+  auto* pageAbout = new QLabel;
+  pageAbout->setObjectName(QStringLiteral("preferencesPageAbout"));
+  pageAbout->setForegroundRole(QPalette::PlaceholderText);
+  pageAbout->setWordWrap(true);
   // Only the page shown counts for the window's minimum size (mitcad#690):
   // the hidden ones are Ignored, as in the Settings window, so that no page
   // makes the window wider or taller than the one shown needs.
-  const auto showPage = [layout, stack](int row) {
+  const auto showPage = [layout, stack, pageTitle, pageAbout](int row) {
     if (row < 0) {
       return;
     }
@@ -3952,6 +4116,9 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
       stack->widget(i)->setSizePolicy(policy, policy);
     }
     stack->setCurrentIndex(row);
+    const PreferencePage& entry = kPreferencePages[std::clamp(row, 0, int(std::size(kPreferencePages)) - 1)];
+    pageTitle->setText(QCoreApplication::translate("View", entry.name));
+    pageAbout->setText(QCoreApplication::translate("View", entry.about));
     stack->updateGeometry();
     layout->invalidate();
     layout->activate();
@@ -3969,41 +4136,112 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
                                 .arg(minimum.height());
     }
   });
-  auto* pagesRow = new QHBoxLayout;
-  auto* pagesColumn = new QVBoxLayout;
-  pagesColumn->addWidget(search);
-  pagesColumn->addWidget(pages, 1);
-  pagesRow->addLayout(pagesColumn);
-  pagesRow->addWidget(stack, 1);
-  layout->addLayout(pagesRow, 1);
+  const QPalette dialogPalette = dialog->palette();
+  // The header.
+  auto* header = new QWidget;
+  header->setObjectName(QStringLiteral("preferencesHeader"));
+  auto* headerRow = new QHBoxLayout(header);
+  headerRow->setContentsMargins(18, 14, 16, 10);
+  headerRow->setSpacing(10);
+  auto* gear = new QLabel;
+  gear->setPixmap(themeIcon(QStringLiteral("settings"))
+                      .pixmap(QSize(uiIconSize(18), uiIconSize(18)), dialog->devicePixelRatioF()));
+  auto* title = new QLabel(tr("Preferences"));
+  {
+    QFont font = title->font();
+    font.setPointSizeF(font.pointSizeF() * 1.15);
+    font.setWeight(QFont::DemiBold);
+    title->setFont(font);
+  }
+  headerRow->addWidget(gear);
+  headerRow->addWidget(title);
+  headerRow->addStretch(1);
+  search->setMinimumWidth(uiRoomSize(280));
+  headerRow->addWidget(search);
+  // Ctrl+F (Cmd+F) takes the search, its text chosen.
+  auto* find = new QShortcut(QKeySequence::Find, dialog.get());
+  connect(find, &QShortcut::activated, search, [search] {
+    search->setFocus(Qt::ShortcutFocusReason);
+    search->selectAll();
+  });
+  layout->addWidget(header);
+  // The sidebar and the page's panel.
+  auto* body = new QHBoxLayout;
+  body->setContentsMargins(12, 4, 16, 0);
+  body->setSpacing(12);
+  body->addWidget(pages);
+  auto* pane = new QFrame;
+  pane->setObjectName(QStringLiteral("preferencesPane"));
+  pane->setStyleSheet(QStringLiteral("QFrame#preferencesPane { background: %1; border: 1px solid %2; "
+                                     "border-radius: 8px; }")
+                          .arg(themeColor(ColorRole::Surface, dialogPalette).name(QColor::HexArgb),
+                               themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb)));
+  auto* paneColumn = new QVBoxLayout(pane);
+  paneColumn->setContentsMargins(24, 18, 24, 16);
+  paneColumn->setSpacing(2);
+  paneColumn->addWidget(pageTitle);
+  paneColumn->addWidget(pageAbout);
+  paneColumn->addSpacing(14);
+  paneColumn->addWidget(stack, 1);
+  body->addWidget(pane, 1);
+  layout->addLayout(body, 1);
 
-  auto* buttons = new QDialogButtonBox(QDialogButtonBox::Ok | QDialogButtonBox::Cancel);
-  connect(buttons, &QDialogButtonBox::accepted, dialog.get(), &QDialog::accept);
-  connect(buttons, &QDialogButtonBox::rejected, dialog.get(), &QDialog::reject);
-  // Restore Defaults (mitcad#1887): the dialog is accepted as OK accepts
-  // it, so that the changes made on the other pages are saved; the pages
-  // are then reset, and Preferences opens again on the same page (below).
+  // The foot: Restore Defaults (mitcad#1887), Export and Import Settings
+  // (mitcad#1889) at the left; Cancel, Apply and OK at the right.
+  auto* foot = new QHBoxLayout;
+  foot->setContentsMargins(16, 12, 16, 14);
+  foot->setSpacing(8);
+  // Restore Defaults: the dialog is accepted as OK accepts it, so that the
+  // changes made on the other pages are saved; the pages are then reset,
+  // and Preferences opens again on the same page (below).
   const auto restorePages = std::make_shared<QStringList>();
   const auto restoreAll = std::make_shared<bool>(false);
   QDialog* const restoring = dialog.get();
-  buttons->addButton(restoreDefaultsButton([pages] { return pages->currentRow(); },
-                                           [restoring, restorePages, restoreAll](const QStringList& ids, bool all) {
-                                             *restorePages = ids;
-                                             *restoreAll = all;
-                                             restoring->accept();
-                                           }),
-                     QDialogButtonBox::ResetRole);
-  // Export and Import Settings (mitcad#1889): accepted as OK, as Restore
-  // Defaults is, then the file is written or read and Preferences opens
-  // again on the same page (below).
+  foot->addWidget(restoreDefaultsButton([pages] { return pages->currentRow(); },
+                                        [restoring, restorePages, restoreAll](const QStringList& ids, bool all) {
+                                          *restorePages = ids;
+                                          *restoreAll = all;
+                                          restoring->accept();
+                                        }));
+  // Export and Import Settings: accepted as OK, as Restore Defaults is,
+  // then the file is written or read and Preferences opens again on the
+  // same page (below).
   const auto transferAfterOk = std::make_shared<int>(0); // 1 export, 2 import
   const auto transferChosen = [restoring, transferAfterOk](bool importing) {
     *transferAfterOk = importing ? 2 : 1;
     restoring->accept();
   };
-  buttons->addButton(transferButton(false, transferChosen), QDialogButtonBox::ResetRole);
-  buttons->addButton(transferButton(true, transferChosen), QDialogButtonBox::ResetRole);
-  layout->addWidget(buttons);
+  foot->addWidget(transferButton(false, transferChosen));
+  foot->addWidget(transferButton(true, transferChosen));
+  foot->addStretch(1);
+  auto* cancel = new QPushButton(tr("Cancel"));
+  cancel->setObjectName(QStringLiteral("preferencesCancel"));
+  cancel->setAutoDefault(false);
+  connect(cancel, &QPushButton::clicked, dialog.get(), &QDialog::reject);
+  // Apply: what OK saves, saved now, the dialog kept open (the pages' own
+  // savings hang on accepted, the shared ones on the commit).
+  auto* apply = new QPushButton(tr("Apply"));
+  apply->setObjectName(QStringLiteral("preferencesApply"));
+  apply->setAutoDefault(false);
+  connect(apply, &QPushButton::clicked, dialog.get(), [dialog = dialog.get(), commit] {
+    emit dialog->accepted();
+    (*commit)();
+    qDebug().noquote() << QStringLiteral("Preferences applied");
+  });
+  auto* ok = new QPushButton(tr("OK"));
+  ok->setObjectName(QStringLiteral("preferencesOk"));
+  ok->setDefault(true);
+  ok->setMinimumWidth(uiRoomSize(84));
+  ok->setStyleSheet(QStringLiteral("QPushButton#preferencesOk { background: %1; color: %2; border: none; "
+                                   "border-radius: 5px; padding: 5px 18px; font-weight: 600; } "
+                                   "QPushButton#preferencesOk:hover { background: %3; }")
+                        .arg(accentColor(dialogPalette).name(), themeColor(ColorRole::AccentText, dialogPalette).name(),
+                             accentColor(dialogPalette).darker(112).name()));
+  connect(ok, &QPushButton::clicked, dialog.get(), &QDialog::accept);
+  foot->addWidget(cancel);
+  foot->addWidget(apply);
+  foot->addWidget(ok);
+  layout->addLayout(foot);
   // The page list as wide as its entries in the style and fonts the dialog
   // shows them in (mitcad#690: measured before the dialog was polished, the
   // list could clip them), with room for a scroll bar on a low screen; it
