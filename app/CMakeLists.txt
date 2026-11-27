@@ -2329,6 +2329,10 @@ target_sources(mitcad PRIVATE drawings/DrawingPreferences.cpp drawings/DrawingPr
 # open designs' shown bodies.
 target_sources(mitcad PRIVATE view/SmallCirclesPreference.cpp view/SmallCirclesPreference.hpp
                               MainWindowDisplayMeshes.cpp)
+# Fork: Preferences › Display › Smoothness and Anti-aliasing, and the view's
+# eased glides.
+target_sources(mitcad PRIVATE view/ViewQualityPreference.cpp view/ViewQualityPreference.hpp
+                              view/EasedCameraAnimation.hpp framework/Motion.cpp framework/Motion.hpp)
 
 # A read of the model while a job computes it, out of an event handler
 # (mitcad#1360, GitHub mitcad/Mitcad#156, app/COMMANDS.md "Background

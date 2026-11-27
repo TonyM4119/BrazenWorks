@@ -109,6 +109,8 @@ const SettingsRule kRules[] = {
     {"view/menuBar", "preferences", PathKind::None},
     {"view/windowMenuBar", "preferences", PathKind::None},
     {"view/smallCircles", "preferences", PathKind::None},
+    {"view/smoothness", "preferences", PathKind::None},   // Fork
+    {"view/antialiasing", "preferences", PathKind::None}, // Fork
     {"view/originStyle", "preferences", PathKind::None},
     {"view/originSize", "preferences", PathKind::None},
     {"view/originSizeMm", "preferences", PathKind::None},

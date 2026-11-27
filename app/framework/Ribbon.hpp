@@ -31,6 +31,8 @@ class QResizeEvent;
 class QShowEvent;
 class QStackedWidget;
 class QTabBar;
+class QVariantAnimation;
+class QEnterEvent;
 
 namespace mitcad {
 
@@ -718,10 +720,17 @@ protected:
   void paintEvent(QPaintEvent* event) override;
   void changeEvent(QEvent* event) override;
   void mousePressEvent(QMouseEvent* event) override;
+  // Fork: the hover highlight fades in and out (framework/Motion.hpp).
+  void enterEvent(QEnterEvent* event) override;
+  void leaveEvent(QEvent* event) override;
 
 private:
   // The arrow part's width: a split button's or a menu button's.
   int arrowWidth() const;
+  // Fork: fades the hover highlight to `level` (0 to 1).
+  void fadeHover(qreal level);
+  QVariantAnimation* m_hover = nullptr;
+  qreal m_hoverLevel = 0.0;
 
   int m_iconSize;
   // The room around the icon: 5 pixels, 3 on the toolbar panel.

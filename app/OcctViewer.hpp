@@ -1214,6 +1214,10 @@ public:
   // Fits what the view shows, on the next frame; with nothing to fit (an
   // empty design's origin is hidden), frames the origin (setOriginBox).
   void fitAll();
+  // Fork: Fit (the command) glides to what fitAll would show, as Home does
+  // (moveCamera; at once when view changes do not animate or the view has
+  // no frame yet).
+  void glideToFit();
   // A new, empty design (mitcad#1000): on the next frame, the view of the
   // origin planes' box at the same share of the view's height whatever the
   // view's size, logged "View: new design framed, scale <mm> mm per view
@@ -1254,7 +1258,8 @@ public:
   // Fits the view to a box (model coordinates) as Fit fits everything:
   // along the current view direction, with Fit's margin, in the part of the
   // view no card covers; at once (mitcad#405).
-  void frameBox(const Bnd_Box& box);
+  // Fork: with `glide`, it glides there (Fit of a selection).
+  void frameBox(const Bnd_Box& box, bool glide = false);
   // Moves the view sideways, as little as it takes, so that a box (model
   // coordinates: a part just placed) is out from under the panels floating
   // over the view (mitcad#656); false when it is clear already. Logged

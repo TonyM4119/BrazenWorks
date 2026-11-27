@@ -34,6 +34,9 @@
 #include "mitcad/geometry/datum.hpp"
 #include "mitcad/geometry/import.hpp"
 #include "view/CameraHeight.hpp"
+#include "view/EasedCameraAnimation.hpp" // Fork: eased glides
+#include "view/ViewQualityPreference.hpp" // Fork: anti-aliasing
+#include "framework/Motion.hpp"           // Fork: whether the interface animates
 #include "view/CameraTurn.hpp"
 #include "view/DefaultView.hpp"
 #include "view/FaceProjection.hpp"
@@ -1999,7 +2002,11 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
 
   // In glass of its own (mitcad#430).
   m_orientationCube = makeViewCube();
+  // Fork: the view's glides ease in and out (view/EasedCameraAnimation.hpp);
+  // the cube shares the animation.
+  SetViewAnimation(new EasedCameraAnimation("OcctViewer view animation"));
   m_orientationCube->SetViewAnimation(ViewAnimation());
+  m_orientationCube->SetDuration(kGlideSeconds); // Fork: as the other glides
   m_orientationCube->SetFixedAnimationLoop(false);
   m_orientationCube->SetAutoStartAnimation(true);
   // In the upper right corner, with its labels in capitals.
@@ -2094,7 +2101,17 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
 
   m_view = m_viewer->CreateView();
   m_view->SetImmediateUpdate(false);
-  m_view->ChangeRenderingParams().NbMsaaSamples = 4;
+  // Fork: Preferences › Display › Anti-aliasing (view/ViewQualityPreference.hpp,
+  // 4 samples by default as before), applied at once when it changes.
+  m_view->ChangeRenderingParams().NbMsaaSamples = savedAntialiasing();
+  connect(&ViewQualityNotifier::instance(), &ViewQualityNotifier::antialiasingChanged, this, [this](int samples) {
+    if (!qEnvironmentVariableIsSet("MITCAD_VIEWPORT_AA")) {
+      m_view->ChangeRenderingParams().NbMsaaSamples = samples;
+      m_view->Invalidate();
+      requestFrame();
+      qDebug().noquote() << QStringLiteral("View anti-aliasing: %1 samples").arg(samples);
+    }
+  });
   // Diagnostic overrides only: retain the normal four-sample policy until
   // physical-display measurements justify changing it (mitcad#552).
   const QString aa = qEnvironmentVariable("MITCAD_VIEWPORT_AA");
@@ -6591,18 +6608,29 @@ void OcctViewer::lookAtSketchPlane(bool saveCamera, const TopoDS_Shape& face) {
   // of the free area as a fit moves it there, without the fit's zoom. Never
   // an exception out of the Sketch Palette's Look At button's slot
   // (mitcad#773).
-  runViewOperation(QStringLiteral("look at the sketch"), [this, &camera, &centre, &normal] {
-    const double distance = turnDistance(camera->Distance(), centre);
-    camera->SetEyeAndCenter(centre.Translated(gp_Vec(normal) * distance), centre);
-    camera->SetUp(m_sketchPlane.YDirection());
-    camera->OrthogonalizeUp();
-    const gp_Vec move = freeAreaShift(camera);
-    camera->SetEyeAndCenter(camera->Eye().Translated(move), camera->Center().Translated(move));
+  // Fork: worked out on a copy, which the view then glides to (moveCamera,
+  // eased, as SolidCraft turns to a sketch plane) instead of jumping there;
+  // at once under the UI tests (framework/Motion.hpp), whose logs below
+  // read the view at its end, and when view changes do not animate.
+  occ::handle<Graphic3d_Camera> end = new Graphic3d_Camera();
+  end->Copy(camera);
+  runViewOperation(QStringLiteral("look at the sketch"), [this, &end, &centre, &normal] {
+    const double distance = turnDistance(end->Distance(), centre);
+    end->SetEyeAndCenter(centre.Translated(gp_Vec(normal) * distance), centre);
+    end->SetUp(m_sketchPlane.YDirection());
+    end->OrthogonalizeUp();
+    const gp_Vec move = freeAreaShift(end);
+    end->SetEyeAndCenter(end->Eye().Translated(move), end->Center().Translated(move));
   });
+  if (motion::enabled()) {
+    moveCamera(end);
+  } else {
+    camera->Copy(end);
+  }
   // For UI tests: the side of the view cube the sketch is seen from
   // (mitcad#1060: a new sketch on XY from TOP, on YZ from RIGHT, on XZ
   // from FRONT), on entering the sketch and on Look At.
-  const gp_Dir seenAlong = camera->Direction();
+  const gp_Dir seenAlong = end->Direction();
   qDebug().noquote() << QStringLiteral("Sketch plane seen from %1 (along %2)")
                             .arg(cubeSideSeenFrom(seenAlong), vectorText(seenAlong.XYZ()));
   // For UI tests: the sketch's origin and the free area's middle in the
@@ -6625,11 +6653,20 @@ void OcctViewer::restoreCamera() {
   if (!m_savedCamera.IsNull()) {
     // In the view's aspect now, with the height the saved view showed: the
     // window may have been resized in the sketch (mitcad#1996).
-    mitcad::copyCameraKeepingAspect(*m_view->Camera(), m_savedCamera);
+    // Fork: into a copy the view glides back to (moveCamera), as it glided
+    // into the sketch; at once under the UI tests (framework/Motion.hpp).
+    occ::handle<Graphic3d_Camera> end = new Graphic3d_Camera();
+    end->Copy(m_view->Camera());
+    mitcad::copyCameraKeepingAspect(*end, m_savedCamera);
     m_savedCamera.Nullify();
     // Anaglyph 3D switched in the sketch stays as it is (mitcad#1449).
-    keepProjection(*m_view->Camera());
-    logRestoredCamera();
+    keepProjection(*end);
+    if (motion::enabled()) {
+      moveCamera(end);
+    } else {
+      m_view->Camera()->Copy(end);
+      logRestoredCamera();
+    }
   }
   sceneChanged();
 }
@@ -6679,6 +6716,21 @@ void OcctViewer::fitAll() {
   requestFrame();
 }
 
+void OcctViewer::glideToFit() {
+  // Fork: as the pending fit frames it (fitPending), into a copy the glide
+  // ends at; a view without a frame yet fits on its first one, as before.
+  if (m_view->Window().IsNull() || m_fitPending || width() <= 0 || height() <= 0) {
+    fitAll();
+    return;
+  }
+  m_framingNewDesign = false;
+  occ::handle<Graphic3d_Camera> end = new Graphic3d_Camera();
+  end->Copy(m_view->Camera());
+  fitPending(end);
+  m_fitMade = true;
+  moveCamera(end);
+}
+
 namespace {
 
 // Looks along the default view's direction (view/DefaultView.hpp, Z up)
@@ -6723,7 +6775,7 @@ void OcctViewer::frameNewDesign(bool defaultView) {
 
 double OcctViewer::visibleHeight() const { return m_view->Camera()->ViewDimensions().Y(); }
 
-void OcctViewer::frameBox(const Bnd_Box& box) {
+void OcctViewer::frameBox(const Bnd_Box& box, bool glide) {
   if (box.IsVoid()) {
     return;
   }
@@ -6737,6 +6789,10 @@ void OcctViewer::frameBox(const Bnd_Box& box) {
   }
   keepEyeOffCentre(*fitted);
   fitToFreeArea(fitted);
+  if (glide) { // Fork
+    moveCamera(fitted);
+    return;
+  }
   m_view->Camera()->Copy(fitted);
   m_view->Invalidate();
   cameraMoved();
@@ -7292,7 +7348,13 @@ void OcctViewer::moveCamera(const occ::handle<Graphic3d_Camera>& end) {
   animation->SetView(m_view);
   animation->SetCameraStart(start);
   animation->SetCameraEnd(end);
-  animation->SetOwnDuration(0.4);
+  // Fork: kGlideSeconds for a turn up to a quarter turn, longer for larger
+  // turns, at most kGlideMaxSeconds (as SolidCraft's view changes), so that
+  // a big turn never sweeps too far a frame; eased in and out
+  // (view/EasedCameraAnimation.hpp).
+  const double turn = start->Direction().Angle(end->Direction()) + start->Up().Angle(end->Up()) / 2.0;
+  const double longer = std::isfinite(turn) ? std::max(1.0, turn / (3.14159265358979323846 / 2.0)) : 1.0;
+  animation->SetOwnDuration(std::min(kGlideSeconds * longer, kGlideMaxSeconds));
   animation->StartTimer(0.0, 1.0, true, false);
   requestFrame();
 }
