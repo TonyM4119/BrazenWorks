@@ -2910,12 +2910,16 @@ void BrowserController::browserMenu(const BrowserNode& node, const QPoint& at) {
       menu.add(QStringLiteral("copy"), tr("Copy"), [this, node] {
         m_clipboard = node.occurrence;
         m_clipboardName = node.name;
+        m_host.copiedOccurrence(node.occurrence, node.name); // PureCAD: for another design's Paste
         qDebug().noquote() << QStringLiteral("Copied %1").arg(node.name);
       });
     }
     if (!m_clipboard.isEmpty()) {
       menu.add(QStringLiteral("paste"), tr("Paste"), [this] { paste(false); });
       menu.add(QStringLiteral("paste"), tr("Paste New"), [this] { paste(true); });
+    } else if (const QString other = m_host.otherDesignCopy(); !other.isEmpty()) {
+      // PureCAD: a component copied in another design.
+      menu.add(QStringLiteral("paste"), tr("Paste %1").arg(other), [this] { m_host.pasteFromOtherDesign(); });
     }
     // Another parent for the occurrence, with what is in it (mitcad#219),
     // named as the body's structure move so that it is not taken for

@@ -6,6 +6,9 @@
 // again whenever the page's settings are saved.
 #include "MainWindow.hpp"
 
+#include <QSettings>
+#include <QJsonObject>
+#include <QJsonArray>
 #include <QLineEdit>
 #include <QDir>
 #include <QFileInfo>
@@ -313,6 +316,54 @@ void MainWindow::renameFromTab() {
     return;
   }
   openDesignMoved(moved);
+}
+
+namespace {
+// PureCAD: the component copied last, in whichever design.
+struct CrossCopy {
+  QPointer<MainWindow> source;
+  QString path; // the occurrence, uids from the root
+  QString name;
+};
+CrossCopy& crossCopy() {
+  static CrossCopy copy;
+  return copy;
+}
+} // namespace
+
+void MainWindow::copiedOccurrence(const QString& path, const QString& name) {
+  crossCopy() = CrossCopy{this, path, name};
+}
+
+QString MainWindow::otherDesignCopy() const {
+  const CrossCopy& copy = crossCopy();
+  return copy.source != nullptr && copy.source != this ? copy.name : QString();
+}
+
+void MainWindow::pasteFromOtherDesign() {
+  const CrossCopy copy = crossCopy();
+  if (copy.source == nullptr || copy.source == this || !canChangeModel()) return;
+  const QString file = copy.source->documentFilePath();
+  if (file.isEmpty() || copy.source->isWindowModified()) {
+    showError(tr("Save %1 first: the component is pasted from its saved file.").arg(copy.source->documentName()));
+    return;
+  }
+  QJsonObject command{{QStringLiteral("cmd"), QStringLiteral("insert_component")},
+                      {QStringLiteral("path"), QFileInfo(file).absoluteFilePath()},
+                      {QStringLiteral("link"), true},
+                      {QStringLiteral("parts"), QJsonObject{{QStringLiteral("occurrences"), QJsonArray{copy.path}}}}};
+  if (!QSettings().value(QStringLiteral("design/pasteAtOrigin"), false).toBool()) {
+    // Where it was in its design: its placement there.
+    const gp_Trsf where = copy.source->m_placements.value(copy.path);
+    QJsonArray rows;
+    for (int r = 1; r <= 3; ++r) {
+      rows.append(QJsonArray{where.Value(r, 1), where.Value(r, 2), where.Value(r, 3), where.Value(r, 4)});
+    }
+    command.insert(QStringLiteral("transform"), rows);
+  }
+  if (runModelCommand(command)) {
+    qInfo().noquote() << QStringLiteral("Pasted %1 from %2").arg(copy.name, file);
+  }
 }
 
 } // namespace mitcad

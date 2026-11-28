@@ -254,6 +254,12 @@ public:
   // Drawings kept in the design (mitcad#707): a drawing (`D1`) opened in
   // its own view over the 3D view; a new one in a component's Drawings
   // folder (the root's: "C0"), opened at once.
+  // PureCAD: copy and paste of components between designs. A Copy in the
+  // browser tells the window; another design's browser offers Paste while
+  // the copy is of a different, saved design.
+  virtual void copiedOccurrence(const QString& /*path*/, const QString& /*name*/) {}
+  virtual QString otherDesignCopy() const { return {}; }
+  virtual void pasteFromOtherDesign() {}
   virtual void openDrawing(const QString& /*uid*/) {}
   virtual void createDrawing(const QString& /*component*/) {}
   // Create Drawing of Flat Pattern (mitcad#2446): a new drawing with the

@@ -202,6 +202,12 @@ class MainWindow : public QMainWindow, public SketchHost, public DocumentHost {
 public:
   // PureCAD: Design › Update changed links when a tab comes back.
   void checkLinksOnReturn() { checkLinkedFiles(); }
+  // PureCAD: components copied in one design, pasted in another
+  // (DocumentHost); at the origin or where they were (Preferences › Design ›
+  // Paste components from another design at the origin).
+  void copiedOccurrence(const QString& path, const QString& name) override;
+  QString otherDesignCopy() const override;
+  void pasteFromOtherDesign() override;
   // PureCAD: Layout › Double-click renames tab: a new name for the design
   // (its file renamed in its folder once saved).
   void renameFromTab();
