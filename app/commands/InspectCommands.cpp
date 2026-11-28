@@ -95,6 +95,17 @@
 namespace mitcad {
 namespace {
 
+// PureCAD: Preferences › Design › Angle decimals for the angles shown, once
+// saved; the full precision as before until then (the log keeps it).
+QString shownDegrees(double radians) {
+  const QSettings store;
+  const QString key = QStringLiteral("design/angleDecimals");
+  if (!store.contains(key)) return cmd::degrees(radians);
+  QString text = QString::number(radians * 180.0 / 3.14159265358979323846, 'f', std::clamp(store.value(key).toInt(), 0, 6));
+  while (text.contains(QLatin1Char('.')) && (text.endsWith(QLatin1Char('0')) || text.endsWith(QLatin1Char('.')))) text.chop(1);
+  return text == QStringLiteral("-0") ? QStringLiteral("0") : text;
+}
+
 using namespace cmd;
 
 QString n(double value, int decimals = 3) {
@@ -488,7 +499,7 @@ QStringList recordValues(const QJsonObject& answer, const QString& unit) {
   }
   if (between.value(QStringLiteral("angle")).isDouble()) {
     values << QStringLiteral("%1 %2°")
-                  .arg(QObject::tr("Angle"), degrees(between.value(QStringLiteral("angle")).toDouble()));
+                  .arg(QObject::tr("Angle"), shownDegrees(between.value(QStringLiteral("angle")).toDouble()));
   }
   const std::pair<const char*, QString> distances[] = {
       {"axis_distance", QObject::tr("Axis distance")},
@@ -647,10 +658,11 @@ Inspection measureShapes(const SelectionItem& first, const SelectionItem* second
     const auto db = lineDirection(b);
     if (da && db) {
       // The angle between the lines, 0 to 90 degrees.
-      const QString angle = degrees(std::acos(std::min(1.0, std::abs(da->Dot(*db)))));
-      lines << QObject::tr("<b>Angle: %1°</b>").arg(angle);
+      const double turn = std::acos(std::min(1.0, std::abs(da->Dot(*db))));
+      const QString angle = degrees(turn);
+      lines << QObject::tr("<b>Angle: %1°</b>").arg(shownDegrees(turn));
       log << QStringLiteral("angle %1 deg").arg(angle);
-      result.values.push_back(valueRow(QObject::tr("Angle"), QStringLiteral("%1°").arg(angle)));
+      result.values.push_back(valueRow(QObject::tr("Angle"), QStringLiteral("%1°").arg(shownDegrees(turn))));
     }
     parts << lines.join(QStringLiteral("<br>"));
   }
@@ -829,10 +841,11 @@ CommandDef measureCommand() {
         result.values.push_back(minimumRow);
       }
       if (between.value(QStringLiteral("angle")).isDouble()) {
-        const QString angle = degrees(between.value(QStringLiteral("angle")).toDouble());
-        lines << QObject::tr("<b>Angle: %1°</b>").arg(angle);
+        const double turn = between.value(QStringLiteral("angle")).toDouble();
+        const QString angle = degrees(turn);
+        lines << QObject::tr("<b>Angle: %1°</b>").arg(shownDegrees(turn));
         log << QStringLiteral("angle %1 deg").arg(angle);
-        result.values.push_back(valueRow(QObject::tr("Angle"), QStringLiteral("%1°").arg(angle)));
+        result.values.push_back(valueRow(QObject::tr("Angle"), QStringLiteral("%1°").arg(shownDegrees(turn))));
       }
       // The query chooses the main dimension's points: a perpendicular
       // plane gap, including faces with no common projection (mitcad#1161).
@@ -3106,7 +3119,7 @@ QString quickMeasurement(const Selection& picked, const std::function<QJsonObjec
       parts << QObject::tr("Distance %1").arg(lengthInUnit(between.value(QStringLiteral("distance")).toDouble(), unit));
     }
     if (between.value(QStringLiteral("angle")).isDouble()) {
-      parts << QObject::tr("Angle %1°").arg(degrees(between.value(QStringLiteral("angle")).toDouble()));
+      parts << QObject::tr("Angle %1°").arg(shownDegrees(between.value(QStringLiteral("angle")).toDouble()));
     }
     return parts.join(QStringLiteral("   "));
   }
