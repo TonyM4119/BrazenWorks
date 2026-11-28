@@ -3950,6 +3950,29 @@ bool MainWindow::chooseInCommand(const QString& command, const QString& input, c
 void MainWindow::onCommandFinished(bool committed) {
   clearNativeCommandContinuation();
   markActiveCommand(QString()); // PureCAD
+  // PureCAD: Tools › Hole › Group holes made together: the run's holes,
+  // the last one too, one timeline group once the run ends.
+  if (m_holeRunContinues) {
+    m_holeRunContinues = false; // the next hole of the run is starting
+  } else if (!m_holeRun.isEmpty()) {
+    const QStringList earlier = m_holeRun;
+    const QStringList start = m_holeRunStart;
+    m_holeRun.clear();
+    if (QSettings().value(QStringLiteral("tools/holeGroupTogether"), false).toBool()) {
+      QTimer::singleShot(0, this, [this, earlier, start, committed] {
+        QStringList run = earlier;
+        if (committed) {
+          for (const QString& uid : timelineUids()) {
+            if (!start.contains(uid) && !run.contains(uid)) run << uid; // the last hole
+          }
+        }
+        if (run.size() > 1 && !modelBusy()) {
+          runModelCommand({{QStringLiteral("cmd"), QStringLiteral("group_features")},
+                           {QStringLiteral("features"), QJsonArray::fromStringList(run)}});
+        }
+      });
+    }
+  }
   if (!m_oldPlaceGhosts.isEmpty()) { // PureCAD: Tools › old place ghost gone
     m_oldPlaceGhosts.clear();
     m_viewer->setOldPlaceGhosts({});
@@ -4173,6 +4196,13 @@ void MainWindow::cancel() {
     return;
   }
   clearSelection();
+}
+
+// PureCAD: the timeline's features by uid, in order.
+QStringList MainWindow::timelineUids() const {
+  QStringList uids;
+  for (const auto& feature : m_snapshot.features) uids << feature.uid;
+  return uids;
 }
 
 // PureCAD: the old place ghosts of what Move moves (startFeatureCommand,
@@ -7390,6 +7420,53 @@ void MainWindow::onPicked(const Selection& items, Qt::KeyboardModifiers modifier
           },
           QStringLiteral("extrude to %1").arg(target.logDescription()));
       if (taken) return;
+    }
+    // PureCAD: Preferences › Tools › Hole › Move by click or drag: with the
+    // hole placed on a face, a click elsewhere on that face moves it there.
+    if (!window && items.size() == 1 && items.first().kind == SelectKind::Face &&
+        m_session->def().id == QLatin1String("solid.hole") &&
+        m_session->state().object(QStringLiteral("at_form")).value(QStringLiteral("form")).toString() == QStringLiteral("face") &&
+        m_session->state().items(QStringLiteral("at")).contains(items.first()) &&
+        QSettings().value(QStringLiteral("tools/holeMoveByClick"), false).toBool() &&
+        !QSettings().value(QStringLiteral("tools/holeSeveralOnFace"), false).toBool()) {
+      m_session->changeInputs(
+          [](CommandState& state, const CommandContext&) {
+            state.setItems(QStringLiteral("at"), {});
+            return true;
+          },
+          QStringLiteral("hole moved by a click"));
+      if (m_session->activateSelection(QStringLiteral("at"))) {
+        m_session->picked(items, modifiers, window, click);
+        return;
+      }
+    }
+    // PureCAD: Preferences › Tools › Hole › Several holes on one face: with
+    // a hole placed on a face, a click on a face makes that hole (OK) and
+    // starts the next one there with the same settings (Repeat's); Group
+    // holes made together groups them in the timeline when the run ends.
+    if (!window && items.size() == 1 && items.first().kind == SelectKind::Face &&
+        m_session->def().id == QLatin1String("solid.hole") &&
+        m_session->state().object(QStringLiteral("at_form")).value(QStringLiteral("form")).toString() == QStringLiteral("face") &&
+        QSettings().value(QStringLiteral("tools/holeSeveralOnFace"), false).toBool()) {
+      const QStringList before = timelineUids();
+      const CommandDef* hole = &m_session->def();
+      if (m_session->commit()) {
+        for (const QString& uid : timelineUids()) {
+          if (!before.contains(uid)) m_holeRun << uid;
+        }
+        m_holeRunContinues = true;
+        m_repeatCommand = hole->id; // the next one starts as this one was
+        const Selection pick = items;
+        QTimer::singleShot(0, this, [this, pick, modifiers, click] {
+          if (m_session != nullptr || m_mode != Mode::Idle) return;
+          if (const CommandDef* def = m_registry->find(QStringLiteral("solid.hole"))) {
+            m_holeRunStart = timelineUids();
+            startFeatureCommand(*def);
+            if (m_session != nullptr) m_session->picked(pick, modifiers, false, click);
+          }
+        });
+        return;
+      }
     }
     m_session->picked(items, modifiers, window, click);
     return;

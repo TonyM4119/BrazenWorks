@@ -1334,6 +1334,12 @@ private:
   std::unique_ptr<CommandDef> m_invertedJoint; // PureCAD: Design › Invert joint selection order
   Selection m_oldPlaceGhosts; // PureCAD: Tools › moved parts' old place
   void showOldPlaceGhosts();
+  // PureCAD: Tools › Hole › Several holes on one face / Group holes made
+  // together: the holes of one run, and whether the next one is starting.
+  QStringList timelineUids() const;
+  QStringList m_holeRun;
+  bool m_holeRunContinues = false;
+  QStringList m_holeRunStart;
   // Print Analysis kept in the document (mitcad#620,
   // MainWindowPrintAnalysis.cpp): the shown one's overhangs and thin walls
   // over the bodies, computed again when it, its bodies or the design

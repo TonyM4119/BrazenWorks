@@ -6394,6 +6394,16 @@ bool CommandSession::ask(const QString& key, const QString& message) {
   return true;
 }
 
+bool CommandSession::activateSelection(const QString& key) {
+  const auto slot = slotOf(key);
+  if (m_done || !slot || slot->def->type != InputDef::Type::Selection || !isShown(*slot)) {
+    return false;
+  }
+  activate(key);
+  updateHighlights();
+  return true;
+}
+
 bool CommandSession::pickInWindow(const QString& key) {
   if (m_done) {
     return false;
