@@ -4528,7 +4528,9 @@ void MainWindow::showThreads(const std::vector<BodyDisplay>& bodies) {
         return feature.type == QStringLiteral("thread") || feature.type == QStringLiteral("hole");
       });
   QJsonArray threads;
-  if (threaded) {
+  // PureCAD: Preferences › Graphics › Cosmetic thread markings (on by
+  // default, as MitCad draws them).
+  if (threaded && QSettings().value(QStringLiteral("graphics/cosmeticThreads"), true).toBool()) {
     try {
       // Only the cosmetic ones, which the view draws: measuring modelled
       // threads cost an open 0.3-0.6 s (mitcad#878).
