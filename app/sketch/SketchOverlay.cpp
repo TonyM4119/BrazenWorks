@@ -10,6 +10,7 @@
 #include <utility>
 #include <vector>
 
+#include <QHash>
 #include <QDebug>
 #include <QFontMetricsF>
 #include <QPaintDevice>
@@ -149,6 +150,22 @@ bool conflictColoring() {
     readAt = now;
   }
   return on;
+}
+
+// PureCAD: a Preferences › Sketch switch, read again at most once a second.
+bool sketchSwitch(const char* key, bool otherwise) {
+  struct Read {
+    bool on;
+    qint64 at;
+  };
+  static QHash<QString, Read> cache;
+  const QString name = QStringLiteral("sketchPrefs/") + QLatin1String(key);
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  auto found = cache.find(name);
+  if (found == cache.end() || now - found->at > 1000) {
+    found = cache.insert(name, {QSettings().value(name, otherwise).toBool(), now});
+  }
+  return found->on;
 }
 
 // PureCAD: Preferences › Sketch › Constraint glyph size (percent of 15 px).
@@ -1590,6 +1607,9 @@ void SketchOverlay::paintGlyph(QPainter& painter, const Glyph& glyph, bool selec
 
 void SketchOverlay::paintDimensionHalo(QPainter& painter, const DimensionShape& placed,
                                        const QColor& halo) {
+  if (!sketchSwitch("dimensionRim", true)) {
+    return; // PureCAD: Preferences › Sketch › Rim under dimensions
+  }
   const DimensionShape shape = onDevicePixels(placed, painter);
   painter.setPen(QPen(halo, kDimensionHaloWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
   painter.setBrush(Qt::NoBrush);
@@ -2395,7 +2415,8 @@ SketchOverlay::BadgeLayout SketchOverlay::badgeLayout() const {
   const int bottomInset = m_view.overlayInsets().bottom();
   const int topInset = m_view.overlayInsets().top();
   const std::vector<QRect> covered = m_view.coveredRects();
-  const QString pointer = m_c.pointerText();
+  // PureCAD: Preferences › Sketch › Cursor coordinates.
+  const QString pointer = sketchSwitch("cursorCoordinates", true) ? m_c.pointerText() : QString();
   out.pointer = pointer;
   // The pointer's place in the sketch's coordinates (mitcad#254), above the
   // badge, at least as wide as a place of three digits so that it does not
