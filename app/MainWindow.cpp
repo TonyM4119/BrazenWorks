@@ -7250,7 +7250,11 @@ void MainWindow::onPicked(const Selection& items, Qt::KeyboardModifiers modifier
     const SelectionItem& item = items.first();
     // A block's instance is picked as one (mitcad#2110).
     const Selection whole = sketching ? m_sketch->instanceSelection(item) : Selection();
-    if (add && next.contains(item)) {
+    // PureCAD: Preferences › Sketch › Shift adds only; Ctrl / Cmd toggles.
+    const bool addsOnly = !sketching && modifiers.testFlag(Qt::ShiftModifier) &&
+                          !modifiers.testFlag(Qt::ControlModifier) &&
+                          QSettings().value(QStringLiteral("sketchPrefs/shiftAddsOnly"), false).toBool();
+    if (add && !addsOnly && next.contains(item)) {
       next.removeAll(item);
       for (const SelectionItem& member : whole) {
         next.removeAll(member);
