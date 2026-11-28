@@ -7315,6 +7315,32 @@ void MainWindow::onPicked(const Selection& items, Qt::KeyboardModifiers modifier
     return;
   }
   if (m_session) {
+    // PureCAD: Preferences › Tools › Extrude to a picked target: in Extrude
+    // with its profiles chosen, a click on a vertex, or on a body's face,
+    // makes the extent To that object.
+    if (!window && items.size() == 1 && m_session->def().id == QLatin1String("solid.extrude") &&
+        (items.first().kind == SelectKind::Vertex || items.first().kind == SelectKind::Face) &&
+        QSettings().value(QStringLiteral("tools/extrudeToTarget"), false).toBool()) {
+      const SelectionItem target = items.first();
+      const bool taken = m_session->changeInputs(
+          [target](CommandState& state, const CommandContext&) {
+            if (state.items(QStringLiteral("profiles")).isEmpty() ||
+                state.items(QStringLiteral("profiles")).contains(target)) {
+              return false;
+            }
+            if (target.kind == SelectKind::Face) {
+              // A face on the profiles' own body is a profile pick, not a target.
+              for (const SelectionItem& profile : state.items(QStringLiteral("profiles"))) {
+                if (profile.kind == SelectKind::Face && profile.owner == target.owner) return false;
+              }
+            }
+            state.setChoice(QStringLiteral("extent"), QStringLiteral("to_object"));
+            state.setItems(QStringLiteral("object"), {target});
+            return true;
+          },
+          QStringLiteral("extrude to %1").arg(target.logDescription()));
+      if (taken) return;
+    }
     m_session->picked(items, modifiers, window, click);
     return;
   }
