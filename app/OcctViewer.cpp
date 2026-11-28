@@ -78,6 +78,7 @@
 #include <QKeySequence>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
+#include <QTouchEvent>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QPainter>
@@ -311,6 +312,10 @@ constexpr Aspect_VKeyFlags kCtrlShift = Aspect_VKeyFlags_CTRL | Aspect_VKeyFlags
 // drag does.
 constexpr Aspect_VKeyFlags kScrollPan = Aspect_VKeyFlags_META | Aspect_VKeyFlags_SHIFT;
 constexpr Aspect_VKeyFlags kScrollOrbit = Aspect_VKeyFlags_META | Aspect_VKeyFlags_CTRL;
+// Fork: a side button's drag (Side button drag): the middle button's with
+// flags no key gives.
+constexpr Aspect_VKeyFlags kSideBackDrag = Aspect_VKeyFlags_META | Aspect_VKeyFlags_ALT | Aspect_VKeyFlags_SHIFT;
+constexpr Aspect_VKeyFlags kSideForwardDrag = Aspect_VKeyFlags_META | Aspect_VKeyFlags_ALT | Aspect_VKeyFlags_CTRL;
 // A scroll that pauses this long ends its drag (ms).
 constexpr int kScrollEndMilliseconds = 150;
 // The zoom steps (what a wheel notch of 15 gives, about 15 %) of a pixel of
@@ -432,6 +437,9 @@ QString viewSizeText(const QWidget& view) { return QStringLiteral("%1x%2").arg(v
 
 // The icon of a cube arrow by its id.
 QString arrowIconName(const QString& id) {
+  if (id == QStringLiteral("around")) {
+    return QStringLiteral("flip"); // fork: Turn Around
+  }
   const bool roll = id == QStringLiteral("cw") || id == QStringLiteral("ccw");
   return (roll ? QStringLiteral("view-roll-") : QStringLiteral("view-arrow-")) + id;
 }
@@ -442,7 +450,7 @@ QString overlaySymbol(const QString& id) {
   static const std::pair<const char*, const char*> symbols[] = {
       {"home", "house"},         {"up", "chevron.up"},      {"down", "chevron.down"},
       {"left", "chevron.left"},  {"right", "chevron.right"}, {"cw", "arrow.clockwise"},
-      {"ccw", "arrow.counterclockwise"}};
+      {"ccw", "arrow.counterclockwise"}, {"around", "arrow.uturn.left"}};
   for (const auto& [name, symbol] : symbols) {
     if (id == QLatin1String(name)) {
       return QString::fromLatin1(symbol);
@@ -2092,7 +2100,9 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
         std::pair{"left", QT_TR_NOOP("Turn to the face on the left")},
         std::pair{"right", QT_TR_NOOP("Turn to the face on the right")},
         std::pair{"cw", QT_TR_NOOP("Roll the view 90 degrees clockwise")},
-        std::pair{"ccw", QT_TR_NOOP("Roll the view 90 degrees counter-clockwise")}}) {
+        std::pair{"ccw", QT_TR_NOOP("Roll the view 90 degrees counter-clockwise")},
+        // Fork: Turn Around, the view from the other side.
+        std::pair{"around", QT_TR_NOOP("Turn around: look from the other side")}}) {
     QToolButton* arrow = makeOverlayButton(this);
     const QString name = QString::fromLatin1(id);
     arrow->setObjectName(QStringLiteral("orientationCube_") + name);
@@ -2101,7 +2111,21 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
     arrow->setAutoRaise(true);
     arrow->setFocusPolicy(Qt::NoFocus);
     arrow->hide();
-    connect(arrow, &QToolButton::clicked, this, [this, name] { pressCubeArrow(name); });
+    // Fork: the arrows the other way round when Preferences says so.
+    connect(arrow, &QToolButton::clicked, this, [this, name] {
+      QString turned = name;
+      if (m_navigation.invertNavigatorArrows) {
+        turned = name == QLatin1String("up")     ? QStringLiteral("down")
+                 : name == QLatin1String("down") ? QStringLiteral("up")
+                 : name == QLatin1String("left") ? QStringLiteral("right")
+                 : name == QLatin1String("right") ? QStringLiteral("left")
+                                                  : name;
+      }
+      if (m_navigation.invertRollArrows) {
+        turned = name == QLatin1String("cw") ? QStringLiteral("ccw") : name == QLatin1String("ccw") ? QStringLiteral("cw") : turned;
+      }
+      pressCubeArrow(turned);
+    });
     m_cubeArrows.emplace_back(name, arrow);
   }
   sizeCubeButtons(); // at the cube's size (mitcad#2071)
@@ -6471,6 +6495,7 @@ void OcctViewer::OnSelectionChanged(const occ::handle<AIS_InteractiveContext>& c
     m_cubeClick = false;
     m_context->ClearSelected(false);
     restoreWindowDecided();
+    fitAfterNavigator(); // fork
     return;
   }
   Selection items;
@@ -7226,6 +7251,15 @@ void OcctViewer::fitCamera(const occ::handle<Graphic3d_Camera>& fitted) const {
   m_viewStep = "the fit to the free area";
   keepEyeOffCentre(*fitted);
   fitToFreeArea(fitted);
+  // Fork: Home and Fit size: the fit fills that share of the view.
+  if (m_navigation.homeFitSize < 100) {
+    const double larger = 100.0 / std::clamp(m_navigation.homeFitSize, 50, 100);
+    if (fitted->IsOrthographic()) {
+      fitted->SetScale(fitted->Scale() * larger);
+    } else {
+      fitted->SetDistance(fitted->Distance() * larger);
+    }
+  }
 }
 
 void OcctViewer::frameOrigin(const occ::handle<Graphic3d_Camera>& camera) const {
@@ -7368,7 +7402,9 @@ void OcctViewer::moveCamera(const occ::handle<Graphic3d_Camera>& end) {
   // (view/EasedCameraAnimation.hpp).
   const double turn = start->Direction().Angle(end->Direction()) + start->Up().Angle(end->Up()) / 2.0;
   const double longer = std::isfinite(turn) ? std::max(1.0, turn / (3.14159265358979323846 / 2.0)) : 1.0;
-  animation->SetOwnDuration(std::min(kGlideSeconds * longer, kGlideMaxSeconds));
+  // Fork: at Preferences' animation speed.
+  animation->SetOwnDuration(std::min(kGlideSeconds * longer, kGlideMaxSeconds) /
+                            std::clamp(m_navigation.animationSpeed, 0.25, 4.0));
   animation->StartTimer(0.0, 1.0, true, false);
   requestFrame();
 }
@@ -7671,7 +7707,7 @@ void OcctViewer::applyCubePlacement() {
   m_orientationCube->SetFontHeight(m_cubeBaseFont * scale);
   m_orientationCube->SetTransformPersistence(
       cubePersistence(m_cubeRatio, cubeOffset(), m_overlayInsets, m_cubeProjection != CubeProjection::FollowView));
-  if (displayed) {
+  if (displayed && m_navigation.viewNavigator != ViewNavigator::Axes) {
     m_context->Display(m_orientationCube, 0, 0, false);
   }
   sceneChanged();
@@ -7769,6 +7805,8 @@ void OcctViewer::placeCubeArrows() {
       at = QPoint(68, 0);
     } else if (id == QStringLiteral("cw")) {
       at = QPoint(58, -58);
+    } else if (id == QStringLiteral("around")) {
+      at = QPoint(-58, -58); // fork: Turn Around, at the top left
     } else {
       at.setX(32);
     }
@@ -7795,8 +7833,10 @@ void OcctViewer::updateCubeArrows() {
   }
   bool changed = false;
   for (const auto& [id, arrow] : m_cubeArrows) {
-    changed = changed || arrow->isHidden() == faceOn;
-    arrow->setVisible(faceOn);
+    // Fork: Turn Around only while Preferences shows it.
+    const bool shown = faceOn && (id != QLatin1String("around") || m_navigation.showTurnAround);
+    changed = changed || arrow->isHidden() == shown;
+    arrow->setVisible(shown);
   }
   if (faceOn) {
     for (const auto& [id, arrow] : m_cubeArrows) {
@@ -7838,6 +7878,20 @@ void OcctViewer::publishCubeArrows() {
 
 void OcctViewer::pressCubeArrow(const QString& id) {
   runViewOperation(QStringLiteral("cube arrow ") + id, [this, id] { turnCube(id); });
+  fitAfterNavigator(); // fork
+}
+
+// Fork: Fit the model after a navigator view change: once the turn's glide
+// has ended, the view glides to a fit.
+void OcctViewer::fitAfterNavigator() {
+  if (!m_navigation.fitAfterNavigatorChange) {
+    return;
+  }
+  const int after = int(std::lround(kGlideMaxSeconds * 1000.0 / std::clamp(m_navigation.animationSpeed, 0.25, 4.0))) + 60;
+  QTimer::singleShot(after, this, [this] {
+    qDebug().noquote() << "View fit after a navigator view change";
+    glideToFit();
+  });
 }
 
 void OcctViewer::turnCube(const QString& arrow) {
@@ -7869,6 +7923,8 @@ void OcctViewer::turnCube(const QString& arrow) {
     turnTo(right.Reversed(), up);
   } else if (arrow == QStringLiteral("cw")) {
     turnTo(direction, right.Reversed());
+  } else if (arrow == QStringLiteral("around")) {
+    turnTo(direction.Reversed(), up); // fork: the other side
   } else {
     turnTo(direction, right);
   }
@@ -8529,7 +8585,10 @@ void OcctViewer::bindGestures() {
   auto& gestures = ChangeMouseGestureMap();
   gestures.Clear();
   // A window selection with or without the keys that add to a selection.
-  gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
+  // Fork: Left drag Nothing: a plain left drag selects no window.
+  if (m_navigation.leftDrag != DragOverride::Nothing) {
+    gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
+  }
   gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL,
                 AIS_MouseGesture_SelectRectangle);
   gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT,
@@ -8548,8 +8607,9 @@ void OcctViewer::bindGestures() {
     }
     return AIS_MouseGesture_NONE;
   };
-  const auto bindings = m_navigation.scheme == NavigationScheme::Custom ? m_navigation.customBindings
-                                                                        : navigationBindings(m_navigation.scheme);
+  // Fork: with Right drag orbits and the buttons' overrides
+  // (effectiveNavigationBindings).
+  const auto bindings = effectiveNavigationBindings(m_navigation);
   for (const auto& binding : bindings) {
     if (!navigationBindingAllowed(binding) || binding.action == NavigationAction::None ||
         binding.input == NavigationInput::TrackpadScroll) {
@@ -8560,6 +8620,13 @@ void OcctViewer::bindGestures() {
                                                                                   : Aspect_VKeyMouse_RightButton;
     const auto flags = binding.f4 ? kF4Drag : toVKeyFlags(binding.modifiers);
     gestures.Bind(button | flags, gesture(binding.action));
+  }
+  // Fork: the side buttons' drags.
+  if (const NavigationAction back = sideButtonAction(m_navigation.backDrag); back != NavigationAction::None) {
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton | kSideBackDrag, gesture(back));
+  }
+  if (const NavigationAction forward = sideButtonAction(m_navigation.forwardDrag); forward != NavigationAction::None) {
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton | kSideForwardDrag, gesture(forward));
   }
   if (m_navigation.scheme == NavigationScheme::Trackpad ||
       m_navigation.scheme == NavigationScheme::TrackpadShift ||
@@ -8585,7 +8652,16 @@ void OcctViewer::setNavigation(const NavigationSettings& settings) {
   m_panRemainder = {};
   bindGestures();
   SetOrbitAcceleration(float(m_navigation.orbitSpeed));
-  SetLockOrbitZUp(settings.constrainedOrbit);
+  // Fork: the turntable turns about the vertical axis unless that is off.
+  SetLockOrbitZUp(settings.constrainedOrbit && settings.turnAroundVertical);
+  setAttribute(Qt::WA_AcceptTouchEvents, settings.touchscreen);
+  if (!m_orientationCube.IsNull()) {
+    m_orientationCube->SetDuration(kGlideSeconds / std::clamp(settings.animationSpeed, 0.25, 4.0));
+  }
+  applyViewNavigator();
+  if (!m_view.IsNull()) {
+    updateCubeArrows();
+  }
   emit navigationChanged(); // the 3D mouse follows (mitcad#951)
 }
 
@@ -8617,6 +8693,11 @@ bool cameraMovedFrom(const CameraPose& before, const Graphic3d_Camera& camera) {
 } // namespace
 
 void OcctViewer::userNavigated(NavigationAction action) {
+  // Fork: Keep the highlight while the view moves off: the hover's highlight
+  // goes as the view moves.
+  if (!m_navigation.keepHighlightWhileMoving && action != NavigationAction::None) {
+    m_context->ClearDetected(false);
+  }
   const char* name = action == NavigationAction::Orbit ? "orbit"
                      : action == NavigationAction::Pan ? "pan"
                      : action == NavigationAction::Zoom ? "zoom"
@@ -8696,6 +8777,18 @@ bool OcctViewer::UpdateZoom(const Aspect_ScrollDelta& delta) {
     // A drag zoom (mitcad#1867): OCCT zooms in as the pointer goes down the
     // window; here up zooms in and down out, about the same point.
     scaled.Delta = -scaled.Delta;
+  }
+  // Fork: Stop zoom at the model: in perspective, a zoom in toward the
+  // cursor stops before the eye reaches the surface under it.
+  if (m_navigation.stopZoomAtModel && scaled.Delta > 0.0 && scaled.HasPoint() && !m_view.IsNull() &&
+      !m_view->Camera()->IsOrthographic()) {
+    if (const std::optional<gp_Pnt> under = modelPointAt(scaled.Point)) {
+      const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
+      if (camera->Eye().Distance(*under) < std::max(camera->ZNear() * 4.0, camera->Distance() * 0.02)) {
+        qDebug().noquote() << "View zoom stopped at the model";
+        return false;
+      }
+    }
   }
   return AIS_ViewController::UpdateZoom(scaled);
 }
@@ -9885,6 +9978,7 @@ QString OcctViewer::attachGl() {
       m_view->SetSize(250.0); // an empty scene shows about 250 mm
     }
     m_context->Display(m_orientationCube, 0, 0, false);
+    applyViewNavigator(); // fork: or the axes in its place
     updateGrid(true);
     // Through OCCT's functions in the view's own context (mitcad#2292),
     // where Qt's is not current.
@@ -10603,12 +10697,20 @@ std::optional<gp_Pnt2d> OcctViewer::sketchPlanePoint(const QPointF& position) co
 // While a sketch tool is active, the left button belongs to it, not to
 // OCCT, except on the orientation cube.
 Aspect_VKeyMouse OcctViewer::viewButtons(Qt::MouseButtons buttons) const {
-  return toVKeyMouse(m_sketchInput && !m_cubePress ? (buttons & ~Qt::LeftButton) : buttons);
+  Aspect_VKeyMouse shown = toVKeyMouse(m_sketchInput && !m_cubePress ? (buttons & ~Qt::LeftButton) : buttons);
+  // Fork: a side button's drag is the middle button's.
+  if (m_sidePress != 0 && (buttons & (m_sidePress == 1 ? Qt::BackButton : Qt::ForwardButton))) {
+    shown |= Aspect_VKeyMouse_MiddleButton;
+  }
+  return shown;
 }
 
 // Cube and F4 drags use separate synthetic flags, so custom F4 actions
 // cannot replace the cube's orbit gesture.
 Aspect_VKeyFlags OcctViewer::viewFlags(Qt::KeyboardModifiers modifiers) const {
+  if (m_sidePress != 0) {
+    return m_sidePress == 1 ? kSideBackDrag : kSideForwardDrag;
+  }
   return m_f4Press ? kF4Drag : m_cubePress ? kCubeDrag : toVKeyFlags(modifiers);
 }
 
@@ -10666,6 +10768,11 @@ void OcctViewer::updateCursor(bool log) {
 }
 
 void OcctViewer::cancelPointerInteraction() {
+  m_sidePress = 0;
+  if (m_gestureRing) {
+    m_gestureRing = false;
+    emit gestureRingReleased(QPoint(-100000, -100000)); // nothing chosen
+  }
   disarmPickList(); // a press cut off opens no pick list (mitcad#1703)
   endScrollDrag();
   ResetViewInput();
@@ -10736,6 +10843,64 @@ void OcctViewer::buttonsReleased() {
   }
 }
 
+// Fork: Preferences' view navigator: the cube, or the axes (OCCT's trihedron
+// in the cube's corner, the cube hidden; a drag there still orbits).
+void OcctViewer::applyViewNavigator() {
+  if (m_view.IsNull() || m_orientationCube.IsNull() || m_view->Window().IsNull()) {
+    return;
+  }
+  const bool axes = m_navigation.viewNavigator == ViewNavigator::Axes;
+  if (axes) {
+    if (m_context->IsDisplayed(m_orientationCube)) {
+      m_context->Erase(m_orientationCube, false);
+    }
+    m_view->TriedronDisplay(Aspect_TOTP_RIGHT_UPPER, Quantity_NOC_GRAY30, 0.1, V3d_ZBUFFER);
+  } else {
+    m_view->TriedronErase();
+    if (!m_context->IsDisplayed(m_orientationCube)) {
+      m_context->Display(m_orientationCube, 0, 0, false);
+    }
+  }
+  qDebug().noquote() << QStringLiteral("View navigator: %1").arg(axes ? QStringLiteral("axes") : QStringLiteral("cube"));
+  requestFrame();
+}
+
+bool OcctViewer::touchNavigation(QTouchEvent* event) {
+  if (m_view.IsNull()) {
+    return false;
+  }
+  // Each finger a touch point of OCCT's own navigation (AIS_ViewController:
+  // one finger orbits, two pan and pinch-zoom), keyed by the finger's id.
+  for (const QEventPoint& point : event->points()) {
+    const NCollection_Vec2<double> at(toDevicePixels(point.position()).x(), toDevicePixels(point.position()).y());
+    const auto id = std::size_t(point.id());
+    switch (point.state()) {
+    case QEventPoint::State::Pressed:
+      AddTouchPoint(id, at);
+      break;
+    case QEventPoint::State::Updated:
+      UpdateTouchPoint(id, at);
+      break;
+    case QEventPoint::State::Released:
+      RemoveTouchPoint(id);
+      break;
+    default:
+      break;
+    }
+  }
+  if (event->type() == QEvent::TouchCancel) {
+    for (const QEventPoint& point : event->points()) {
+      RemoveTouchPoint(std::size_t(point.id()));
+    }
+  }
+  if (event->type() == QEvent::TouchBegin) {
+    qDebug().noquote() << QStringLiteral("Touch navigation: %1 finger(s)").arg(event->points().size());
+  }
+  requestFrame();
+  event->accept();
+  return true;
+}
+
 bool OcctViewer::event(QEvent* event) {
   if (headlessUiTest()) {
     // Reparenting and layout changes can show this widget without calling
@@ -10748,6 +10913,13 @@ bool OcctViewer::event(QEvent* event) {
   if (event->type() == QEvent::NativeGesture) {
     nativeGesture(static_cast<QNativeGestureEvent*>(event));
     return true;
+  }
+  // Fork: Touchscreen navigation.
+  if (m_navigation.touchscreen && (event->type() == QEvent::TouchBegin || event->type() == QEvent::TouchUpdate ||
+                                   event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchCancel)) {
+    if (touchNavigation(static_cast<QTouchEvent*>(event))) {
+      return true;
+    }
   }
   if (event->type() == QEvent::ShortcutOverride && m_spaceMouseWheel.duringMotion(spaceMouseNow())) {
     // Every key pressed in the view comes here first, a shortcut's too: a
@@ -10847,6 +11019,25 @@ void OcctViewer::mousePressEvent(QMouseEvent* event) {
     return;
   }
   m_pointerModifiers = event->modifiers();
+  // Fork: Middle double-click goes Home or fits.
+  if (event->type() == QEvent::MouseButtonDblClick && event->button() == Qt::MiddleButton &&
+      m_navigation.middleDoubleClick != MiddleDoubleClick::Nothing) {
+    qDebug().noquote() << QStringLiteral("Middle double-click: %1")
+                              .arg(m_navigation.middleDoubleClick == MiddleDoubleClick::Home ? QStringLiteral("Home")
+                                                                                             : QStringLiteral("Fit"));
+    if (m_navigation.middleDoubleClick == MiddleDoubleClick::Home) {
+      goHome();
+    } else {
+      fitAll();
+    }
+    return;
+  }
+  // Fork: a side button whose drag does something drags as the middle one.
+  if (event->button() == Qt::BackButton || event->button() == Qt::ForwardButton) {
+    const bool back = event->button() == Qt::BackButton;
+    const NavigationAction side = sideButtonAction(back ? m_navigation.backDrag : m_navigation.forwardDrag);
+    m_sidePress = side == NavigationAction::None ? 0 : (back ? 1 : 2);
+  }
   disarmPickList(); // another button too: a held left press lists nothing
   if (event->buttons() == event->button()) {
     resetOrbitWrap(); // the first button: a new drag
@@ -11005,6 +11196,20 @@ void OcctViewer::endOccurrenceDrag(const QPointF& position, bool cancelled) {
 
 void OcctViewer::mouseReleaseEvent(QMouseEvent* event) {
   QOpenGLWidget::mouseReleaseEvent(event);
+  // Fork: a side button's drag ends with its release, however the release
+  // goes on.
+  struct SideRelease {
+    OcctViewer* viewer;
+    bool side;
+    ~SideRelease() {
+      if (side) viewer->m_sidePress = 0;
+    }
+  } sideRelease{this, event->button() == Qt::BackButton || event->button() == Qt::ForwardButton};
+  // Fork: the gesture ring's tool runs as the right button goes up.
+  if (event->button() == Qt::RightButton && m_gestureRing) {
+    m_gestureRing = false;
+    emit gestureRingReleased(event->globalPosition().toPoint());
+  }
   if (ignoresClickWithoutGraphics(event, "release")) {
     return;
   }
@@ -11204,6 +11409,20 @@ void OcctViewer::mouseMoveEvent(QMouseEvent* event) {
       emit pointerMoved(event->position());
     }
   }
+  // Fork: a right drag of the SolidWorks mapping shows the gesture ring
+  // once it has moved, and follows it instead of navigating.
+  if ((event->buttons() & Qt::RightButton) && m_navigation.gestureRing &&
+      m_navigation.scheme == NavigationScheme::MiddleOrbit) {
+    const QPointF moved = event->position() - m_rightPressPosition;
+    if (!m_gestureRing && std::hypot(moved.x(), moved.y()) > kDragPixels) {
+      m_gestureRing = true;
+      emit gestureRingStarted(mapToGlobal(m_rightPressPosition.toPoint()));
+    }
+    if (m_gestureRing) {
+      emit gestureRingMoved(event->globalPosition().toPoint());
+      return;
+    }
+  }
   // While a button is held, the press's keys (mitcad#1571): OCCT would take
   // other keys for a new gesture of the held button (Option pressed during
   // a select turning it into an orbit, released during an orbit turning it
@@ -11223,8 +11442,8 @@ void OcctViewer::mouseMoveEvent(QMouseEvent* event) {
 // edge as before. With two screens side by side the shared edge jumps too:
 // the cursor stays on the screen the orbit is on (mitcad#2188).
 void OcctViewer::wrapOrbitCursor(const QMouseEvent* event) {
-  if (myMouseActiveGesture != AIS_MouseGesture_RotateOrbit || event->source() != Qt::MouseEventNotSynthesized ||
-      !m_orbitWrap.canJump()) {
+  if (!m_navigation.wrapCursor || myMouseActiveGesture != AIS_MouseGesture_RotateOrbit ||
+      event->source() != Qt::MouseEventNotSynthesized || !m_orbitWrap.canJump()) {
     return;
   }
   const QPointF from = event->globalPosition();
@@ -11332,13 +11551,27 @@ void OcctViewer::wheelEvent(QWheelEvent* event) {
   if (m_navigation.reverseZoom) {
     steps = -steps;
   }
-  const bool zoomed = m_navigation.zoomToCursor
-                          ? UpdateZoom(Aspect_ScrollDelta(toDevicePixels(event->position()), steps))
-                          : UpdateZoom(Aspect_ScrollDelta(steps));
-  if (zoomed) {
-    navigationStep();
-    requestFrame();
+  // Fork: Smooth wheel zoom: a wheel's step glides in a few parts, one a
+  // frame, instead of jumping.
+  const NCollection_Vec2<int> at = toDevicePixels(event->position());
+  const bool toCursor = m_navigation.zoomToCursor;
+  const auto zoomBy = [this, at, toCursor](double part) {
+    const bool zoomed = toCursor ? UpdateZoom(Aspect_ScrollDelta(at, part)) : UpdateZoom(Aspect_ScrollDelta(part));
+    if (zoomed) {
+      navigationStep();
+      requestFrame();
+    }
+  };
+  if (m_navigation.smoothWheelZoom && !isTrackpadScroll(event)) {
+    constexpr int kParts = 5;
+    const double part = steps / kParts;
+    zoomBy(part);
+    for (int i = 1; i < kParts; ++i) {
+      QTimer::singleShot(i * 16, this, [zoomBy, part] { zoomBy(part); });
+    }
+    return;
   }
+  zoomBy(steps);
 }
 
 // The trackpad schemes: a two-finger scroll pans, with the chosen orbit key
@@ -11374,7 +11607,16 @@ void OcctViewer::trackpadScroll(QWheelEvent* event) {
     return;
   }
   const Qt::KeyboardModifiers keys = event->modifiers();
-  const NavigationAction action = navigationAction(m_navigation, NavigationInput::TrackpadScroll, keys);
+  NavigationAction action = navigationAction(m_navigation, NavigationInput::TrackpadScroll, keys);
+  // Fork: Two-finger scroll pans off: a plain scroll zooms; the zoom key
+  // held: a scroll zooms.
+  if (action == NavigationAction::Pan && !m_navigation.twoFingerScrollPans && keys == Qt::NoModifier) {
+    action = NavigationAction::Zoom;
+  }
+  if (const Qt::KeyboardModifiers zoomKey = heldKeyModifier(m_navigation.scrollZoomKey);
+      zoomKey != Qt::NoModifier && (keys & zoomKey) == zoomKey) {
+    action = NavigationAction::Zoom;
+  }
   ScrollMode mode = action == NavigationAction::Orbit ? ScrollMode::Orbit
                     : action == NavigationAction::Pan ? ScrollMode::Pan
                     : action == NavigationAction::Zoom ? ScrollMode::Zoom : ScrollMode::None;

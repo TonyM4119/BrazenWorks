@@ -77,6 +77,7 @@
 
 class OpenGl_Context;
 class QNativeGestureEvent;
+class QTouchEvent;
 class QOpenGLContext;
 class QPainter;
 class QSurface;
@@ -1487,6 +1488,11 @@ signals:
                  const mitcad::Selection& items);
   // A right click; `item` is what lies under the mouse (invalid if nothing).
   void contextMenuRequested(const QPoint& globalPosition, const mitcad::SelectionItem& item);
+  // Fork: the gesture ring of a right drag (SolidWorks mapping): shown about
+  // where the drag started, following the pointer, run as the button goes up.
+  void gestureRingStarted(const QPoint& globalCenter);
+  void gestureRingMoved(const QPoint& globalPosition);
+  void gestureRingReleased(const QPoint& globalPosition);
   // A right click on the orientation cube.
   void orientationCubeMenuRequested(const QPoint& globalPosition);
   // The camera came to rest after it moved (logged as "Camera direction ...").
@@ -1611,7 +1617,17 @@ private:
   // The keys that decide a press on the view (mitcad#1571): those of the
   // press that put the first button down, while a button is held; the keys
   // held now otherwise.
-  Qt::KeyboardModifiers pressKeys(Qt::KeyboardModifiers live) const { return m_buttonKeys.value_or(live); }
+  // Fork: unless A drag keeps the navigation it started with is off.
+  Qt::KeyboardModifiers pressKeys(Qt::KeyboardModifiers live) const {
+    return m_navigation.dragKeepsNavigation ? m_buttonKeys.value_or(live) : live;
+  }
+  // Fork: a touch screen's fingers (Touchscreen navigation): OCCT's touch
+  // navigation, one finger orbiting, two panning and zooming.
+  bool touchNavigation(QTouchEvent* event);
+  // Fork: the cube or the axes as Preferences' view navigator says.
+  void applyViewNavigator();
+  // Fork: a fit after a navigator's turn, when Preferences asks for one.
+  void fitAfterNavigator();
   // Whether a press, a drag, a held F4 or a scroll's drag is under way:
   // what a window losing the activation ends (mitcad#1573).
   bool pointerInteractionHeld() const;
@@ -2280,6 +2296,8 @@ private:
   bool m_cubeClick = false;
   bool m_cubePress = false; // the left button went down on the cube
   QPointF m_rightPressPosition;
+  // Fork: a right drag showing the gesture ring.
+  bool m_gestureRing = false;
   bool m_orbitKey = false; // F4 held (MiddlePanF4: the left button orbits)
   // The keys of the press that put the first mouse button down on the view,
   // until all are up (mitcad#1571): a key pressed or released meanwhile does
@@ -2314,6 +2332,9 @@ private:
   QPointF m_panRemainder;
   bool m_pointerMoving = false; // in UpdateMousePosition: a drag zoom's step
   bool m_f4Press = false;
+  // Fork: a side button's drag under way (1 back, 2 forward): the view takes
+  // it as a drag of the middle button with flags of its own.
+  int m_sidePress = 0;
   // An orbit goes on past the edge of the screen, on the screen it began.
   OrbitWrap m_orbitWrap;
   QPointer<QScreen> m_orbitScreen;

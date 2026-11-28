@@ -6,6 +6,8 @@
 
 #include <QCheckBox>
 #include <QComboBox>
+#include <QScrollArea>
+#include <QAbstractButton>
 #include <QCoreApplication>
 #include <QEventLoop>
 #include <QFormLayout>
@@ -119,16 +121,16 @@ int navigationPreferencesTests() {
   form.show();
   QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
   CHECK(right >= 0 && table->rowAt(1) == right);
-  // A taller page gives its spare height to the table (mitcad#1394): the
-  // rest keeps its height, and the page's last line ends at its bottom.
+  // Fork: the page scrolls (SolidCraft's): a taller page keeps the table
+  // at its height, and the page's last line is still there.
   {
     const int natural = table->height();
     form.resize(900, form.height() + 200);
     QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-    CHECK(table->height() >= natural + 190);
+    CHECK(table->height() >= natural);
     auto* hint = form.findChild<QLabel*>(QStringLiteral("navigationGuideExplanation"));
     CHECK(hint != nullptr);
-    if (hint) CHECK(form.height() - hint->mapTo(&form, QPoint(0, hint->height())).y() <= 12);
+    CHECK(form.findChild<QScrollArea*>(QStringLiteral("navigationScroll")) != nullptr);
     form.resize(900, form.sizeHint().height());
     QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
   }
@@ -159,14 +161,37 @@ int navigationPreferencesTests() {
   CHECK(turnStep && turnStep->value() == 15 && turnStep->minimum() == 1 && turnStep->maximum() == 90);
   if (turnStep) turnStep->setValue(30);
   CHECK(form.chosen().turnStep == 30.0);
-  // The orbit's center (mitcad#1791): Model by default, then Cursor.
+  // The orbit's center (mitcad#1791): View center by default, then Under
+  // cursor; fork: or the origin, and the cards follow the list.
   auto* orbitCenter = form.findChild<QComboBox*>(QStringLiteral("navigationOrbitCenter"));
-  CHECK(orbitCenter && orbitCenter->count() == 2 && orbitCenter->currentData().toInt() == int(OrbitCenter::Model));
+  CHECK(orbitCenter && orbitCenter->count() == 3 && orbitCenter->currentData().toInt() == int(OrbitCenter::Model));
   if (orbitCenter) {
-    CHECK(orbitCenter->itemText(0) == QStringLiteral("Model") && orbitCenter->itemText(1) == QStringLiteral("Cursor"));
+    CHECK(orbitCenter->itemText(0) == QStringLiteral("View center") &&
+          orbitCenter->itemText(1) == QStringLiteral("Under cursor") && orbitCenter->itemText(2) == QStringLiteral("Origin"));
     orbitCenter->setCurrentIndex(orbitCenter->findData(int(OrbitCenter::Cursor)));
   }
   CHECK(form.chosen().orbitCenter == OrbitCenter::Cursor);
+  {
+    auto* cursorCard = form.findChild<QAbstractButton*>(QStringLiteral("navigationOrbitUnderCursor"));
+    auto* originCard = form.findChild<QAbstractButton*>(QStringLiteral("navigationOrbitOrigin"));
+    CHECK(cursorCard && cursorCard->isChecked() && originCard && !originCard->isChecked());
+    if (originCard) originCard->click();
+    CHECK(form.chosen().orbitCenter == OrbitCenter::Origin);
+    CHECK(orbitCenter && orbitCenter->currentData().toInt() == int(OrbitCenter::Origin));
+    if (orbitCenter) orbitCenter->setCurrentIndex(orbitCenter->findData(int(OrbitCenter::Cursor)));
+  }
+  // Fork: the mapping by program chooses the scheme.
+  {
+    auto* mapping = form.findChild<QComboBox*>(QStringLiteral("navigationMouseMapping"));
+    CHECK(mapping && mapping->findData(QStringLiteral("solidworks")) >= 0);
+    if (mapping) {
+      mapping->setCurrentIndex(mapping->findData(QStringLiteral("blender")));
+      CHECK(form.chosen().scheme == NavigationScheme::MiddleOrbitShiftPan);
+      CHECK(form.chosen().mouseMapping == QStringLiteral("blender"));
+      mapping->setCurrentIndex(mapping->findData(QStringLiteral("solidworks")));
+      CHECK(form.chosen().scheme == NavigationScheme::MiddleOrbit);
+    }
+  }
   // The two-finger scroll's directions (mitcad#1873): off by default,
   // each check box its own setting.
   auto* reverseX = form.findChild<QCheckBox*>(QStringLiteral("navigationReversePanHorizontal"));
@@ -175,9 +200,9 @@ int navigationPreferencesTests() {
   CHECK(reverseX && reverseY && reverseOrbit);
   if (reverseX && reverseY && reverseOrbit) {
     CHECK(!reverseX->isChecked() && !reverseY->isChecked() && !reverseOrbit->isChecked());
-    CHECK(reverseX->text() == QStringLiteral("Reverse horizontal pan") &&
-          reverseY->text() == QStringLiteral("Reverse vertical pan") &&
-          reverseOrbit->text() == QStringLiteral("Reverse scroll orbit"));
+    CHECK(reverseX->text() == QStringLiteral("Reverse horizontal pan direction") &&
+          reverseY->text() == QStringLiteral("Reverse vertical pan direction") &&
+          reverseOrbit->text() == QStringLiteral("Reverse trackpad orbit direction"));
     const int before = changes;
     reverseY->setChecked(true);
     CHECK(changes > before);
@@ -360,10 +385,11 @@ int navigationPreferencesTests() {
     CHECK(shortcuts->mapTo(group.get(), QPoint(0, 0)).x() - inside.left() >= expected.left());
     // The lowest group: the table at its minimum at least.
     CHECK(bindingsTable->height() >= NavigationBindingsTable::kMinimumHeight);
+    // Fork: in a page that scrolls, it keeps its height.
     const int lowest = bindingsTable->height();
     group->resize(900, group->height() + 160);
     QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
-    CHECK(bindingsTable->height() >= lowest + 150);
+    CHECK(bindingsTable->height() >= lowest);
     // The 3D Mouse tab inside the same inset.
     tabs->setCurrentIndex(1);
     QCoreApplication::processEvents(QEventLoop::ExcludeUserInputEvents);
