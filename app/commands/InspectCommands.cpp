@@ -639,7 +639,9 @@ Inspection measureShapes(const SelectionItem& first, const SelectionItem* second
       row.tip = QObject::tr("From %1 to %2").arg(pointTextIn(p, unit), pointTextIn(q, unit));
       row.places = segmentPlaces(p, q);
       result.values.push_back(row);
-      insertDeltaRows(result.values, p, q, unit);
+      if (QSettings().value(QStringLiteral("tools/axisDistances"), true).toBool()) { // PureCAD
+        insertDeltaRows(result.values, p, q, unit);
+      }
     }
     const auto da = lineDirection(a);
     const auto db = lineDirection(b);
@@ -849,7 +851,10 @@ CommandDef measureCommand() {
         lines << QObject::tr("From %1 to %2").arg(xyzIn(a, unit), xyzIn(c, unit));
         result.values.front().tip = QObject::tr("From %1 to %2").arg(xyzIn(a, unit), xyzIn(c, unit));
         result.values.front().places = segmentPlaces(p, q);
-        insertDeltaRows(result.values, p, q, unit);
+        // PureCAD: Preferences › Tools › Axis distances in Measure.
+        if (QSettings().value(QStringLiteral("tools/axisDistances"), true).toBool()) {
+          insertDeltaRows(result.values, p, q, unit);
+        }
         addDimension(builder, drawn, p, q);
         result.measurementWire = true;
         if (planeGap) {
