@@ -5,6 +5,7 @@
 #include "AppearancePreferences.hpp"
 #include "DesignPreferences.hpp"
 #include "GraphicsPreferences.hpp"
+#include "ShortcutsPreferences.hpp"
 #include "ToolsPreferences.hpp"
 #include "SketchPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
@@ -411,6 +412,10 @@ const PreferencePage kPreferencePages[] = {
      "mouse orbit pan zoom scheme shortcuts bindings custom trackpad 3d_mouse space speed arrow key step "
      "orbit_center cursor constrained reverse smooth transitions scroll",
      "INPUT", QT_TRANSLATE_NOOP("View", "Mouse, trackpad and 3D mouse."), "named-view"},
+    // Fork: SolidCraft's Shortcuts page.
+    {"shortcuts", QT_TRANSLATE_NOOP("View", "Shortcuts"),
+     "shortcuts keyboard keys hotkeys bindings commands export import modifier reselect sketches",
+     "INPUT", QT_TRANSLATE_NOOP("View", "Keys for each command."), "keyboard"},
     // The folders for designs, which AI assistants save to and open from
     // (mitcad#402).
     {"agents", QT_TRANSLATE_NOOP("View", "AI Assistants"),
@@ -440,7 +445,8 @@ bool pageFills(const char* id) {
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
          page == QLatin1String("layout") || page == QLatin1String("graphics") ||
          page == QLatin1String("sketch") || page == QLatin1String("appearance") ||
-         page == QLatin1String("design") || page == QLatin1String("tools"); // fork: own scroll areas
+         page == QLatin1String("design") || page == QLatin1String("tools") ||
+         page == QLatin1String("shortcuts"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -4006,6 +4012,57 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, toolsPage, [toolsPage] { toolsPage->commit(); });
   }
   groups.insert(QStringLiteral("tools"), toolsBox);
+
+  // Fork: Preferences › Shortcuts (SolidCraft's, view/ShortcutsPreferences.hpp):
+  // every command by its group (the id's first part: SOLID, SKETCH, VIEW,
+  // ...), its key the registry's in all its contexts.
+  QWidget* shortcutsBox = section(tr("Shortcuts"));
+  auto* shortcutsColumn = new QVBoxLayout(shortcutsBox);
+  insetPreferencesGroup(shortcutsColumn, window == nullptr);
+  QVector<ShortcutsPreferences::Row> shortcutRows;
+  {
+    QStringList groupOrder;
+    QHash<QString, QVector<ShortcutsPreferences::Row>> byGroup;
+    for (const auto& def : m_registry.commands()) {
+      if (def->name.isEmpty()) continue;
+      const QString group = def->id.section(QLatin1Char('.'), 0, 0).toUpper().replace(QLatin1Char('_'), QLatin1Char(' '));
+      if (!groupOrder.contains(group)) groupOrder << group;
+      ShortcutsPreferences::Row row;
+      row.id = def->id;
+      row.name = QString(def->name).remove(QLatin1Char('&'));
+      row.group = group;
+      row.key = m_registry.shortcut(def->id);
+      row.defaultKey = m_registry.defaultShortcut(def->id);
+      byGroup[group].append(row);
+    }
+    for (const QString& group : std::as_const(groupOrder)) shortcutRows += byGroup.value(group);
+  }
+  auto* shortcutsPage = new ShortcutsPreferences(shortcutRows);
+  shortcutsColumn->addWidget(shortcutsPage);
+  const auto allContexts = [this](const QString& id, const QKeySequence& key) {
+    ContextShortcuts keys = m_registry.shortcuts(id);
+    if (keys.isEmpty()) keys.insert(AllShortcutContexts, key);
+    for (QKeySequence& each : keys) each = key;
+    return keys;
+  };
+  shortcutsPage->conflict = [this, allContexts](const QString& id, const QKeySequence& key) {
+    for (const ShortcutConflict& found : m_registry.shortcutConflicts({{id, allContexts(id, key)}})) {
+      if (found.first.id == id) return found.second.name;
+      if (found.second.id == id) return found.first.name;
+    }
+    return QString();
+  };
+  shortcutsPage->apply = [this, allContexts](const QHash<QString, QKeySequence>& changedKeys) {
+    QHash<QString, ContextShortcuts> proposal;
+    for (auto it = changedKeys.cbegin(); it != changedKeys.cend(); ++it) proposal.insert(it.key(), allContexts(it.key(), it.value()));
+    m_registry.setShortcuts(proposal);
+  };
+  if (window != nullptr) {
+    shortcutsPage->onChanged = [shortcutsPage] { shortcutsPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, shortcutsPage, [shortcutsPage] { shortcutsPage->commit(); });
+  }
+  groups.insert(QStringLiteral("shortcuts"), shortcutsBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
