@@ -176,6 +176,13 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
   // Panels › History: the Play button.
   if (m_controller != nullptr && m_controller->timeline() != nullptr) {
     m_controller->timeline()->setPlayButtonShown(layout.playHistoryButton);
+    // Fold the History bar into groups: turned on, the groups there fold.
+    if (layout.foldHistoryGroups && !timelineFoldsGroups()) {
+      for (const TimelineWidget::ShownGroup& group : m_controller->timeline()->shownGroups()) {
+        m_controller->timeline()->setGroupCollapsed(group.name, true);
+      }
+    }
+    timelineFoldsGroups() = layout.foldHistoryGroups;
   }
   // Panels › Browser: how rows start, for the rows made from now on.
   browserOpenDefaults().componentsOpen = layout.componentsStartOpen;

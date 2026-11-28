@@ -1516,6 +1516,12 @@ void TimelineWidget::rebuild(const DocumentSnapshot& snapshot) {
   QSet<QString> names;
   for (const DocumentSnapshot::Group& group : snapshot.groups) {
     names.insert(group.name);
+    // PureCAD: a group seen for the first time starts folded while
+    // Preferences › Layout › Fold the History bar into groups is on.
+    if (!m_seenGroups.contains(group.name)) {
+      m_seenGroups.insert(group.name);
+      if (timelineFoldsGroups()) m_collapsed.insert(group.name);
+    }
     int first = static_cast<int>(items.size());
     int last = -1;
     for (const QString& uid : group.features) {

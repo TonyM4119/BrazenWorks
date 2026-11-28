@@ -24,6 +24,15 @@ class QLineEdit;
 class QScrollArea;
 #include <QToolButton>
 class QTimer;
+
+namespace mitcad {
+// PureCAD: Preferences › Layout › Fold the History bar into groups: groups
+// start folded.
+inline bool& timelineFoldsGroups() {
+  static bool folds = false;
+  return folds;
+}
+} // namespace mitcad
 class QTreeWidget;
 class QVBoxLayout;
 class QWheelEvent;
@@ -310,6 +319,7 @@ private:
   const CommandContext& m_model;
   DocumentSnapshot m_snapshot; // the last rebuild's
   QSet<QString> m_collapsed;   // folded groups
+  QSet<QString> m_seenGroups;  // PureCAD: groups shown before (timelineFoldsGroups)
   QVector<QPair<QString, QToolButton*>> m_buttons; // the playback buttons
   QToolButton* m_play = nullptr;   // PureCAD: Play
   QTimer* m_playTimer = nullptr;
