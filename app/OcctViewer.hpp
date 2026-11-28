@@ -2465,6 +2465,8 @@ private:
   QString m_gridUnit = QStringLiteral("mm"); // the design's length unit (mitcad#1210)
   occ::handle<LayoutGrid> m_grid;
   gp_Ax3 m_gridPlane;
+  bool m_gridHome = true;          // PureCAD: the grid on XY, free to follow the view
+  bool m_gridFollowsView = false;  // PureCAD: Graphics › Grid follows the view
   Graphic3d_ZLayerId m_gridLayer = Graphic3d_ZLayerId_UNKNOWN;
   int m_gridRebuilds = 0; // updateGrid's rebuilds so far (a 3D mouse motion's log counts them)
   // Fork: the plane ruler (setPlaneRuler): the plane, the grid's plane before

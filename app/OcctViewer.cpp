@@ -261,6 +261,17 @@ const Quantity_Color kConstructionColor = viewRole(ColorRole::SketchConstruction
 const Quantity_Color kProfileFill = viewRole(ColorRole::ProfileFill);
 const Quantity_Color kPreviewColor = viewRole(ColorRole::PreviewAdd);
 const Quantity_Color kCutPreviewColor = viewRole(ColorRole::PreviewRemove);
+// PureCAD: Preferences › Graphics › Tint new surface in a preview, Show
+// removed material in red, and Section hatch by part (applyGraphicsSettings).
+bool g_tintNewSurface = true;
+bool g_removedMaterialRed = true;
+bool g_hatchByPart = true;
+Quantity_Color addPreviewColor() {
+  return g_tintNewSurface ? kPreviewColor : Quantity_Color(0.72, 0.74, 0.77, Quantity_TOC_RGB);
+}
+Quantity_Color cutPreviewColor() {
+  return g_removedMaterialRed ? kCutPreviewColor : addPreviewColor();
+}
 // A split's extended tool (mitcad#712): the orange of the panel's second
 // selection input, the splitting tool's.
 const Quantity_Color kExtendedToolColor = viewRole(ColorRole::ExtendedTool);
@@ -1355,7 +1366,7 @@ occ::handle<AIS_Shape> makeBodyObject(const geometry::Shape& named, BodyDisplay:
   };
   if (style == BodyDisplay::Style::New) {
     occ::handle<AIS_Shape> body = object();
-    body->SetColor(kPreviewColor);
+    body->SetColor(addPreviewColor());
     behindSection(body, sectioned);
     body->SetTransparency(0.5);
     return body;
@@ -1363,7 +1374,7 @@ occ::handle<AIS_Shape> makeBodyObject(const geometry::Shape& named, BodyDisplay:
   if (style == BodyDisplay::Style::Tool || style == BodyDisplay::Style::CutTool) {
     // As the command's tool preview (setPreview), but pickable (mitcad#561).
     occ::handle<AIS_Shape> body = object();
-    body->SetColor(style == BodyDisplay::Style::CutTool ? kCutPreviewColor : kPreviewColor);
+    body->SetColor(style == BodyDisplay::Style::CutTool ? cutPreviewColor() : addPreviewColor());
     behindSection(body, sectioned);
     body->SetTransparency(0.5);
     return body;
@@ -5406,9 +5417,9 @@ void OcctViewer::setPreview(const TopoDS_Shape& shape, PreviewStyle style) {
       logPreviewLook(QStringLiteral("extended tool"), m_cullSeeThrough && cullHiddenBackFaces(m_preview));
       m_context->Display(m_preview, AIS_Shaded, -1, false);
     } else {
-      m_preview->SetColor(style == PreviewStyle::Remove         ? kCutPreviewColor
+      m_preview->SetColor(style == PreviewStyle::Remove         ? cutPreviewColor()
                           : style == PreviewStyle::Interference ? viewRole(ColorRole::Interference, m_backgroundDark)
-                                                                : kPreviewColor);
+                                                                : addPreviewColor());
       m_preview->SetTransparency(0.5);
       // A Join/Cut tool shares faces with the previewed body (the walls of a
       // cut hole); pull it towards the viewer so it wins the depth test there.
@@ -9179,6 +9190,10 @@ void OcctViewer::setGridUnit(const QString& unit) {
 }
 
 void OcctViewer::setGridPlane(const gp_Ax3& plane) {
+  // PureCAD: on the XY plane (no sketch, no ruler elsewhere), Grid follows
+  // the view may turn it onto the origin plane the view faces most.
+  m_gridHome = plane.Location().Distance(gp::Origin()) < 1e-9 && plane.Direction().IsEqual(gp::DZ(), 1e-9) &&
+               plane.XDirection().IsEqual(gp::DX(), 1e-9);
   m_gridPlane = plane;
   gp_Trsf placement;
   placement.SetDisplacement(gp_Ax3(), plane);
@@ -9209,6 +9224,26 @@ double OcctViewer::gridStep() const {
 }
 
 void OcctViewer::updateGrid(bool force) {
+  if (m_gridHome && m_gridShown) {
+    gp_Ax3 want; // XY
+    if (m_gridFollowsView && !m_view.IsNull()) {
+      const gp_Dir look = m_view->Camera()->Direction();
+      const double x = std::abs(look.X()), y = std::abs(look.Y()), z = std::abs(look.Z());
+      if (y > z && y >= x) {
+        want = gp_Ax3(gp::Origin(), -gp::DY(), gp::DX());
+      } else if (x > z && x > y) {
+        want = gp_Ax3(gp::Origin(), gp::DX(), gp::DY());
+      }
+    }
+    if (!want.Direction().IsEqual(m_gridPlane.Direction(), 1e-9) ||
+        !want.XDirection().IsEqual(m_gridPlane.XDirection(), 1e-9)) {
+      m_gridPlane = want;
+      gp_Trsf placement;
+      placement.SetDisplacement(gp_Ax3(), want);
+      m_grid->SetLocalTransformation(placement);
+      force = true;
+    }
+  }
   if (!m_gridShown || m_gridOnCurvedFace || m_view->Window().IsNull() || showsRenderedImage()) {
     if (m_context->IsDisplayed(m_grid)) {
       m_context->Erase(m_grid, false);
@@ -9290,7 +9325,7 @@ void OcctViewer::setPlaneRuler(const QString& originPlane) {
   if (frame) {
     // The layout grid onto the plane: the plane a sketch would be drawn on.
     if (!m_rulerMovedGrid) {
-      m_gridPlaneBeforeRuler = m_gridPlane;
+      m_gridPlaneBeforeRuler = m_gridHome ? gp_Ax3() : m_gridPlane; // PureCAD: not a followed plane
       m_rulerMovedGrid = true;
     }
     m_rulerFrame = *frame;
@@ -9564,7 +9599,7 @@ void OcctViewer::setSectionCaps(const std::vector<SectionCap>& caps, const gp_Ax
     const QColor color = caps[i].color.isValid() ? caps[i].color : kCapColor;
     const QColor hatchColor = capHatchColor(color);
     // The components' caps hatch in turn at 45 and 135 degrees, as drawings do.
-    const bool mirrored = i % 2 == 1;
+    const bool mirrored = g_hatchByPart && i % 2 == 1; // PureCAD: One style or By part
     occ::handle<AIS_Shape> object = new AIS_Shape(caps[i].faces);
     object->SetColor(occtColor(color));
     // In the colour itself, as the timeline shows it: light does not darken
@@ -11166,6 +11201,14 @@ void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
   if (m_sketchHaloEverywhere != settings.sketchHalo) {
     m_sketchHaloEverywhere = settings.sketchHalo;
     restyleSketchEntities();
+  }
+  // PureCAD: preview tints and the section hatch, for the next preview/section.
+  g_tintNewSurface = settings.tintNewSurface;
+  g_removedMaterialRed = settings.removedMaterialRed;
+  g_hatchByPart = settings.hatchByPart;
+  if (m_gridFollowsView != settings.gridFollowsView) { // PureCAD: Grid follows the view
+    m_gridFollowsView = settings.gridFollowsView;
+    updateGrid(true);
   }
   // PureCAD: Vertex markers, on the bodies in the view too.
   if (g_vertexMarkers != settings.vertexMarkers) {
