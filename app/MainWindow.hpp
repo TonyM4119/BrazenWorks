@@ -202,6 +202,12 @@ class MainWindow : public QMainWindow, public SketchHost, public DocumentHost {
 public:
   // PureCAD: Design › Update changed links when a tab comes back.
   void checkLinksOnReturn() { checkLinkedFiles(); }
+  // PureCAD: Layout › Remember each design's toolbar tab (off: a design shown
+  // takes the tab of the one before) and Keep dialogs and tools open when
+  // switching designs (off: the one left closes its command).
+  QString toolbarTab() const;
+  void showToolbarTab(const QString& tab);
+  void cancelOnLeave();
   // PureCAD: components copied in one design, pasted in another
   // (DocumentHost); at the origin or where they were (Preferences › Design ›
   // Paste components from another design at the origin).

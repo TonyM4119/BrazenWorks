@@ -32,8 +32,8 @@ struct LayoutSettings {
   bool statusBar = false;
   bool operationsInView = true;         // a running operation's progress over the view
   bool waitForFiles = false;            // a file opens before the window takes input
-  bool keepToolsOpenAcrossDesigns = false;
-  bool rememberTabPerDesign = false;
+  bool keepToolsOpenAcrossDesigns = true;  // PureCAD: each design keeps its own, as before
+  bool rememberTabPerDesign = true;  // PureCAD: each design keeps its own tab, as before
   bool doubleClickRenamesTab = true;
   bool pauseDrawingWhileDragged = false;
   bool windowButtons = true;            // minimize, maximize and close in the title bar

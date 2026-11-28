@@ -366,4 +366,17 @@ void MainWindow::pasteFromOtherDesign() {
   }
 }
 
+QString MainWindow::toolbarTab() const { return m_ribbon != nullptr ? m_ribbon->currentTab() : QString(); }
+
+void MainWindow::showToolbarTab(const QString& tab) {
+  if (m_ribbon != nullptr && !tab.isEmpty() && m_mode != Mode::Sketch) m_ribbon->showTab(tab);
+}
+
+void MainWindow::cancelOnLeave() {
+  if (m_session && !modelBusy()) {
+    qInfo().noquote() << QStringLiteral("Command closed on leaving the design (Preferences)");
+    m_session->cancel();
+  }
+}
+
 } // namespace mitcad
