@@ -231,7 +231,7 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
     VersionSettings().save();
   }
 
-  if (resets("updates")) {
+  if (resets("updates") || resets("general")) { // fork: Updates are on General
     UpdateSettings updates = UpdateSettings::load();
     const UpdateSettings defaults{};
     updates.automatic = defaults.automatic;

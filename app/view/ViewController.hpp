@@ -295,7 +295,8 @@ private:
   // Import asks first, saying what the file holds and which groups it
   // replaces, then applies them as Preferences applies a change.
   void exportSettings(QWidget* parent);
-  void importSettings(QWidget* parent);
+  // Fork: `chosen`, a file to import without asking for one.
+  void importSettings(QWidget* parent, const QString& chosen = QString());
   // What the open windows had before an import (PreferencesTransfer.cpp).
   struct SettingsBeforeImport;
   // The imported groups applied as a change in Preferences applies.

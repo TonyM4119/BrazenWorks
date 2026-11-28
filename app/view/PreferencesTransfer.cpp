@@ -248,10 +248,11 @@ void ViewController::exportSettings(QWidget* parent) {
   m_host.showStatus(tr("Settings saved to %1.").arg(QFileInfo(path).fileName()), NoticeLevel::Success);
 }
 
-void ViewController::importSettings(QWidget* parent) {
+void ViewController::importSettings(QWidget* parent, const QString& chosen) {
   const QString path =
-      dialogOpenFileName(parent, tr("Choose a Settings File"), startFolder(),
-                         fileFilter() + QStringLiteral(";;") + tr("All files (*)"));
+      !chosen.isEmpty() ? chosen
+                        : dialogOpenFileName(parent, tr("Choose a Settings File"), startFolder(),
+                                             fileFilter() + QStringLiteral(";;") + tr("All files (*)"));
   if (path.isEmpty()) {
     qDebug().noquote() << QStringLiteral("Preferences: settings import cancelled");
     return;
