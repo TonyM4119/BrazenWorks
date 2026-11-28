@@ -881,8 +881,11 @@ void stylePreferencesPage(QWidget* page) {
                                         "padding-top: 14px; margin-bottom: 6px; } QGroupBox::title { "
                                         "subcontrol-origin: margin; subcontrol-position: top left; left: 0px; "
                                         "padding: 0 10px 0 6px; color: %2; background: %3; } "
-                                        "QGroupBox[purecadHover=\"true\"] { border-top-color: transparent; } "
-                                        "QGroupBox[purecadHover=\"true\"]::title { background: transparent; }")
+                                        "QGroupBox[purecadHover=\"true\"] { border: none; border-top: 1px solid transparent; margin-top: 0.7em; "
+                                        "padding-top: 14px; margin-bottom: 6px; } "
+                                        "QGroupBox[purecadHover=\"true\"]::title { "
+                                        "subcontrol-origin: margin; subcontrol-position: top left; left: 0px; "
+                                        "padding: 0 10px 0 6px; color: %2; background: transparent; }")
                              .arg(line, text, surface));
     inner->setCursor(Qt::ArrowCursor);
     inner->setMouseTracking(true);
