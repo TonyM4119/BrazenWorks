@@ -459,6 +459,215 @@ QString overlaySymbol(const QString& id) {
   return {};
 }
 
+// Fork: the U-turn arrow of the Axes navigator's Turn Around button, drawn
+// in black (the button tints it).
+QIcon uTurnIcon() {
+  QPixmap pixmap(64, 64);
+  pixmap.fill(Qt::transparent);
+  QPainter p(&pixmap);
+  p.setRenderHint(QPainter::Antialiasing);
+  QPainterPath path(QPointF(17, 54));
+  path.lineTo(17, 30);
+  path.arcTo(QRectF(17, 12, 30, 36), 180, -180);
+  path.lineTo(47, 40);
+  p.setPen(QPen(Qt::black, 7.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+  p.drawPath(path);
+  QPolygonF head{{35, 38}, {59, 38}, {47, 55}};
+  p.setPen(Qt::NoPen);
+  p.setBrush(Qt::black);
+  p.drawPolygon(head);
+  p.end();
+  return QIcon(pixmap);
+}
+
+// Fork: the Axes view navigator (Preferences › Navigation › View navigator):
+// the model's axes from the camera, a coloured ball with its letter at each
+// positive end and a hollow ring at each negative one, the nearer drawn over
+// the farther; a click on one turns the view to look from it.
+class AxesNavigator : public QWidget {
+public:
+  using Turn = std::function<void(const gp_Dir& direction, const gp_Dir& up)>;
+  AxesNavigator(QWidget* parent, std::function<occ::handle<Graphic3d_Camera>()> camera, Turn turn)
+      : QWidget(parent), m_camera(std::move(camera)), m_turn(std::move(turn)) {
+    setObjectName(QStringLiteral("axesNavigator"));
+    setAttribute(Qt::WA_TranslucentBackground);
+    setMouseTracking(true);
+    setCursor(Qt::PointingHandCursor);
+  }
+
+protected:
+  struct End {
+    QPointF at;
+    double depth;
+    int axis;      // 0 X, 1 Y, 2 Z
+    bool positive;
+  };
+  QVector<End> ends() const {
+    QVector<End> result;
+    const occ::handle<Graphic3d_Camera> camera = m_camera();
+    if (camera.IsNull()) return result;
+    const gp_Dir dir = camera->Direction();
+    const gp_Dir up = camera->Up();
+    const gp_Dir right = dir.Crossed(up);
+    const QPointF c(width() / 2.0, height() / 2.0);
+    // SolidCraft's size: short axes, about two fifths of the area's radius.
+    const double reach = std::min(width(), height()) / 2.0 - kBall - 2;
+    for (int axis = 0; axis < 3; ++axis) {
+      for (const bool positive : {true, false}) {
+        gp_Vec v(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
+        if (!positive) v.Reverse();
+        const double x = v.Dot(gp_Vec(right));
+        const double y = -v.Dot(gp_Vec(up));
+        result.append({c + QPointF(x, y) * reach, v.Dot(gp_Vec(dir)), axis, positive});
+      }
+    }
+    // The farther first, so that the nearer are drawn over them.
+    std::sort(result.begin(), result.end(), [](const End& a, const End& b) { return a.depth > b.depth; });
+    return result;
+  }
+  // SolidCraft's look: thick axes, a large ball with its letter at each
+  // positive end and a ring at each negative one, the ends that point away
+  // faded, a dark dot in the middle, a faint disc behind while hovered.
+  static constexpr double kBall = 11.0;
+  static constexpr double kRing = 7.0;
+  void paintEvent(QPaintEvent*) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QColor colours[3] = {QColor(0xd1342c), QColor(0x2f9a3c), QColor(0x1d5fd6)};
+    const char* names[3] = {"X", "Y", "Z"};
+    const QPointF c(width() / 2.0, height() / 2.0);
+    if (m_hover) {
+      QColor disc = palette().color(QPalette::WindowText);
+      disc.setAlphaF(0.06f);
+      p.setPen(Qt::NoPen);
+      p.setBrush(disc);
+      p.drawEllipse(c, width() / 2.0 - 1, height() / 2.0 - 1);
+    }
+    const auto list = ends();
+    const auto faded = [](QColor colour, const End& end) {
+      if (end.depth > 0.05) colour.setAlphaF(0.45f); // pointing away from the eye
+      return colour;
+    };
+    // The axes' lines from the middle, the farther first.
+    for (const End& end : list) {
+      p.setPen(QPen(faded(colours[end.axis], end), 3.0, Qt::SolidLine, Qt::RoundCap));
+      const QPointF towards = end.at - c;
+      const double length = std::hypot(towards.x(), towards.y());
+      const double stop = end.positive ? kBall : kRing;
+      if (length > stop) p.drawLine(c, c + towards * ((length - stop) / length));
+    }
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0x1e2328));
+    p.drawEllipse(c, 3.0, 3.0);
+    QFont bold = font();
+    bold.setBold(true);
+    p.setFont(bold);
+    for (const End& end : list) {
+      const QColor colour = faded(colours[end.axis], end);
+      const bool lit = m_hoverEnd && m_hoverEnd->first == end.axis && m_hoverEnd->second == end.positive;
+      if (end.positive) {
+        p.setPen(lit ? QPen(palette().color(QPalette::WindowText), 1.6) : Qt::NoPen);
+        p.setBrush(colour);
+        p.drawEllipse(end.at, kBall + (lit ? 1.5 : 0.0), kBall + (lit ? 1.5 : 0.0));
+        p.setPen(QColor(255, 255, 255, colour.alpha()));
+        p.drawText(QRectF(end.at.x() - kBall, end.at.y() - kBall, 2 * kBall, 2 * kBall), Qt::AlignCenter,
+                   QString::fromLatin1(names[end.axis]));
+      } else {
+        p.setPen(QPen(colour, lit ? 3.0 : 2.4));
+        QColor inside = palette().color(QPalette::Base);
+        inside.setAlphaF(0.85f);
+        p.setBrush(inside);
+        p.drawEllipse(end.at, kRing, kRing);
+      }
+    }
+  }
+  std::optional<std::pair<int, bool>> endAt(const QPointF& at) const {
+    const auto list = ends();
+    for (auto it = list.crbegin(); it != list.crend(); ++it) { // the nearest first
+      if (std::hypot(it->at.x() - at.x(), it->at.y() - at.y()) <= (it->positive ? kBall + 1.5 : kRing + 2.0)) {
+        return std::pair<int, bool>{it->axis, it->positive};
+      }
+    }
+    return std::nullopt;
+  }
+ public:
+  // Repaints only when the camera has turned: a repaint over the GL view
+  // makes the view draw again, so repainting every frame never stops.
+  void followCamera() {
+    const occ::handle<Graphic3d_Camera> camera = m_camera();
+    if (camera.IsNull()) return;
+    const gp_Dir d = camera->Direction();
+    const gp_Dir u = camera->Up();
+    const std::array<double, 6> now{d.X(), d.Y(), d.Z(), u.X(), u.Y(), u.Z()};
+    bool same = true;
+    for (std::size_t i = 0; i < now.size(); ++i) {
+      if (std::abs(now[i] - m_seen[i]) > 1e-6) same = false;
+    }
+    if (same) return;
+    m_seen = now;
+    update();
+  }
+
+ protected:
+  void mouseMoveEvent(QMouseEvent* event) override {
+    if (m_forwarding) {
+      forward(event);
+      return;
+    }
+    const auto end = endAt(event->position());
+    if (end != m_hoverEnd) {
+      m_hoverEnd = end;
+      update();
+    }
+  }
+  void enterEvent(QEnterEvent*) override {
+    m_hover = true;
+    update();
+  }
+  void leaveEvent(QEvent*) override {
+    m_hover = false;
+    m_hoverEnd.reset();
+    update();
+  }
+  // A press away from the balls and rings, and its moves and release, go to
+  // the view as a press on the cube's area: a drag orbits.
+  void forward(QMouseEvent* event) {
+    QWidget* view = parentWidget();
+    QMouseEvent copy(event->type(), view->mapFromGlobal(event->globalPosition()), event->globalPosition(),
+                     event->button(), event->buttons(), event->modifiers());
+    QCoreApplication::sendEvent(view, &copy);
+  }
+  void mouseReleaseEvent(QMouseEvent* event) override {
+    if (m_forwarding) {
+      forward(event);
+      if (event->buttons() == Qt::NoButton) m_forwarding = false;
+    }
+  }
+  void mousePressEvent(QMouseEvent* event) override {
+    const auto end = endAt(event->position());
+    if (!end || event->button() != Qt::LeftButton) {
+      m_forwarding = true;
+      forward(event);
+      return;
+    }
+    // From the end clicked toward the origin; the up a standard view has.
+    const int axis = end->first;
+    const gp_Dir along(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
+    const gp_Dir direction = end->second ? along.Reversed() : along;
+    const gp_Dir up = axis == 2 ? gp_Dir(0, end->second ? 1 : -1, 0) : gp_Dir(0, 0, 1);
+    qDebug().noquote() << QStringLiteral("Axes navigator: %1%2").arg(end->second ? '+' : '-').arg(QLatin1Char("XYZ"[axis]));
+    m_turn(direction, up);
+  }
+
+private:
+  std::function<occ::handle<Graphic3d_Camera>()> m_camera;
+  Turn m_turn;
+  bool m_hover = false;
+  bool m_forwarding = false;
+  std::array<double, 6> m_seen{};
+  std::optional<std::pair<int, bool>> m_hoverEnd;
+};
+
 // A small round button over the view in the material of the floating
 // cards: a translucent fill, a hairline border and a soft shadow; the icon
 // is drawn by the tool button.
@@ -7530,6 +7739,10 @@ void OcctViewer::sizeCubeButtons() {
   const bool glass = chromeStyle() == ChromeStyle::Floating;
   m_homeButton->setIconSize(QSize(cubeScaledSize(14), cubeScaledSize(14)));
   m_homeButton->setFixedSize(QSize(cubeScaledSize(36), cubeScaledSize(24)));
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    // Fork: round beside the Axes navigator, as SolidCraft's.
+    m_homeButton->setFixedSize(QSize(cubeScaledSize(26), cubeScaledSize(26)));
+  }
   const int arrow = cubeScaledSize(glass ? 26 : 22);
   const int icon = cubeScaledSize(glass ? 12 : 16);
   for (const auto& [id, button] : m_cubeArrows) {
@@ -7779,17 +7992,67 @@ void OcctViewer::setOverlayInsets(const QMargins& insets) {
 void OcctViewer::placeHomeButton() {
   if (m_nativeControls) {
     m_homeButton->hide();
+    if (m_axesTurnButton != nullptr) {
+      m_axesTurnButton->hide();
+    }
     return;
   }
-  // At the cube's upper left, at the cube's size (mitcad#2071).
-  m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
-                     m_overlayInsets.top() + cubeScaled(9));
+  // At the cube's upper left, at the cube's size (mitcad#2071); fork: with
+  // the Axes navigator, left of its whole area, clear of its axes.
+  // (The Axes navigator's compact axes leave its corner free too.)
+  sizeCubeButtons(); // round with the Axes navigator, a capsule with the cube
+  const bool axes = m_axesNavigator != nullptr && m_axesNavigator->isVisible();
+  if (axes && m_axesTurnButton == nullptr) {
+    m_axesTurnButton = new ViewCubeHomeButton(this);
+    m_axesTurnButton->setObjectName(QStringLiteral("viewAxesTurnAround"));
+    m_axesTurnButton->setIcon(uTurnIcon());
+    m_axesTurnButton->setAutoRaise(true);
+    m_axesTurnButton->setFocusPolicy(Qt::NoFocus);
+    m_axesTurnButton->setDark(m_backgroundDark);
+    m_axesTurnButton->setToolTip(tr("Turn around: look from the other side"));
+    connect(m_axesTurnButton, &QToolButton::clicked, this, [this] {
+      // From any view, not only face on: the view from the other side, the
+      // same way up.
+      qDebug() << "Axes navigator: turn around";
+      runViewOperation(QStringLiteral("axes turn around"), [this] {
+        settleCamera();
+        const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
+        turnTo(camera->Direction().Reversed(), camera->Up());
+      });
+      fitAfterNavigator();
+    });
+  }
+  if (m_axesTurnButton != nullptr) {
+    m_axesTurnButton->setVisible(axes);
+  }
+  if (axes) {
+    // Fork: round buttons at the compact Axes navigator's upper corners,
+    // Home on the left and Turn Around on the right, as SolidCraft's.
+    const int side = cubeScaled(92);
+    const QPoint middle(width() - m_overlayInsets.right() - cubeOffset(), m_overlayInsets.top() + cubeOffset());
+    const int reach = side * 2 / 5;
+    m_homeButton->move(middle + QPoint(-reach, -reach) - QPoint(m_homeButton->width() / 2, m_homeButton->height() / 2));
+    m_axesTurnButton->setIconSize(m_homeButton->iconSize());
+    m_axesTurnButton->setFixedSize(m_homeButton->size());
+    m_axesTurnButton->move(middle + QPoint(reach, -reach) -
+                           QPoint(m_axesTurnButton->width() / 2, m_axesTurnButton->height() / 2));
+    m_axesTurnButton->raise();
+  } else {
+    m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
+                       m_overlayInsets.top() + cubeScaled(9));
+  }
   m_homeButton->raise();
   const QPoint at = mapTo(window(), m_homeButton->geometry().center());
   qDebug().noquote() << QStringLiteral("View home at %1,%2").arg(at.x()).arg(at.y());
 }
 
 void OcctViewer::placeCubeArrows() {
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    const int side = cubeScaled(92);
+    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - cubeOffset() - side / 2,
+                                 m_overlayInsets.top() + cubeOffset() - side / 2, side, side);
+    m_axesNavigator->lower(); // under Home and the arrows placed below
+  }
   // Around the cube's middle (cubeOffset from the corner), at the cube's
   // size (mitcad#2071).
   const QPoint middle(width() - m_overlayInsets.right() - cubeOffset(), m_overlayInsets.top() + cubeOffset());
@@ -7931,6 +8194,13 @@ void OcctViewer::turnCube(const QString& arrow) {
 }
 
 bool OcctViewer::isOnOrientationCube(const QPointF& position) {
+  // Fork: the Axes navigator's area drags as the cube does (an orbit); its
+  // balls and rings take their clicks before the view sees them.
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    const QPointF middle = QRectF(m_axesNavigator->geometry()).center();
+    const double radius = m_axesNavigator->width() / 2.0;
+    return std::hypot(position.x() - middle.x(), position.y() - middle.y()) <= radius;
+  }
   if (m_view->Window().IsNull() || !cubeArea().contains(position)) {
     return false;
   }
@@ -8812,6 +9082,9 @@ void OcctViewer::setBackground(const QColor& top, const QColor& bottom, bool gra
     updateOverlayIcons(); // the buttons over the view
     setViewCubeBackdrop(*m_orientationCube, m_backgroundDark); // the cube's glass
     m_homeButton->setDark(m_backgroundDark);
+    if (m_axesTurnButton != nullptr) {
+      m_axesTurnButton->setDark(m_backgroundDark);
+    }
     m_context->Redisplay(m_orientationCube, false);
     restyleSketchEntities();
     // A feature's input lines have a variant for each tone (mitcad#957).
@@ -10364,6 +10637,10 @@ void OcctViewer::readViewEglFrame(const occ::handle<OpenGl_Context>& gl) {
 #endif
 
 void OcctViewer::paintGL() {
+  // Fork: the Axes navigator follows the camera when it turns.
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    static_cast<AxesNavigator*>(m_axesNavigator)->followCamera();
+  }
 #ifdef MITCAD_OCCT_EGL
   if (m_viewEgl != nullptr && m_viewEgl->context != nullptr) {
     // Qt on X11 with GLX (mitcad#2292): OCCT draws in the view's own EGL
@@ -10854,12 +11131,37 @@ void OcctViewer::applyViewNavigator() {
     if (m_context->IsDisplayed(m_orientationCube)) {
       m_context->Erase(m_orientationCube, false);
     }
-    m_view->TriedronDisplay(Aspect_TOTP_RIGHT_UPPER, Quantity_NOC_GRAY30, 0.1, V3d_ZBUFFER);
+    if (m_axesNavigator == nullptr) {
+      m_axesNavigator = new AxesNavigator(
+          this, [this] { return m_view.IsNull() ? occ::handle<Graphic3d_Camera>() : m_view->Camera(); },
+          [this](const gp_Dir& direction, const gp_Dir& up) {
+            runViewOperation(QStringLiteral("axes navigator"), [this, direction, up] { turnTo(direction, up); });
+            fitAfterNavigator();
+          });
+    }
+    // Where the cube is: its middle cubeOffset from the corner.
+    const int side = cubeScaled(92);
+    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - cubeOffset() - side / 2,
+                                 m_overlayInsets.top() + cubeOffset() - side / 2, side, side);
+    m_axesNavigator->show();
+    m_axesNavigator->raise();
+    // Home and the cube's arrows stay over it, so that their clicks reach them.
+    if (m_homeButton != nullptr) {
+      m_homeButton->raise();
+    }
+    for (const auto& [id, arrow] : m_cubeArrows) {
+      arrow->raise();
+    }
   } else {
-    m_view->TriedronErase();
+    if (m_axesNavigator != nullptr) {
+      m_axesNavigator->hide();
+    }
     if (!m_context->IsDisplayed(m_orientationCube)) {
       m_context->Display(m_orientationCube, 0, 0, false);
     }
+  }
+  if (m_homeButton != nullptr) {
+    placeHomeButton();
   }
   qDebug().noquote() << QStringLiteral("View navigator: %1").arg(axes ? QStringLiteral("axes") : QStringLiteral("cube"));
   requestFrame();
