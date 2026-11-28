@@ -11,7 +11,10 @@
 #include <QStatusBar>
 #include <QPointer>
 #include <QTimer>
+#include <QToolButton>
 
+#include "framework/AppTheme.hpp"
+#include "framework/CommandRegistry.hpp"
 #include "framework/FloatingLayout.hpp"
 #include "framework/IconSizeStyle.hpp"
 #include "framework/Ribbon.hpp"
@@ -211,6 +214,35 @@ void MainWindow::followLayoutSettings() {
       self->applyLayoutSettings(layout);
     }
   });
+}
+
+void MainWindow::markActiveCommand(const QString& id) {
+  // The buttons tinted before go back to their own look.
+  const QList<QToolButton*> buttons = findChildren<QToolButton*>();
+  for (QToolButton* button : buttons) {
+    if (button->property("purecadActiveCommand").toBool()) {
+      button->setStyleSheet(button->property("purecadOwnStyle").toString());
+      button->setProperty("purecadActiveCommand", false);
+    }
+  }
+  if (id.isEmpty() || !LayoutSettings::load().highlightActiveCommands) {
+    return;
+  }
+  const QAction* action = m_registry->action(id);
+  if (action == nullptr) {
+    return;
+  }
+  QColor tint = accentColor(palette());
+  tint.setAlpha(60);
+  for (QToolButton* button : buttons) {
+    if (button->defaultAction() == action && button->isVisible()) {
+      button->setProperty("purecadOwnStyle", button->styleSheet());
+      button->setProperty("purecadActiveCommand", true);
+      button->setStyleSheet(button->styleSheet() +
+                            QStringLiteral(" QToolButton { background: %1; border-radius: 6px; }")
+                                .arg(tint.name(QColor::HexArgb)));
+    }
+  }
 }
 
 } // namespace mitcad

@@ -1601,6 +1601,9 @@ private:
   void newDesign();
   // PureCAD: File › New's What do you want to create? (file.new_choice).
   void showNewDocumentChoice();
+  // PureCAD: Preferences › Layout › Highlight active commands: the running
+  // command's toolbar buttons tinted while it runs (empty: none).
+  void markActiveCommand(const QString& id);
   // What the panel asks for (paths relative to the project at `root`).
   void createDesignInProject(const QString& root, const QString& path);
   void createFolderInProject(const QString& root, const QString& path);
