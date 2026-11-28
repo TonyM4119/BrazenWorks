@@ -369,7 +369,9 @@ inline QVector<NavigationBinding> effectiveNavigationBindings(const NavigationSe
       }
     }
   };
-  if (settings.rightDragOrbits) {
+  // The gesture ring takes the right drag of the SolidWorks mapping.
+  const bool ring = settings.gestureRing && settings.scheme == NavigationScheme::MiddleOrbit;
+  if (settings.rightDragOrbits && !ring) {
     for (auto& binding : bindings) {
       if (binding.input == NavigationInput::RightButton && binding.modifiers == Qt::NoModifier &&
           binding.action == NavigationAction::None) {

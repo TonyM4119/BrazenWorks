@@ -1841,6 +1841,25 @@ its panes) in SolidCraft's look, over the same settings:
   left; Cancel, Apply and OK at the right, OK on the accent. Apply saves
   what OK saves and keeps the dialog open.
 
+### Navigation page and menus (fork)
+
+The Navigation page's mouse tab follows SolidCraft's: sections that fold
+(Mouse, Orbit around, Orbit style, Wheel and trackpad, Speed, View) in a
+page that scrolls. The mouse mapping is chosen by the program the user
+knows (Fusion, SolidWorks, Creo, NX, Inventor, Alias, Maya, Blender,
+Tinkercad, OpenSCAD, HFSS, the trackpads, Custom); the guide shows a mouse
+in a tile and the mapping's bindings as key caps beside their actions.
+Choices with a picture (Orbit around, View navigator) are cards: picture
+over name, the chosen one framed in the accent with a check in its corner.
+Orbit style is a two-segment control. The bindings table stays below the
+guide for Custom.
+
+The radial context menu shows up to eight commands in pills around the
+cursor (the rest under More…); the gesture ring is the same ring of eight
+tools on a right drag of the SolidWorks mapping; the quick menu is a small
+rounded bar of up to six enabled commands beside the cursor after a
+selection, gone after a few seconds, a click elsewhere or a command.
+
 ## 19. What not to do
 
 - Two texts for one control by default (a label beside a button that

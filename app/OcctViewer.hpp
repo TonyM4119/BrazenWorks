@@ -1488,6 +1488,11 @@ signals:
                  const mitcad::Selection& items);
   // A right click; `item` is what lies under the mouse (invalid if nothing).
   void contextMenuRequested(const QPoint& globalPosition, const mitcad::SelectionItem& item);
+  // Fork: the gesture ring of a right drag (SolidWorks mapping): shown about
+  // where the drag started, following the pointer, run as the button goes up.
+  void gestureRingStarted(const QPoint& globalCenter);
+  void gestureRingMoved(const QPoint& globalPosition);
+  void gestureRingReleased(const QPoint& globalPosition);
   // A right click on the orientation cube.
   void orientationCubeMenuRequested(const QPoint& globalPosition);
   // The camera came to rest after it moved (logged as "Camera direction ...").
@@ -2291,6 +2296,8 @@ private:
   bool m_cubeClick = false;
   bool m_cubePress = false; // the left button went down on the cube
   QPointF m_rightPressPosition;
+  // Fork: a right drag showing the gesture ring.
+  bool m_gestureRing = false;
   bool m_orbitKey = false; // F4 held (MiddlePanF4: the left button orbits)
   // The keys of the press that put the first mouse button down on the view,
   // until all are up (mitcad#1571): a key pressed or released meanwhile does

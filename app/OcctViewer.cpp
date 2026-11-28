@@ -10769,6 +10769,10 @@ void OcctViewer::updateCursor(bool log) {
 
 void OcctViewer::cancelPointerInteraction() {
   m_sidePress = 0;
+  if (m_gestureRing) {
+    m_gestureRing = false;
+    emit gestureRingReleased(QPoint(-100000, -100000)); // nothing chosen
+  }
   disarmPickList(); // a press cut off opens no pick list (mitcad#1703)
   endScrollDrag();
   ResetViewInput();
@@ -11201,6 +11205,11 @@ void OcctViewer::mouseReleaseEvent(QMouseEvent* event) {
       if (side) viewer->m_sidePress = 0;
     }
   } sideRelease{this, event->button() == Qt::BackButton || event->button() == Qt::ForwardButton};
+  // Fork: the gesture ring's tool runs as the right button goes up.
+  if (event->button() == Qt::RightButton && m_gestureRing) {
+    m_gestureRing = false;
+    emit gestureRingReleased(event->globalPosition().toPoint());
+  }
   if (ignoresClickWithoutGraphics(event, "release")) {
     return;
   }
@@ -11398,6 +11407,20 @@ void OcctViewer::mouseMoveEvent(QMouseEvent* event) {
       emit pointerLeft();
     } else {
       emit pointerMoved(event->position());
+    }
+  }
+  // Fork: a right drag of the SolidWorks mapping shows the gesture ring
+  // once it has moved, and follows it instead of navigating.
+  if ((event->buttons() & Qt::RightButton) && m_navigation.gestureRing &&
+      m_navigation.scheme == NavigationScheme::MiddleOrbit) {
+    const QPointF moved = event->position() - m_rightPressPosition;
+    if (!m_gestureRing && std::hypot(moved.x(), moved.y()) > kDragPixels) {
+      m_gestureRing = true;
+      emit gestureRingStarted(mapToGlobal(m_rightPressPosition.toPoint()));
+    }
+    if (m_gestureRing) {
+      emit gestureRingMoved(event->globalPosition().toPoint());
+      return;
     }
   }
   // While a button is held, the press's keys (mitcad#1571): OCCT would take

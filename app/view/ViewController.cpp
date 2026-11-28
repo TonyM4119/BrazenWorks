@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "ViewController.hpp"
 #include "NavigationPreferences.hpp"
+#include "RadialMenu.hpp" // Fork
 #include "GridSpacing.hpp"
 #include "DefaultView.hpp"
 #include "../platform/SpaceMouseDevice.hpp"
@@ -837,6 +838,30 @@ ViewController::ViewController(OcctViewer& viewer, CommandRegistry& registry, Do
     qInfo().noquote() << QStringLiteral("No render worker (%1) next to the application: no rendered view")
                              .arg(QString::fromLatin1(render::kWorkerName));
   }
+  // Fork: the gesture ring (Preferences › Navigation › Mouse gestures): its
+  // tools are the commands the settings name, clockwise from the top.
+  connect(&m_viewer, &OcctViewer::gestureRingStarted, this, [this](const QPoint& center) {
+    QVector<QPair<QString, QAction*>> tools;
+    QStringList ids = m_viewer.navigation().gestureCommands;
+    if (ids.size() != 8) ids = defaultGestureCommands();
+    for (const QString& id : ids) {
+      tools.append({id, id.isEmpty() ? nullptr : m_registry.action(id)});
+    }
+    delete m_gestureRing;
+    auto* ring = new GestureRing(tools);
+    m_gestureRing = ring;
+    ring->showAt(center);
+    qDebug().noquote() << QStringLiteral("Gesture ring at %1,%2").arg(center.x()).arg(center.y());
+  });
+  connect(&m_viewer, &OcctViewer::gestureRingMoved, this, [this](const QPoint& at) {
+    if (auto* ring = static_cast<GestureRing*>(m_gestureRing.data())) ring->follow(at);
+  });
+  connect(&m_viewer, &OcctViewer::gestureRingReleased, this, [this](const QPoint& at) {
+    if (auto* ring = static_cast<GestureRing*>(m_gestureRing.data())) {
+      ring->release(at);
+      ring->deleteLater();
+    }
+  });
   // The automatic background (Follow System) follows the theme while
   // MitCad runs: the Theme preference, the system's light and dark modes
   // (mitcad#2145). The view hears of it more than once for one change (its
@@ -1563,7 +1588,11 @@ void ViewController::showOrientationCubeMenu(const QPoint& globalPosition) {
   qDebug().noquote() << QStringLiteral("Context menu: %1").arg(entries.join(QStringLiteral(" | ")));
   qDebug().noquote() << QStringLiteral("Context menu Camera: %1").arg(cameraEntries.join(QStringLiteral(" | ")));
   qDebug().noquote() << QStringLiteral("Context menu Cube Size: %1").arg(sizeEntries.join(QStringLiteral(" | ")));
-  execMenu(&menu, globalPosition);
+  if (m_viewer.navigation().radialContextMenu) {
+    execRadialMenu(&menu, globalPosition); // fork
+  } else {
+    execMenu(&menu, globalPosition);
+  }
 }
 
 void ViewController::setCubeSize(int percent) {

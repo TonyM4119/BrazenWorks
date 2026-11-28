@@ -307,6 +307,7 @@ private:
   std::function<void()> m_lookAt;
   QWidget* m_window;
   QPointer<QWidget> m_settingsWindow; // macOS: the Settings window, when open
+  QPointer<QWidget> m_gestureRing;    // fork: the gesture ring while a right drag shows it
   ViewSettings m_settings;
   QHash<QString, QAction*> m_checks; // checkable actions by command id
   // View > Rendered (docs/rendering.md); null without the render worker.

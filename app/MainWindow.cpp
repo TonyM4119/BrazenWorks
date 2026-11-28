@@ -178,6 +178,7 @@
 #include "view/ViewQualityPreference.hpp" // Fork
 #include "framework/Motion.hpp"           // Fork
 #include "view/SpaceMouseController.hpp"
+#include "view/RadialMenu.hpp" // Fork
 #include "view/ViewController.hpp"
 #include "render/RenderWorkspace.hpp"
 #include "view/NavigationBar.hpp"
@@ -7058,6 +7059,27 @@ void MainWindow::deliverPendingPicks() {
 }
 
 void MainWindow::onPicked(const Selection& items, Qt::KeyboardModifiers modifiers, bool window, quint64 click) {
+  // Fork: Preferences › Navigation › Quick menu after a selection: a few
+  // commands for what was picked in the view, beside the cursor, once the
+  // commands know the new selection (the next turn of the event loop).
+  if (m_viewer->navigation().quickMenuAfterSelection && !items.isEmpty() && !m_session && m_mode != Mode::Sketch) {
+    const QPoint cursor = QCursor::pos();
+    QTimer::singleShot(0, this, [this, cursor] {
+      QList<QAction*> actions;
+      for (const char* id : {"solid.press_pull", "solid.extrude", "solid.fillet", "solid.chamfer", "solid.shell",
+                             "solid.move", "solid.appearance", "view.isolate", "view.toggle_visibility"}) {
+        QAction* action = m_registry != nullptr ? m_registry->action(QString::fromLatin1(id)) : nullptr;
+        if (action != nullptr && action->isEnabled() && action->isVisible() && actions.size() < 6) {
+          actions.append(action);
+        }
+      }
+      if (!actions.isEmpty()) {
+        auto* bar = new QuickMenuBar(actions);
+        bar->showNear(cursor);
+        qDebug().noquote() << QStringLiteral("Quick menu: %1 commands").arg(actions.size());
+      }
+    });
+  }
   if (m_nativeUi && m_session) {
     // The session invalidates an in-flight preview before queuing picks.
     m_session->picked(items, modifiers, window, click);
@@ -8148,7 +8170,12 @@ void MainWindow::showContextMenu(const QPoint& globalPosition, const SelectionIt
                             .arg(menuMs)
                             .arg(selectMs + menuMs);
   qDebug().noquote() << QStringLiteral("Context menu: %1").arg(entries.join(QStringLiteral(" | ")));
-  execMenu(&menu, globalPosition);
+  // Fork: Preferences › Navigation › Radial context menu.
+  if (m_viewer->navigation().radialContextMenu) {
+    execRadialMenu(&menu, globalPosition);
+  } else {
+    execMenu(&menu, globalPosition);
+  }
   // The print bed face shown while the menu was open (mitcad#731).
   if (m_printBedShown.isValid()) {
     m_printBedShown = SelectionItem();
