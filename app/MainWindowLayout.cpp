@@ -7,10 +7,14 @@
 #include "MainWindow.hpp"
 
 #include <QEvent>
+#include <QLabel>
+#include <QStatusBar>
 #include <QPointer>
 #include <QTimer>
 
 #include "framework/FloatingLayout.hpp"
+#include "framework/IconSizeStyle.hpp"
+#include "framework/Ribbon.hpp"
 #include "framework/GlassCard.hpp"
 #include "view/LayoutSettings.hpp"
 #include "view/NavigationBar.hpp"
@@ -77,6 +81,40 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
       show();
     }
   }
+  // Window › Show window control buttons: the title bar's minimize,
+  // maximize and close (the system's frame keeps its title).
+  // Changed only when asked for: the window keeps the system's own flags
+  // otherwise.
+  const bool customized = windowFlags().testFlag(Qt::CustomizeWindowHint);
+  if (layout.windowButtons == customized) {
+    const bool shown = isVisible();
+    Qt::WindowFlags flags = windowFlags();
+    if (layout.windowButtons) {
+      flags &= ~(Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowSystemMenuHint);
+    } else {
+      flags |= Qt::CustomizeWindowHint | Qt::WindowTitleHint | Qt::WindowSystemMenuHint;
+      flags &= ~(Qt::WindowMinMaxButtonsHint | Qt::WindowCloseButtonHint);
+    }
+    setWindowFlags(flags);
+    if (shown) {
+      show();
+    }
+  }
+  // Window › Menus: List or Large icons (menus made from now on).
+  IconSizeStyle::setLargeMenuIcons(layout.largeMenuIcons);
+  // Window › Ribbon.
+  if (m_ribbon != nullptr) {
+    m_ribbon->setGroupsShown(layout.ribbon);
+  }
+  // Window › Status bar: the Floating layout's status line at the bottom of
+  // the window (the Docked layout always has one: it holds the navigation
+  // bar).
+  if (m_floating != nullptr) {
+    m_layoutStatusBar = layout.statusBar;
+    statusBar()->setSizeGripEnabled(false);
+    statusBar()->setVisible(layout.statusBar);
+    echoStatusLine();
+  }
   // Window › Card headers, Notices.
   GlassCard::setHeaderMode(layout.cardHeaders);
   if (m_floating != nullptr) {
@@ -109,6 +147,12 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
                             .arg(layout.navigationIdle)
                             .arg(layout.navigationCompact ? QStringLiteral(" compact") : QString())
                             .arg(layout.navigationLabels ? QStringLiteral(" labels") : QString());
+}
+
+void MainWindow::echoStatusLine() {
+  if (m_layoutStatusBar && m_floating != nullptr && m_statusLabel != nullptr) {
+    statusBar()->showMessage(m_statusLabel->text());
+  }
 }
 
 void MainWindow::followLayoutSettings() {

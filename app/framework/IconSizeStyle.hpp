@@ -68,6 +68,10 @@ class IconSizeStyle : public QProxyStyle {
 public:
   // Takes `base` (made from a key by QStyleFactory; null: Qt's default).
   explicit IconSizeStyle(QStyle* base = nullptr);
+  // Fork: Preferences › Layout › Menus › Large icons: the icons of menus'
+  // rows half as large again (24 px for 16 at 100 %).
+  static void setLargeMenuIcons(bool large);
+  static bool largeMenuIcons();
 
   int pixelMetric(PixelMetric metric, const QStyleOption* option = nullptr,
                   const QWidget* widget = nullptr) const override;

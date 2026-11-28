@@ -2163,6 +2163,10 @@ private:
   void applyLayoutSettings(const LayoutSettings& layout);
   void followLayoutSettings();
   bool m_searchCentered = true; // Layout › Open Search commands centered
+  bool m_layoutStatusBar = false; // Layout › Status bar (the Floating layout's)
+  // The status line's text in the Floating layout's status bar, while
+  // Preferences › Layout shows one.
+  void echoStatusLine();
   NavigationBar* m_navigationBar = nullptr;
   GlassCard* m_navigationCard = nullptr;
   // MitCad's version over the view's lower right (mitcad#1209); it keeps

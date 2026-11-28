@@ -4728,6 +4728,7 @@ bool MainWindow::reportRecompute(const QJsonObject& result, double milliseconds)
   }
   m_statusLabel->setText(tr("Recomputed %n feature(s) in %1 ms", nullptr, recomputed)
                              .arg(milliseconds, 0, 'f', 1));
+  echoStatusLine(); // fork: Layout › Status bar
   qDebug().noquote() << m_statusLabel->text();
   // The drawings of an older design file whose views now keep the bodies
   // they showed (mitcad#1293): one information each, in the history too.
@@ -6639,6 +6640,7 @@ void MainWindow::showFeatureStatus(const QString& given, NoticeLevel level, cons
     setErrorStyleSheet(m_statusLabel, QString());
   }
   m_statusLabel->setText(message);
+  echoStatusLine(); // fork: Layout › Status bar
   const QIcon icon = noticeIcon(level);
   if (m_statusIcon == nullptr) {
     // (Not made yet: a message while the window is built.)
