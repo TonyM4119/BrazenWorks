@@ -517,7 +517,8 @@ void MainWindow::prepareFileMenuActions() {
   // each is, is the command layout's File menu (mitcad#1951). Their texts
   // with the menu's underlined letters, set here on the shared actions.
   const std::pair<const char*, QString> texts[] = {
-      {"file.new_design", tr("&New Design…")},
+      {"file.new_choice", tr("&New…")},
+      {"file.new_design", tr("New Desi&gn")},
       {"file.open", tr("&Open…")},
       {"file.open_from_project", tr("Open &from Project…")},
       {"file.open_read_only", tr("Open Rea&d-Only…")},

@@ -11,6 +11,7 @@
 // inserted there as a component (mitcad#2428, dropProjectDesign in
 // files/MainWindowFiles.cpp). The panel itself is projects/ProjectsPanel.
 #include "../MainWindow.hpp"
+#include "../files/NewDocumentDialog.hpp"
 #include "../WindowManager.hpp"
 
 #include <algorithm>
@@ -128,6 +129,59 @@ void MainWindow::registerProjectsPanelCommands() {
                      QStringLiteral("document"), QStringLiteral("blank")};
   design.run = [this] { newDesign(); };
   m_registry->add(design);
+  // PureCAD: File › New asks what to create (files/NewDocumentDialog.hpp);
+  // New Design keeps Ctrl+N and makes one at once.
+  CommandDef choice;
+  choice.id = QStringLiteral("file.new_choice");
+  choice.name = tr("New…");
+  choice.icon = QStringLiteral("add");
+  choice.tooltip = tr("Asks what to create: a design, a drawing, an import or a project");
+  choice.kind = CommandDef::Kind::Action;
+  choice.mode = CommandDef::Mode::Any;
+  choice.keywords = {QStringLiteral("new"), QStringLiteral("create"), QStringLiteral("design"),
+                     QStringLiteral("drawing"), QStringLiteral("import"), QStringLiteral("project"),
+                     QStringLiteral("units")};
+  choice.run = [this] { showNewDocumentChoice(); };
+  m_registry->add(choice);
+}
+
+void MainWindow::showNewDocumentChoice() {
+  const GeneralSettings general = GeneralSettings::load();
+  // A drawing needs a design with something in it.
+  const QString drawingOf = m_noDesign ? QString() : documentName();
+  NewDocumentDialog dialog(GeneralSettings::newDesignUnitChoices(), general.newDesignUnits, drawingOf, this);
+  if (execDialog(&dialog) != QDialog::Accepted) {
+    return;
+  }
+  const NewDocumentDialog::Choice chosen = dialog.choice();
+  qInfo().noquote() << QStringLiteral("New: %1").arg(int(chosen.kind));
+  if (chosen.unitsDefault && chosen.units != general.newDesignUnits) {
+    GeneralSettings kept = general;
+    kept.newDesignUnits = chosen.units;
+    kept.save();
+    newDesignUnitsChanged();
+  }
+  const auto run = [this](const char* id) {
+    if (const CommandDef* def = m_registry->find(QLatin1String(id)); def != nullptr && def->run) def->run();
+  };
+  switch (chosen.kind) {
+  case NewDocumentDialog::Kind::Design:
+    m_newDesignUnits = chosen.units;
+    newDesign();
+    m_newDesignUnits.clear();
+    break;
+  case NewDocumentDialog::Kind::Drawing:
+    createDrawing(QStringLiteral("C0"));
+    break;
+  case NewDocumentDialog::Kind::Import:
+    m_newDesignUnits = chosen.units;
+    run("file.import");
+    m_newDesignUnits.clear();
+    break;
+  case NewDocumentDialog::Kind::Project:
+    run("file.new_project");
+    break;
+  }
 }
 
 // ---------------------------------------------------------------------------
