@@ -68,6 +68,7 @@ class QMenu;
 class QResizeEvent;
 class QStackedWidget;
 class QTimer;
+class QFrame;
 class QToolButton;
 
 namespace mitcad {
@@ -1319,6 +1320,8 @@ private:
   bool hideShownAnalysis(const QString& key);
   void updateAnalysisChip();
   QToolButton* m_analysisChip = nullptr;
+  void updateProfileOperations(); // PureCAD: Graphics › Profile operations
+  QFrame* m_profileBar = nullptr;
   // Print Analysis kept in the document (mitcad#620,
   // MainWindowPrintAnalysis.cpp): the shown one's overhangs and thin walls
   // over the bodies, computed again when it, its bodies or the design

@@ -46,6 +46,8 @@
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
+#include <QFrame>
+#include <QCursor>
 #include <QToolButton>
 #include <QTextEdit>
 #include <QUrl>
@@ -4116,6 +4118,48 @@ void MainWindow::cancel() {
   clearSelection();
 }
 
+// PureCAD: Preferences › Graphics › Profile operations: profiles selected
+// on an idle view bring a small bar of what they make (Extrude, Revolve,
+// Sweep, Loft) beside the pointer.
+void MainWindow::updateProfileOperations() {
+  const bool profiles = m_mode == Mode::Idle && !m_selection.isEmpty() &&
+                        std::all_of(m_selection.cbegin(), m_selection.cend(),
+                                    [](const SelectionItem& item) { return item.kind == SelectKind::Profile; });
+  if (!profiles || !QSettings().value(QStringLiteral("graphics/profileOperations"), false).toBool()) {
+    if (m_profileBar != nullptr) m_profileBar->hide();
+    return;
+  }
+  if (m_profileBar == nullptr) {
+    m_profileBar = new QFrame(m_viewer);
+    m_profileBar->setObjectName(QStringLiteral("profileOperations"));
+    auto* row = new QHBoxLayout(m_profileBar);
+    row->setContentsMargins(4, 4, 4, 4);
+    row->setSpacing(2);
+    for (const char* id : {"solid.extrude", "solid.revolve", "solid.sweep", "solid.loft"}) {
+      QAction* action = m_registry->action(QString::fromLatin1(id));
+      if (action == nullptr) continue;
+      auto* button = new QToolButton(m_profileBar);
+      button->setDefaultAction(action);
+      button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+      button->setIconSize(QSize(22, 22));
+      button->setAutoRaise(true);
+      connect(button, &QToolButton::clicked, m_profileBar, &QWidget::hide);
+      row->addWidget(button);
+    }
+  }
+  const bool dark = isDarkTheme();
+  m_profileBar->setStyleSheet(QStringLiteral("QFrame#profileOperations { background: %1; border: 1px solid %2; border-radius: 10px; }")
+                                  .arg(dark ? QStringLiteral("#2a313b") : QStringLiteral("#ffffff"),
+                                       dark ? QStringLiteral("#46505e") : QStringLiteral("#c9d0da")));
+  m_profileBar->adjustSize();
+  QPoint at = m_viewer->mapFromGlobal(QCursor::pos()) + QPoint(18, 18);
+  at.setX(std::clamp(at.x(), 8, std::max(8, m_viewer->width() - m_profileBar->width() - 8)));
+  at.setY(std::clamp(at.y(), 8, std::max(8, m_viewer->height() - m_profileBar->height() - 8)));
+  m_profileBar->move(at);
+  m_profileBar->show();
+  m_profileBar->raise();
+}
+
 // PureCAD: hides the analysis shown (it stays in the Analysis folder) when
 // the switch `key` is on (empty: always); whether one was hidden.
 bool MainWindow::hideShownAnalysis(const QString& key) {
@@ -7384,6 +7428,7 @@ void MainWindow::setSelection(const Selection& items) {
       }
     }
     m_viewer->setHiddenEdgesOf(dashed);
+    updateProfileOperations(); // PureCAD
   }
   const qint64 viewMs = selectionClock.restart();
   m_sketch->refreshView();
