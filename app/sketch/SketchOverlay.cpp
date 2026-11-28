@@ -122,9 +122,34 @@ QRectF clearOfCards(QRectF block, const QRectF& free, const std::vector<QRect>& 
   return start;
 }
 
+// PureCAD: Preferences › Sketch › Dimension color: the user's own color for
+// driving dimensions while chosen, else the theme's (kDimensionColor).
+QColor userDimensionColor(const QColor& theme) {
+  static QColor chosen;
+  static qint64 readAt = -1;
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  if (readAt < 0 || now - readAt > 1000) { // read again at most once a second
+    const QSettings store;
+    chosen = store.value(QStringLiteral("sketchPrefs/dimensionColorCustom"), false).toBool()
+                 ? QColor(store.value(QStringLiteral("sketchPrefs/dimensionColor"), QStringLiteral("#822a6e")).toString())
+                 : QColor();
+    readAt = now;
+  }
+  return chosen.isValid() ? chosen : theme;
+}
+
 // PureCAD: Preferences › Sketch › Conflicting constraints in red (on by
 // default).
-bool conflictColoring() { return QSettings().value(QStringLiteral("sketchPrefs/conflictColor"), true).toBool(); }
+bool conflictColoring() {
+  static bool on = true;
+  static qint64 readAt = -1;
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  if (readAt < 0 || now - readAt > 1000) {
+    on = QSettings().value(QStringLiteral("sketchPrefs/conflictColor"), true).toBool();
+    readAt = now;
+  }
+  return on;
+}
 
 // PureCAD: Preferences › Sketch › Constraint glyph size (percent of 15 px).
 double glyphSizeNow() {
@@ -817,7 +842,11 @@ DimensionShape dimensionShape(const DimensionData& d, const SketchModel& model,
 SketchOverlay::SketchOverlay(SketchController& controller, OcctViewer& view)
     : QObject(&view), m_c(controller), m_view(view), m_font(view.font()) {
   setObjectName(QStringLiteral("sketchOverlay"));
-  m_font.setPointSizeF(9.0 * uiTextScale()); // at Text size (mitcad#1556)
+  // At Text size (mitcad#1556); PureCAD: and Preferences › Sketch ›
+  // Dimension text size (percent), read as each sketch opens.
+  m_font.setPointSizeF(9.0 * uiTextScale() *
+                       std::clamp(QSettings().value(QStringLiteral("sketchPrefs/dimensionTextSize"), 100).toInt(), 50, 300) /
+                       100.0);
   // Drawn by the view itself (mitcad#2296).
   m_layer = view.addPaintLayer(QStringLiteral("sketch overlay"), [this](QPainter& painter) { paint(painter); }, this);
   connect(&m_c.viewer(), &OcctViewer::backgroundToneChanged, this, &SketchOverlay::logDimensionHalos);
@@ -1607,11 +1636,11 @@ std::pair<QColor, QColor> SketchOverlay::dimensionColors(bool driven, bool inact
   const QColor color = hovered    ? kHoverColor
                        : inactive ? kInactiveColor
                        : driven   ? kDrivenColor
-                                  : kDimensionColor;
+                                  : userDimensionColor(kDimensionColor);
   const QColor lines = !dark || hovered ? color
                        : inactive       ? kInactiveColorDark
                        : driven         ? kDrivenColorDark
-                                        : kDimensionColorDark;
+                                        : userDimensionColor(kDimensionColorDark);
   return {color, lines};
 }
 
@@ -2224,11 +2253,11 @@ void SketchOverlay::paint(QPainter& painter) {
                            : conflicted ? kConflictColor
                            : inactive ? kInactiveColor
                            : driven ? kDrivenColor
-                                    : kDimensionColor;
+                                    : userDimensionColor(kDimensionColor);
       const QColor lines = !dark || marked ? color
                            : inactive      ? kInactiveColorDark
                            : driven        ? kDrivenColorDark
-                                           : kDimensionColorDark;
+                                           : userDimensionColor(kDimensionColorDark);
       paintDimension(painter, layout.shape, layout.textRect, color, lines, driven, inactive);
     }
     painter.setOpacity(1.0);
