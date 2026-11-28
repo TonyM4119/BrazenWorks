@@ -122,15 +122,15 @@ void MainWindow::registerProjectsPanelCommands() {
   design.tooltip = tr("A new design in the current project's selected folder, or an untitled one");
   design.kind = CommandDef::Kind::Action;
   design.mode = CommandDef::Mode::Any;
-  // New and New Design are one command (mitcad#175).
-  design.shortcut = QKeySequence(QKeySequence::New);
+  // PureCAD: Ctrl+N is New…'s (below), which asks what to create; New
+  // Design makes one at once, from the File menu, the + and the Start page.
   design.keywords = {QStringLiteral("design"), QStringLiteral("part"),     QStringLiteral("project"),
                      QStringLiteral("folder"), QStringLiteral("new"),      QStringLiteral("untitled"),
                      QStringLiteral("document"), QStringLiteral("blank")};
   design.run = [this] { newDesign(); };
   m_registry->add(design);
-  // PureCAD: File › New asks what to create (files/NewDocumentDialog.hpp);
-  // New Design keeps Ctrl+N and makes one at once.
+  // PureCAD: File › New and Ctrl+N ask what to create
+  // (files/NewDocumentDialog.hpp).
   CommandDef choice;
   choice.id = QStringLiteral("file.new_choice");
   choice.name = tr("New…");
@@ -138,6 +138,7 @@ void MainWindow::registerProjectsPanelCommands() {
   choice.tooltip = tr("Asks what to create: a design, a drawing, an import or a project");
   choice.kind = CommandDef::Kind::Action;
   choice.mode = CommandDef::Mode::Any;
+  choice.shortcut = QKeySequence(QKeySequence::New);
   choice.keywords = {QStringLiteral("new"), QStringLiteral("create"), QStringLiteral("design"),
                      QStringLiteral("drawing"), QStringLiteral("import"), QStringLiteral("project"),
                      QStringLiteral("units")};

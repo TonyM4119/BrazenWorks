@@ -303,6 +303,7 @@ Ui-StartApp 'sketch-origin-project' @('--open', (Join-Path $project 'base.mitcad
 Ui-ExpectLog 'base.mitcad' 'a design of the project opened'
 Ui-Mark
 Ui-Step 'new design (Ctrl+N)'            { Ui-Key 'ctrl+n' }
+Ui-Step 'create new (Return)'            { Ui-Key 'Return' }  # File > New asks what to create
 Ui-ExpectNew 'New Design: in ' 'a design of the current project, not an untitled one'
 Ui-ExpectNew 'Projects panel: naming a new design in ' 'named in the Projects panel' 20
 Ui-Step 'take its name (Enter)'          { Ui-Key 'Return' }

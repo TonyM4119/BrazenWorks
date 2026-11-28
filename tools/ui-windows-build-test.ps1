@@ -1221,6 +1221,7 @@ Ui-Step 'Close (Escape)'                 { Ui-Key 'Escape' }
 # without a question about the changed one, which stays open beside it.
 Ui-Mark
 Ui-Step 'new design (Ctrl+N)'            { Ui-Key 'ctrl+n' }
+Ui-Step 'create new (Return)'            { Ui-Key 'Return' }  # File > New asks what to create
 Ui-ExpectNew 'Document window created: ' 'the new design in a window of its own'
 Ui-ExpectNew 'New document' 'a new design'
 Ui-Mark

@@ -162,6 +162,7 @@ expect_title "block.mitcad - MitCad"
 ui_step "undo again (Ctrl+Z)"            ui_key ctrl+z
 expect_title "block.mitcad* - MitCad"
 ui_step "new design (Ctrl+N)"            ui_key ctrl+n
+ui_step "create new (Return)"             ui_key Return  # File › New asks what to create
 focus_dialog '^MitCad$'
 ui_step "cancel (Esc)"                   ui_key Escape
 focus_main
@@ -202,6 +203,7 @@ ui_step "create a sketch on XY"          ui_create_sketch xy
 expect_title "block.mitcad* - MitCad"
 ui_mark
 ui_step "new design (Ctrl+N)"            ui_key ctrl+n
+ui_step "create new (Return)"             ui_key Return  # File › New asks what to create
 focus_dialog '^MitCad$'
 ui_step "don't save (D)"                 ui_key d
 focus_main

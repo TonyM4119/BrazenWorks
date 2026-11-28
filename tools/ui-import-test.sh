@@ -241,6 +241,7 @@ ui_expect_new "Undo: Insert plate.dxf" "one undo step; the document is as saved"
 echo "--- Insert Component"
 ui_mark
 ui_step "new design (Ctrl+N)"              ui_key ctrl+n
+ui_step "create new (Return)"             ui_key Return  # File › New asks what to create
 ui_expect_new "New document" "an empty document"
 # The component goes into Component1, which takes components (mitcad#421):
 # a new design starts with its Component1 active (mitcad#898), unlike an

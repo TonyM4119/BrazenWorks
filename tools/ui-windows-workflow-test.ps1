@@ -238,6 +238,7 @@ Write-Host 'ok   only the lock of the session is left'
 $saved = Ui-LastMatch 'Document window active: (window-[0-9]+)'
 if (-not $saved) { Ui-Fail 'no active document window logged' }
 Ui-Step 'new (Ctrl+N)'                   { Ui-Key 'ctrl+n' }
+Ui-Step 'create new (Return)'            { Ui-Key 'Return' }  # File > New asks what to create
 Ui-ExpectNew 'New document' 'an empty document'
 Ui-ExpectNew 'Document window created: ' 'in a document window of its own'
 $open = Ui-LastMatch 'Document window created: window-[0-9]+ \(([0-9]+) open\)'
@@ -285,6 +286,7 @@ if (-not (Select-String -Path $html -SimpleMatch 'id="mitcad-data"' -Quiet)) { U
 if (Select-String -Path $html -SimpleMatch '<!--MITCAD:' -Quiet) { Ui-Fail 'a placeholder left in the page' }
 Write-Host 'ok   the page holds the design''s data'
 Ui-Step 'new (Ctrl+N)'                   { Ui-Key 'ctrl+n' }
+Ui-Step 'create new (Return)'            { Ui-Key 'Return' }  # File > New asks what to create
 Ui-ExpectNew 'New document' 'an empty document'
 Ui-Mark
 Ui-Step 'import (F11)'                   { Ui-Key 'F11' }

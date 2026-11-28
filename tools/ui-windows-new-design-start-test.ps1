@@ -177,6 +177,7 @@ Ui-Step 'top view (F9)'                  { Ui-Key 'F9' }
 Ui-ExpectNew 'Camera direction 0 0 -1' 'the opened design seen from the top' | Out-Null
 Ui-Mark
 Ui-Step 'new design (Ctrl+N)'            { Ui-Key 'ctrl+n' }
+Ui-Step 'create new (Return)'            { Ui-Key 'Return' }  # File > New asks what to create
 Ui-ExpectNew 'New design in ' 'New Design replaced the opened design' | Out-Null
 Expect-DefaultView 'New Design after a design turned to Top'
 Expect-Origin $shownOn 'the new design shows its origin, its light bulb on'

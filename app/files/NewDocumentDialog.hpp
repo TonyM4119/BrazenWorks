@@ -120,7 +120,7 @@ public:
     unitsForm->addWidget(m_units, 0, 1);
     m_unitsDefault = new QCheckBox(tr("Use for every new design"));
     m_unitsDefault->setObjectName(QStringLiteral("newDocumentUnitsDefault"));
-    m_unitsDefault->setToolTip(tr("New Design (Ctrl+N) and the Start page start in these units too"));
+    m_unitsDefault->setToolTip(tr("New Design and the Start page start in these units too"));
     unitsForm->addWidget(m_unitsDefault, 1, 1);
     connect(m_units, &QComboBox::currentIndexChanged, this, [this, defaultUnits] {
       m_unitsDefault->setEnabled(m_units->currentData().toString() != defaultUnits);

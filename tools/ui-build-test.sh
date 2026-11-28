@@ -1282,6 +1282,7 @@ ui_step "Close (Escape)"                   ui_key Escape
 # without a question about the changed one, which stays open beside it.
 ui_mark
 ui_step "new design (Ctrl+N)"              ui_key ctrl+n
+ui_step "create new (Return)"             ui_key Return  # File › New asks what to create
 ui_expect_new "Document window created: " "the new design in a window of its own"
 ui_expect_new "New document" "a new design"
 ui_mark

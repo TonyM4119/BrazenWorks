@@ -815,6 +815,7 @@ for action in Open New Close; do
       # New Design (Ctrl+N, mitcad#175) in the project: the name typed in
       # the Projects panel, then the open design would be replaced.
       ui_step "new design (Ctrl+N)"      ui_key ctrl+n
+      ui_step "create new (Return)"             ui_key Return  # File › New asks what to create
       ui_expect_new "Projects panel: naming a new design in " "New Design names one in the panel" 20
       ui_step "type its name"            xdotool type --delay 40 "fresh"
       ui_step "take it (Enter)"          ui_key Return ;;
