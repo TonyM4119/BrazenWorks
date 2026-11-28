@@ -6,6 +6,12 @@
 // again whenever the page's settings are saved.
 #include "MainWindow.hpp"
 
+#include <QLineEdit>
+#include <QDir>
+#include <QFileInfo>
+#include <QFile>
+#include <QRegularExpression>
+#include <QInputDialog>
 #include <QEvent>
 #include <QLabel>
 #include <QStatusBar>
@@ -268,6 +274,37 @@ bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr
   }
 #endif
   return QMainWindow::nativeEvent(eventType, message, result);
+}
+
+// PureCAD: Preferences › Layout › Double-click renames tab.
+void MainWindow::renameFromTab() {
+  const QString current = documentName();
+  bool ok = false;
+  const QString typed =
+      QInputDialog::getText(this, tr("Rename Design"), tr("Name:"), QLineEdit::Normal, current, &ok).trimmed();
+  if (!ok || typed.isEmpty() || typed == current) return;
+  static const QRegularExpression bad(QStringLiteral(R"([\\/:*?"<>|])"));
+  if (typed.contains(bad)) {
+    showError(tr("A name cannot hold any of \\ / : * ? \" < > |"));
+    return;
+  }
+  if (m_filePath.isEmpty()) {
+    m_documentName = typed;
+    updateWindowTitle();
+    qInfo().noquote() << QStringLiteral("Design renamed from its tab: %1 -> %2").arg(current, typed);
+    return;
+  }
+  const QFileInfo was(m_filePath);
+  const QString moved = was.dir().filePath(typed + QLatin1Char('.') + was.suffix());
+  if (QFileInfo::exists(moved)) {
+    showError(tr("%1 already exists in this folder").arg(QFileInfo(moved).fileName()));
+    return;
+  }
+  if (!QFile::rename(m_filePath, moved)) {
+    showError(tr("Could not rename %1").arg(was.fileName()));
+    return;
+  }
+  openDesignMoved(moved);
 }
 
 } // namespace mitcad

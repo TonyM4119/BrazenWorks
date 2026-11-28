@@ -522,6 +522,11 @@ DocumentFrame::DocumentFrame(WindowManager& manager)
       }
     }
   });
+  // PureCAD: Preferences › Layout › Double-click a tab to rename the design.
+  connect(m_tabs, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
+    if (index < 0 || !QSettings().value(QStringLiteral("layout/doubleClickRenamesTab"), true).toBool()) return;
+    if (auto* document = qobject_cast<MainWindow*>(m_stack->widget(index))) document->renameFromTab();
+  });
   // Where the shown design's tab is, for the UI tests (ui_click_logged).
   new PlaceWatcher(m_tabs, [this] { logShownTab(); });
   connect(m_tabs, &QTabBar::tabMoved, this, [this](int from, int to) {
