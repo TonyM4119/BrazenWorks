@@ -53,13 +53,19 @@ public:
     setText(name);
     setCheckable(true);
     setCursor(Qt::PointingHandCursor);
-    setMinimumSize(uiRoomSize(150), uiRoomSize(caption.isEmpty() ? 112 : 128));
+    setMinimumSize(std::max(uiRoomSize(150), nameWidth()), uiRoomSize(caption.isEmpty() ? 112 : 128));
     setSizePolicy(QSizePolicy::Preferred, QSizePolicy::Fixed);
   }
-  QSize sizeHint() const override { return QSize(uiRoomSize(170), minimumHeight()); }
+  QSize sizeHint() const override { return QSize(std::max(uiRoomSize(170), nameWidth()), minimumHeight()); }
+  // Room for the name in bold, which it shows when chosen.
+  int nameWidth() const {
+    QFont bold = font();
+    bold.setBold(true);
+    return QFontMetrics(bold).horizontalAdvance(text()) + uiRoomSize(28);
+  }
   // A smaller card (Curved surfaces, Anti-aliasing).
   void setCompact(int width, int height) {
-    setMinimumSize(uiRoomSize(width), uiRoomSize(height));
+    setMinimumSize(std::max(uiRoomSize(width), nameWidth()), uiRoomSize(height));
     m_compactWidth = uiRoomSize(width);
   }
 

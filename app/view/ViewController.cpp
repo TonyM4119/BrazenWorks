@@ -5,6 +5,7 @@
 #include "AppearancePreferences.hpp"
 #include "DesignPreferences.hpp"
 #include "GraphicsPreferences.hpp"
+#include "ToolsPreferences.hpp"
 #include "SketchPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
 #include "GridSpacing.hpp"
@@ -389,6 +390,11 @@ const PreferencePage kPreferencePages[] = {
      "esc escape leave exit finish unchanged profile profiles shade shading project edges face "
      "hide hidden show shown visible visibility used extrude feature eye",
      "WORK", QT_TRANSLATE_NOOP("View", "Drawing, snapping and selecting."), "sketch"},
+    // Fork: SolidCraft's Tools page.
+    {"tools", QT_TRANSLATE_NOOP("View", "Tools"),
+     "tools hole extrude target operation arrow isometric distance placed features handles snap command dialogs "
+     "remember fillet assembly move joint ghost axis step measure pointer cursor direct interaction",
+     "WORK", QT_TRANSLATE_NOOP("View", "How modeling tools behave."), "settings"},
     // Joints whose picks lie under another component than the active one
     // (mitcad#1856).
     {"assembly", QT_TRANSLATE_NOOP("View", "Assembly"),
@@ -434,7 +440,7 @@ bool pageFills(const char* id) {
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
          page == QLatin1String("layout") || page == QLatin1String("graphics") ||
          page == QLatin1String("sketch") || page == QLatin1String("appearance") ||
-         page == QLatin1String("design"); // fork: own scroll areas
+         page == QLatin1String("design") || page == QLatin1String("tools"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -3982,6 +3988,24 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, designPage, [designPage] { designPage->commit(); });
   }
   groups.insert(QStringLiteral("design"), designBox);
+
+  // Fork: Preferences › Tools (SolidCraft's, view/ToolsPreferences.hpp).
+  // Choose the operation automatically sets the General page's Extrude
+  // starts with (its row hidden there), which keeps its saving.
+  QWidget* toolsBox = section(tr("Tools"));
+  auto* toolsColumn = new QVBoxLayout(toolsBox);
+  insetPreferencesGroup(toolsColumn, window == nullptr);
+  auto* toolsPage = new ToolsPreferences([](const QString& icon) { return themeIcon(icon); },
+                                         extrudeStart->currentIndex() == 0);
+  toolsColumn->addWidget(toolsPage);
+  toolsPage->applyAutoOperation = [extrudeStart](bool automatic) { extrudeStart->setCurrentIndex(automatic ? 0 : 1); };
+  generalForm->setRowVisible(extrudeStart, false);
+  if (window != nullptr) {
+    toolsPage->onChanged = [toolsPage] { toolsPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, toolsPage, [toolsPage] { toolsPage->commit(); });
+  }
+  groups.insert(QStringLiteral("tools"), toolsBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
