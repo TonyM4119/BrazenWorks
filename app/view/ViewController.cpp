@@ -57,6 +57,7 @@
 #include <QListWidget>
 #include <QMessageBox>
 #include <QMenu>
+#include <QToolButton>
 #include <QPushButton>
 #include <QRadioButton>
 #include <QScreen>
@@ -66,6 +67,7 @@
 #include <QStyledItemDelegate>
 #include <QSettings>
 #include <QSignalBlocker>
+#include <QKeySequenceEdit>
 #include <QSlider>
 #include <QSpinBox>
 #include <QStackedWidget>
@@ -345,19 +347,11 @@ const PreferencePage kPreferencePages[] = {
      "tabs windows open_designs folder version native macos extrude operation new_body join cut automatic "
      "save new_design computer project remote remember",
      "", QT_TRANSLATE_NOOP("View", "Design defaults, files, language and saving."), "settings"},
-    {"display", QT_TRANSLATE_NOOP("View", "Display"),
-     "camera perspective orthographic orientation view cube projection follow background environment render device gpu cuda worker optix ghost inactive components pick priority layout docked floating browser background rows card "
-     "focal_length lens field_of_view anaglyph stereo "
-     "quick_access_toolbar quick-access toolbar theme dark light mode colour color scheme "
-     "menu_bar menus hamburger origin_planes origin planes axes size screen model millimetres corner centred "
-     "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
-     "drawings small_circles circles boost navigation_bar",
-     "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
     // Fork: SolidCraft's Appearance page.
     {"appearance", QT_TRANSLATE_NOOP("View", "Appearance"),
      "appearance theme light dark follow system background color gradient picture logo accent scale "
      "interface_size text font color_vision colour blind protan deutan tritan",
-     "LOOK", QT_TRANSLATE_NOOP("View", "Colors, text and accessibility."), "appearance"},
+     "LOOK", QT_TRANSLATE_NOOP("View", "Colors, text and accessibility."), "palette"},
     // Fork: SolidCraft's Layout page.
     {"layout", QT_TRANSLATE_NOOP("View", "Layout"),
      "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
@@ -368,7 +362,15 @@ const PreferencePage kPreferencePages[] = {
      "graphics preset performance quality curved surfaces smoothness tessellation anti-aliasing antialiasing "
      "supersampling shadow perspective ambient occlusion visual style field_of_view frame_rate fps vertex "
      "measurement joint hatch section gpu graphics_card api opengl safe restart",
-     "LOOK", QT_TRANSLATE_NOOP("View", "Trade speed for smoothness."), "visual-style"},
+     "LOOK", QT_TRANSLATE_NOOP("View", "Trade speed for smoothness."), "monitor"},
+    {"display", QT_TRANSLATE_NOOP("View", "Display"),
+     "camera perspective orthographic orientation view cube projection follow background environment render device gpu cuda worker optix ghost inactive components pick priority layout docked floating browser background rows card "
+     "focal_length lens field_of_view anaglyph stereo "
+     "quick_access_toolbar quick-access toolbar theme dark light mode colour color scheme "
+     "menu_bar menus hamburger origin_planes origin planes axes size screen model millimetres corner centred "
+     "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
+     "drawings small_circles circles boost navigation_bar",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
     // Folders of font files for sketch text (mitcad#473).
     {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
@@ -395,7 +397,7 @@ const PreferencePage kPreferencePages[] = {
     {"tools", QT_TRANSLATE_NOOP("View", "Tools"),
      "tools hole extrude target operation arrow isometric distance placed features handles snap command dialogs "
      "remember fillet assembly move joint ghost axis step measure pointer cursor direct interaction",
-     "WORK", QT_TRANSLATE_NOOP("View", "How modeling tools behave."), "settings"},
+     "WORK", QT_TRANSLATE_NOOP("View", "How modeling tools behave."), "wrench"},
     // Joints whose picks lie under another component than the active one
     // (mitcad#1856).
     {"assembly", QT_TRANSLATE_NOOP("View", "Assembly"),
@@ -411,17 +413,17 @@ const PreferencePage kPreferencePages[] = {
     {"navigation", QT_TRANSLATE_NOOP("View", "Navigation"),
      "mouse orbit pan zoom scheme shortcuts bindings custom trackpad 3d_mouse space speed arrow key step "
      "orbit_center cursor constrained reverse smooth transitions scroll",
-     "INPUT", QT_TRANSLATE_NOOP("View", "Mouse, trackpad and 3D mouse."), "named-view"},
+     "INPUT", QT_TRANSLATE_NOOP("View", "Mouse, trackpad and 3D mouse."), "mouse"},
     // Fork: SolidCraft's Shortcuts page.
     {"shortcuts", QT_TRANSLATE_NOOP("View", "Shortcuts"),
      "shortcuts keyboard keys hotkeys bindings commands export import modifier reselect sketches",
      "INPUT", QT_TRANSLATE_NOOP("View", "Keys for each command."), "keyboard"},
     // The folders for designs, which AI assistants save to and open from
     // (mitcad#402).
-    {"agents", QT_TRANSLATE_NOOP("View", "AI Assistants"),
+    {"agents", QT_TRANSLATE_NOOP("View", "Assistant"),
      "mcp agent agents ai folders save open connection assistant assistants designs codex claude comments resolve "
      "chat history api key endpoint approvals timeout custom_agent",
-     "EXTEND", QT_TRANSLATE_NOOP("View", "AI assistants, their folders and chat."), "assistant-chat"},
+     "EXTEND", QT_TRANSLATE_NOOP("View", "AI assistants, their folders and chat."), "sparkle"},
     {"cloud", QT_TRANSLATE_NOOP("View", "Cloud"),
      "git remote sync push fetch version control author email name mqtt live broker brokers known "
      "git_program sign_out",
@@ -466,6 +468,37 @@ QStringList pageKeywords(const PreferencePage& page) {
 // rows stay the pages' indexes for the stack and the search.
 constexpr int kSectionRole = Qt::UserRole + 40;
 
+// Fork: the frameless Preferences window moves by its header: a press there
+// and a drag move the window.
+class PreferencesWindowDrag : public QObject {
+public:
+  using QObject::QObject;
+
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    auto* widget = qobject_cast<QWidget*>(watched);
+    if (widget == nullptr) return false;
+    if (event->type() == QEvent::MouseButtonPress) {
+      const auto* press = static_cast<QMouseEvent*>(event);
+      if (press->button() == Qt::LeftButton) {
+        m_dragging = true;
+        m_offset = press->globalPosition().toPoint() - widget->window()->frameGeometry().topLeft();
+      }
+    } else if (event->type() == QEvent::MouseMove && m_dragging) {
+      const auto* move = static_cast<QMouseEvent*>(event);
+      widget->window()->move(move->globalPosition().toPoint() - m_offset);
+      return true;
+    } else if (event->type() == QEvent::MouseButtonRelease) {
+      m_dragging = false;
+    }
+    return false;
+  }
+
+private:
+  bool m_dragging = false;
+  QPoint m_offset;
+};
+
 class PreferencesSidebarDelegate : public QStyledItemDelegate {
 public:
   using QStyledItemDelegate::QStyledItemDelegate;
@@ -497,26 +530,34 @@ public:
     }
     const bool selected = option.state.testFlag(QStyle::State_Selected);
     const bool hovered = option.state.testFlag(QStyle::State_MouseOver);
-    // SolidCraft's: a soft grey pill under the page shown, a fainter one
-    // under the pointer; the name stays in the text's colour.
+    // SolidCraft's bubble: the page shown on a rounded tint of the accent,
+    // its icon and name in the accent's deep shade; a faint grey one under
+    // the pointer.
+    const QColor accent = accentColor(pal);
+    const QColor deep = isDarkPalette(pal) ? accent.lighter(160) : accent.darker(150);
     if (selected || hovered) {
-      QColor fill = pal.color(QPalette::WindowText);
-      fill.setAlpha(selected ? (isDarkPalette(pal) ? 40 : 22) : 11);
+      QColor fill = selected ? accent : pal.color(QPalette::WindowText);
+      fill.setAlpha(selected ? (isDarkPalette(pal) ? 70 : 34) : 12);
       painter->setPen(Qt::NoPen);
       painter->setBrush(fill);
-      painter->drawRoundedRect(QRectF(row).adjusted(1.5, 1.5, -1.5, -1.5), 6, 6);
+      painter->drawRoundedRect(QRectF(row).adjusted(2.0, 1.5, -2.0, -1.5), 8, 8);
     }
     const int side = uiIconSize(16);
     const QIcon icon = qvariant_cast<QIcon>(index.data(Qt::DecorationRole));
     if (!icon.isNull()) {
-      painter->drawPixmap(QPoint(row.left() + 10, row.center().y() - side / 2 + 1),
-                          icon.pixmap(QSize(side, side), painter->device()->devicePixelRatioF()));
+      QPixmap pixmap = icon.pixmap(QSize(side, side), painter->device()->devicePixelRatioF());
+      if (selected) {
+        QPainter tint(&pixmap);
+        tint.setCompositionMode(QPainter::CompositionMode_SourceIn);
+        tint.fillRect(pixmap.rect(), deep);
+      }
+      painter->drawPixmap(QPoint(row.left() + 12, row.center().y() - side / 2 + 1), pixmap);
     }
     QFont name = option.font;
     name.setBold(selected);
     painter->setFont(name);
-    painter->setPen(pal.color(QPalette::WindowText));
-    const QRect text(row.left() + 10 + side + 10, row.top(), row.width() - side - 24, row.height());
+    painter->setPen(selected ? deep : pal.color(QPalette::WindowText));
+    const QRect text(row.left() + 12 + side + 10, row.top(), row.width() - side - 26, row.height());
     painter->drawText(text, Qt::AlignLeft | Qt::AlignVCenter,
                       QFontMetrics(name).elidedText(index.data(Qt::DisplayRole).toString(), Qt::ElideRight,
                                                     text.width()));
@@ -4537,7 +4578,19 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // the sidebar of the pages by section with their icons; the page shown in
   // a panel under its title and its line; at the foot Restore Defaults,
   // Export and Import at the left, Cancel, Apply and OK at the right.
-  auto* layout = new QVBoxLayout(dialog.get());
+  // Fork: SolidCraft's window: a rounded card of its own, no system frame;
+  // it moves by its header (PreferencesWindowDrag) and closes by its ×.
+  dialog->setWindowFlag(Qt::FramelessWindowHint, true);
+  dialog->setAttribute(Qt::WA_TranslucentBackground, true);
+  auto* outerLayout = new QVBoxLayout(dialog.get());
+  outerLayout->setContentsMargins(1, 1, 1, 1);
+  auto* card = new QFrame;
+  card->setObjectName(QStringLiteral("preferencesCard"));
+  card->setStyleSheet(QStringLiteral("QFrame#preferencesCard { background: %1; border: 1px solid %2; border-radius: 12px; }")
+                          .arg(dialog->palette().color(QPalette::Window).name(),
+                               themeColor(ColorRole::Line, dialog->palette()).name(QColor::HexArgb)));
+  outerLayout->addWidget(card);
+  auto* layout = new QVBoxLayout(card);
   layout->setContentsMargins(0, 0, 0, 0);
   layout->setSpacing(0);
   auto* pages = new QListWidget;
@@ -4681,12 +4734,45 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     search->setFocus(Qt::ShortcutFocusReason);
     search->selectAll();
   });
+  // Fork: the window's × at the header's right end.
+  auto* close = new QToolButton;
+  close->setObjectName(QStringLiteral("preferencesClose"));
+  close->setText(QStringLiteral("✕"));
+  close->setToolTip(tr("Close without saving (Esc)"));
+  close->setAutoRaise(true);
+  close->setFocusPolicy(Qt::NoFocus);
+  close->setStyleSheet(QStringLiteral("QToolButton#preferencesClose { border: none; padding: 4px 8px; font-size: 13pt; } "
+                                      "QToolButton#preferencesClose:hover { background: rgba(128,128,128,40); "
+                                      "border-radius: 6px; }"));
+  connect(close, &QToolButton::clicked, dialog.get(), &QDialog::reject);
+  headerRow->addWidget(close);
+  header->installEventFilter(new PreferencesWindowDrag(header));
   layout->addWidget(header);
   // The sidebar and the page's panel.
   auto* body = new QHBoxLayout;
   body->setContentsMargins(12, 4, 16, 0);
   body->setSpacing(12);
-  body->addWidget(pages);
+  // Fork: the sidebar, with SolidCraft's Profile card at its foot: its menu
+  // exports, imports and restores every setting (filled in at the foot).
+  auto* sidebar = new QVBoxLayout;
+  sidebar->setSpacing(8);
+  sidebar->addWidget(pages, 1);
+  auto* profile = new QPushButton;
+  profile->setObjectName(QStringLiteral("preferencesProfile"));
+  profile->setAutoDefault(false);
+  profile->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
+  profile->setText(tr("👤   PROFILE\n      None"));
+  profile->setStyleSheet(QStringLiteral("QPushButton#preferencesProfile { text-align: left; border: 1px solid %1; "
+                                        "border-radius: 10px; padding: 8px 12px; background: %2; font-weight: 600; } "
+                                        "QPushButton#preferencesProfile::menu-indicator { subcontrol-position: right center; "
+                                        "subcontrol-origin: padding; right: 4px; }")
+                             .arg(themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb),
+                                  themeColor(ColorRole::Surface, dialogPalette).name(QColor::HexArgb)));
+  auto* profileMenu = new QMenu(profile);
+  profileMenu->setObjectName(QStringLiteral("preferencesProfileMenu"));
+  profile->setMenu(profileMenu);
+  sidebar->addWidget(profile);
+  body->addLayout(sidebar);
   auto* pane = new QFrame;
   pane->setObjectName(QStringLiteral("preferencesPane"));
   pane->setStyleSheet(QStringLiteral("QFrame#preferencesPane { background: %1; border: 1px solid %2; "
@@ -4714,12 +4800,39 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   const auto restorePages = std::make_shared<QStringList>();
   const auto restoreAll = std::make_shared<bool>(false);
   QDialog* const restoring = dialog.get();
-  foot->addWidget(restoreDefaultsButton([pages] { return pages->currentRow(); },
-                                        [restoring, restorePages, restoreAll](const QStringList& ids, bool all) {
-                                          *restorePages = ids;
-                                          *restoreAll = all;
-                                          restoring->accept();
-                                        }));
+  // Fork: SolidCraft's Restore page defaults: the page shown, after the
+  // question; every page is the Profile menu's Restore All Defaults…
+  {
+    auto* restorePage = new QPushButton(tr("Restore page defaults"));
+    restorePage->setObjectName(QStringLiteral("preferencesRestoreDefaults"));
+    restorePage->setAutoDefault(false);
+    restorePage->setToolTip(tr("Puts this page's settings back to their defaults"));
+    connect(restorePage, &QPushButton::clicked, restorePage, [this, restorePage, pages, restoring, restorePages, restoreAll] {
+      const int row = std::clamp(pages->currentRow(), 0, int(std::size(kPreferencePages)) - 1);
+      QTimer::singleShot(0, restorePage, [this, restorePage, row, restoring, restorePages, restoreAll] {
+        const QString name = QCoreApplication::translate("View", kPreferencePages[row].name);
+        if (confirmRestoreDefaults(restorePage->window(), name)) {
+          *restorePages = QStringList{QLatin1String(kPreferencePages[row].id)};
+          *restoreAll = false;
+          restoring->accept();
+        }
+      });
+    });
+    foot->addWidget(restorePage);
+    QAction* restoreEvery = profileMenu->addAction(tr("Restore All Defaults…"));
+    connect(restoreEvery, &QAction::triggered, profile, [this, profile, restoring, restorePages, restoreAll] {
+      QTimer::singleShot(0, profile, [this, profile, restoring, restorePages, restoreAll] {
+        if (confirmRestoreDefaults(profile->window(), QString())) {
+          QStringList every;
+          for (const PreferencePage& entry : kPreferencePages) every << QLatin1String(entry.id);
+          *restorePages = every;
+          *restoreAll = true;
+          restoring->accept();
+        }
+      });
+    });
+    Q_UNUSED(restoreDefaultsButton);
+  }
   // Export and Import Settings: accepted as OK, as Restore Defaults is,
   // then the file is written or read and Preferences opens again on the
   // same page (below).
@@ -4728,8 +4841,20 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     *transferAfterOk = importing ? 2 : 1;
     restoring->accept();
   };
-  foot->addWidget(transferButton(false, transferChosen));
-  foot->addWidget(transferButton(true, transferChosen));
+  // Fork: Export and Import Settings in the Profile card's menu.
+  {
+    QAction* restoreEvery = profileMenu->actions().value(0);
+    auto* exportSettings = new QAction(tr("Export Settings…"), profileMenu);
+    exportSettings->setObjectName(QStringLiteral("preferencesExportSettings"));
+    connect(exportSettings, &QAction::triggered, profile, [transferChosen] { transferChosen(false); });
+    auto* importSettings = new QAction(tr("Import Settings…"), profileMenu);
+    importSettings->setObjectName(QStringLiteral("preferencesImportSettings"));
+    connect(importSettings, &QAction::triggered, profile, [transferChosen] { transferChosen(true); });
+    profileMenu->insertAction(restoreEvery, exportSettings);
+    profileMenu->insertAction(restoreEvery, importSettings);
+    profileMenu->insertSeparator(restoreEvery);
+  }
+  Q_UNUSED(transferButton);
   foot->addStretch(1);
   auto* cancel = new QPushButton(tr("Cancel"));
   cancel->setObjectName(QStringLiteral("preferencesCancel"));
@@ -4740,11 +4865,33 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   auto* apply = new QPushButton(tr("Apply"));
   apply->setObjectName(QStringLiteral("preferencesApply"));
   apply->setAutoDefault(false);
-  connect(apply, &QPushButton::clicked, dialog.get(), [dialog = dialog.get(), commit] {
+  connect(apply, &QPushButton::clicked, dialog.get(), [dialog = dialog.get(), commit, apply] {
     emit dialog->accepted();
     (*commit)();
+    apply->setEnabled(false); // fork: until the next change
     qDebug().noquote() << QStringLiteral("Preferences applied");
   });
+  // Fork: as SolidCraft's, Apply waits for a change on a page.
+  apply->setEnabled(false);
+  {
+    const auto enableApply = [apply] { apply->setEnabled(true); };
+    for (QAbstractButton* control : stack->findChildren<QAbstractButton*>()) {
+      connect(control, &QAbstractButton::clicked, apply, enableApply);
+    }
+    for (QComboBox* control : stack->findChildren<QComboBox*>()) {
+      connect(control, &QComboBox::activated, apply, enableApply);
+    }
+    for (QAbstractSlider* control : stack->findChildren<QAbstractSlider*>()) {
+      connect(control, &QAbstractSlider::sliderMoved, apply, enableApply);
+      connect(control, &QAbstractSlider::actionTriggered, apply, enableApply);
+    }
+    for (QLineEdit* control : stack->findChildren<QLineEdit*>()) {
+      connect(control, &QLineEdit::textEdited, apply, enableApply);
+    }
+    for (QKeySequenceEdit* control : stack->findChildren<QKeySequenceEdit*>()) {
+      connect(control, &QKeySequenceEdit::editingFinished, apply, enableApply);
+    }
+  }
   auto* ok = new QPushButton(tr("OK"));
   ok->setObjectName(QStringLiteral("preferencesOk"));
   ok->setDefault(true);
@@ -4755,6 +4902,18 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
                         .arg(accentColor(dialogPalette).name(), themeColor(ColorRole::AccentText, dialogPalette).name(),
                              accentColor(dialogPalette).darker(112).name()));
   connect(ok, &QPushButton::clicked, dialog.get(), &QDialog::accept);
+  // Fork: SolidCraft's foot buttons: rounded, outlined; Apply greyed while
+  // there is nothing to apply.
+  for (QPushButton* button : {cancel, apply, card->findChild<QPushButton*>(QStringLiteral("preferencesRestoreDefaults"))}) {
+    if (button == nullptr) continue;
+    button->setStyleSheet(QStringLiteral("QPushButton#%1 { border: 1px solid %2; border-radius: 6px; padding: 5px 14px; "
+                                         "background: %3; } QPushButton#%1:hover { background: %4; } "
+                                         "QPushButton#%1:disabled { color: %5; }")
+                              .arg(button->objectName(), themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb),
+                                   themeColor(ColorRole::Surface, dialogPalette).name(QColor::HexArgb),
+                                   dialogPalette.color(QPalette::Window).darker(104).name(),
+                                   themeColor(ColorRole::TextSecondary, dialogPalette).name(QColor::HexArgb)));
+  }
   foot->addWidget(cancel);
   foot->addWidget(apply);
   foot->addWidget(ok);
