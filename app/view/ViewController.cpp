@@ -168,6 +168,9 @@
 
 namespace mitcad {
 namespace {
+// PureCAD: Appearance › Accent when Preferences opened (its change restyles).
+int g_accentAtOpen = -1;
+
 
 // Fork: the brand's community links, read through a call so that the checks
 // on it are not constant conditions (MSVC C4127).
@@ -4501,6 +4504,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   appearanceShown.scale = savedInterfaceSize();
   appearanceShown.systemFont = savedFontFamily().isEmpty();
   appearanceShown.family = savedFontFamily();
+  g_accentAtOpen = QSettings().value(QStringLiteral("appearance/accent"), -1).toInt(); // PureCAD
   auto* appearancePage = new AppearancePreferences(appearanceShown);
   appearanceColumn->addWidget(appearancePage);
   appearancePage->apply = [themeChoice, background, top, bottom, interfaceSize, systemFont,
@@ -4517,6 +4521,21 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     systemFont->setChecked(chosen.systemFont);
     if (!chosen.systemFont && !chosen.family.isEmpty()) fontFamily->setCurrentFont(QFont(chosen.family));
   };
+  // PureCAD: Appearance › Color vision: the selection in a color the chosen
+  // kind of color blindness tells apart from bodies and sketches (Okabe-Ito
+  // blue for protan and deutan, vermilion for tritan); Off, the default
+  // color again. Display's selection color keeps the saving.
+  if (QWidget* vision = appearancePage->findChild<QWidget*>(QStringLiteral("appearance_colorVision"))) {
+    if (auto* group = vision->findChild<QButtonGroup*>()) {
+      connect(group, &QButtonGroup::idClicked, selectionColorButton,
+              [chosenSelectionColor, showSelectionColor](int mode) {
+                *chosenSelectionColor = mode == 1 || mode == 2 ? QColor(0x00, 0x72, 0xb2)
+                                        : mode == 3             ? QColor(0xd5, 0x5e, 0x00)
+                                                                : defaultSelectionColor();
+                showSelectionColor();
+              });
+    }
+  }
   {
     const auto hideRowOf = [display](QWidget* widget) {
       for (int row = 0; row < display->rowCount(); ++row) {
@@ -4820,6 +4839,13 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
       qDebug().noquote() << QStringLiteral("Preferences: theme %1").arg(themeChoiceName(theme));
       applyThemePreference(theme);
     }
+    // PureCAD: Appearance's theme file and accent, once its page has saved.
+    QTimer::singleShot(0, qApp, [accentBefore = g_accentAtOpen] {
+      applyThemeFile();
+      if (QSettings().value(QStringLiteral("appearance/accent"), -1).toInt() != accentBefore) {
+        applyThemePreference(themePreference()); // the window's colors again
+      }
+    });
     // The window's layout (mitcad#419): saved for the next starts; one other
     // than the window's asks whether to restart now, once the dialog is gone.
     if (layoutChoice != nullptr && layoutChoice->currentData().toInt() != *layoutApplied) {

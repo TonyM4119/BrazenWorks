@@ -27,12 +27,16 @@
 #include <cmath>
 #include <functional>
 
+#include <gp_Ax1.hxx>
+#include <QCursor>
+#include <QSettings>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QLabel>
 #include <QTimer>
 #include <QtLogging>
 
+#include "framework/JointHighlight.hpp"
 #include "browser/BrowserController.hpp"
 #include "browser/TimelineWidget.hpp"
 #include "framework/Json.hpp"
@@ -364,6 +368,27 @@ void MainWindow::occurrenceDragStarted(const SelectionItem& item, const gp_Pnt& 
         return QString();
       };
   state.name = nameOf(m_snapshot.occurrences);
+  // PureCAD: Preferences › Design › Turn parts on a ball joint like a
+  // trackball: the dragged occurrence's ball joint (one side on it), its
+  // centre where the model resolved the joint.
+  if (QSettings().value(QStringLiteral("design/ballJointTrackball"), false).toBool()) {
+    const QString own = path.section(QLatin1Char('/'), -1);
+    for (const QJsonValue& value : m_snapshot.joints.value(QStringLiteral("joints")).toArray()) {
+      const JointHighlight joint = jointHighlightOf(value.toObject(), QString());
+      if (joint.kind != QStringLiteral("ball")) continue;
+      const bool onIt = std::any_of(joint.sides.cbegin(), joint.sides.cend(), [&](const JointSide& side) {
+        return side.path == path || side.ownPath.contains(own) || side.path.endsWith(own);
+      });
+      const auto framed = std::find_if(joint.sides.cbegin(), joint.sides.cend(),
+                                       [](const JointSide& side) { return side.frame.has_value(); });
+      if (onIt && framed != joint.sides.cend()) {
+        state.ballCenter = gp_Pnt(framed->frame->origin[0], framed->frame->origin[1], framed->frame->origin[2]);
+        state.pressedAt = m_viewer->mapFromGlobal(QCursor::pos());
+        qDebug().noquote() << QStringLiteral("Drag of %1: trackball about %2's centre").arg(state.name, joint.name);
+        break;
+      }
+    }
+  }
   m_drag = state;
   qDebug().noquote() << QStringLiteral("Drag of %1 started at (%2, %3, %4)")
                             .arg(state.name, rounded(state.grabbed.X()), rounded(state.grabbed.Y()),
@@ -375,6 +400,22 @@ void MainWindow::occurrenceDragged(const gp_Pnt& target) {
     return;
   }
   m_drag->target = target.Transformed(m_drag->parent.Inverted());
+  // PureCAD: a trackball turn about the ball's centre: the pointer's move
+  // on the screen turns the grabbed point about the view's up and right
+  // axes (half a degree a pixel), and the drag pulls it there.
+  if (m_drag->ballCenter) {
+    const QPoint now = m_viewer->mapFromGlobal(QCursor::pos());
+    const QPoint moved = now - m_drag->pressedAt;
+    const gp_Dir look = m_viewer->viewDirection();
+    const gp_Dir up = m_viewer->viewUp();
+    const gp_Dir right = look.Crossed(up);
+    const double perPixel = 0.5 * 3.14159265358979323846 / 180.0;
+    gp_Trsf turnUp;
+    turnUp.SetRotation(gp_Ax1(*m_drag->ballCenter, up), moved.x() * perPixel);
+    gp_Trsf turnRight;
+    turnRight.SetRotation(gp_Ax1(*m_drag->ballCenter, right), moved.y() * perPixel);
+    m_drag->target = m_drag->grabbed.Transformed(turnRight * turnUp);
+  }
   QJsonObject answer;
   try {
     answer = queryObject({{QStringLiteral("query"), QStringLiteral("joint_drag")},

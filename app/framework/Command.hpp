@@ -143,6 +143,10 @@ struct Manipulator {
   // Arrow: the smallest value a drag gives; the handle stops there
   // (mitcad#693; Two Sides distances cross their start since mitcad#765).
   double minimum = -std::numeric_limits<double>::infinity();
+  // PureCAD: Arrow: values a drag snaps to when the pointer comes within a
+  // few pixels (Preferences › Tools › Extrude arrow stops at faces: where
+  // the arrow's line meets the bodies' faces).
+  std::vector<double> stops;
   // Arrow: the size of the geometry it works on, in the value's unit (a
   // fillet's shortest edge or face, an extrusion's profile, a hole's
   // diameter; mitcad#1431): a drag steps by the zoom's step or, finer, by

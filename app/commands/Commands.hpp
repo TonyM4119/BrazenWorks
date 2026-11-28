@@ -57,6 +57,9 @@ void registerAssembleCommands(CommandRegistry& registry, const CommandContext& c
 // INSPECT: Measure, Interference, Section Analysis, Print Analysis
 // (mitcad#620) and Physical Properties (a dialog over `window` for the
 // bodies `selection` gives).
+// PureCAD: Graphics › Quick measurement's line for a selection of one or two.
+QString quickMeasurement(const Selection& picked, const std::function<QJsonObject(const QJsonObject&)>& query,
+                         const QString& unit);
 void registerInspectCommands(CommandRegistry& registry, const CommandContext& context,
                              QWidget* window, std::function<Selection()> selection);
 

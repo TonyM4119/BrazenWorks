@@ -500,9 +500,26 @@ DocumentFrame::DocumentFrame(WindowManager& manager)
   // Within the screen at a larger Interface size (mitcad#1495).
   resize(startWindowSize());
   connect(m_tabs, &QTabBar::currentChanged, this, [this](int index) {
+    // PureCAD: what the design left keeps or gives (Preferences › Layout).
+    MainWindow* left = m_shownDocument;
+    const QSettings layout;
+    if (left != nullptr && !layout.value(QStringLiteral("layout/keepToolsOpenAcrossDesigns"), true).toBool()) {
+      left->cancelOnLeave();
+    }
+    const QString leftTab = left != nullptr ? left->toolbarTab() : QString();
     m_stack->setCurrentIndex(index);
     updateActiveDocument();
+    m_shownDocument = activeDocument();
+    if (m_shownDocument != nullptr && m_shownDocument != left &&
+        !layout.value(QStringLiteral("layout/rememberTabPerDesign"), true).toBool()) {
+      m_shownDocument->showToolbarTab(leftTab);
+    }
     logShownTab();
+    // PureCAD: Preferences › Design › Update changed links when a tab comes back.
+    if (MainWindow* document = activeDocument();
+        document != nullptr && QSettings().value(QStringLiteral("design/updateLinks"), true).toBool()) {
+      document->checkLinksOnReturn();
+    }
   });
   // A click on the shown design's tab leaves the Start page for the
   // design: in the top bar's title row (mitcad#1990, both layouts since
@@ -516,6 +533,11 @@ DocumentFrame::DocumentFrame(WindowManager& manager)
         document->leaveStartPageForDesign();
       }
     }
+  });
+  // PureCAD: Preferences › Layout › Double-click a tab to rename the design.
+  connect(m_tabs, &QTabBar::tabBarDoubleClicked, this, [this](int index) {
+    if (index < 0 || !QSettings().value(QStringLiteral("layout/doubleClickRenamesTab"), true).toBool()) return;
+    if (auto* document = qobject_cast<MainWindow*>(m_stack->widget(index))) document->renameFromTab();
   });
   // Where the shown design's tab is, for the UI tests (ui_click_logged).
   new PlaceWatcher(m_tabs, [this] { logShownTab(); });

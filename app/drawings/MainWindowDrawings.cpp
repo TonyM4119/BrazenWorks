@@ -598,8 +598,29 @@ void MainWindow::createDrawingOf(const QString& component, bool fromSelection, c
   // user's settings.
   QSettings settings;
   const QList<drawings::TemplateChoice> templates = drawings::availableTemplates(*this);
-  const std::optional<QJsonObject> sheet =
-      askNewDrawing(this, templates, drawings::startingChoice(templates, drawings::NewDrawingChoice::load(settings)));
+  drawings::StartingChoice starting = drawings::startingChoice(templates, drawings::NewDrawingChoice::load(settings));
+  // PureCAD: Preferences › Design › Template for new part / assembly
+  // drawings ("ISO A3", "ANSI B"), once saved: its sheet and its standard's
+  // template, with the projection of new drawings.
+  {
+    const bool assembly = !m_snapshot.occurrences.isEmpty();
+    const QString key = assembly ? QStringLiteral("design/assemblyTemplate") : QStringLiteral("design/partTemplate");
+    if (settings.contains(key)) {
+      QString size = settings.value(key).toString();
+      size.remove(QStringLiteral("ISO ")).replace(QLatin1Char(' '), QLatin1Char('_'));
+      const int found = drawings::templateIndex(templates, drawings::defaultTemplate(size));
+      if (found >= 0) {
+        starting.choice.choice = templates.at(found).choice;
+        starting.choice.size = size;
+        starting.choice.projection = settings.value(QStringLiteral("design/thirdAngle"), false).toBool()
+                                         ? QStringLiteral("third_angle")
+                                         : QStringLiteral("first_angle");
+        qDebug().noquote() << QStringLiteral("Create Drawing: the %1 template of Preferences, %2")
+                                  .arg(assembly ? QStringLiteral("assembly") : QStringLiteral("part"), size);
+      }
+    }
+  }
+  const std::optional<QJsonObject> sheet = askNewDrawing(this, templates, starting);
   if (!sheet) {
     return;
   }

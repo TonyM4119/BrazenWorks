@@ -63,8 +63,8 @@ struct SketchPrefs {
   // OPENING AND CLOSING
   bool faceActivatesPart = false;
   bool turnToFace = true;
-  bool doubleEscFinishes = true;
-  int whenSketchEnds = 1;           // 0 Return to the view before, 1 Keep, 2 Unless turned
+  bool doubleEscFinishes = false;   // off: UI tests and habits press Esc twice
+  int whenSketchEnds = 0;           // 0 Return to the view before (as before), 1 Keep, 2 Unless turned
   // SELECTING
   bool clickSelectsBodies = false;  // Click selects: Faces and edges or Whole bodies
   bool shiftAddsOnly = false;       // Shift adds only; Ctrl / Cmd toggles

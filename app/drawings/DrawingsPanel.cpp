@@ -4,6 +4,7 @@
 #include <algorithm>
 #include <utility>
 
+#include <QSettings>
 #include <QAbstractItemDelegate>
 #include <QFont>
 #include <QHeaderView>
@@ -144,8 +145,10 @@ void DrawingsPanel::setDrawings(const QJsonArray& drawings, const QString& open,
         item->setFont(0, bold);
         current = item;
       }
-      // A cut sheet is one sheet: no rows under it.
-      if (!cut) {
+      // A cut sheet is one sheet: no rows under it. PureCAD: Preferences ›
+      // Design › Sheets section: Multiple sheets only, Always, Never.
+      const int sheetRows = QSettings().value(QStringLiteral("design/sheetsSection"), 1).toInt();
+      if (!cut && sheetRows != 2 && (sheetRows == 1 || sheets.size() > 1)) {
         for (int i = 0; i < sheets.size(); ++i) {
           auto* row = new QTreeWidgetItem(item);
           row->setText(0, sheets.at(i).toObject().value(QStringLiteral("name")).toString());

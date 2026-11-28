@@ -46,6 +46,8 @@
 #include <QStatusBar>
 #include <QTimer>
 #include <QToolBar>
+#include <QFrame>
+#include <QCursor>
 #include <QToolButton>
 #include <QTextEdit>
 #include <QUrl>
@@ -54,6 +56,7 @@
 #include <QtLogging>
 
 #include <AIS_AnimationCamera.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
@@ -144,6 +147,7 @@
 #include "framework/SelectionCreate.hpp"
 #include "framework/TitleBar.hpp"
 #include "framework/ShortcutDialog.hpp"
+#include "framework/JointHighlight.hpp"
 #include "framework/Theme.hpp"
 #include "framework/Diagnostics.hpp"
 #include "framework/PaintWatch.hpp"
@@ -3479,6 +3483,31 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
   if (!readOnlyCommand(def) && refuseReadOnly(editUid.isEmpty() ? def.id : QStringLiteral("editing %1").arg(editUid))) {
     return;
   }
+  // PureCAD: Preferences › Tools › Use joint motion handles for Move: Move
+  // on one component a joint moves drives that joint instead, its handles
+  // only the motion the joint allows.
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.move") && m_selection.size() == 1 &&
+      m_selection.first().kind == SelectKind::Component &&
+      QSettings().value(QStringLiteral("tools/jointMotionHandles"), false).toBool()) {
+    const QString path = m_selection.first().occurrence;
+    const QString own = path.section(QLatin1Char('/'), -1);
+    for (const QJsonValue& value : m_snapshot.joints.value(QStringLiteral("joints")).toArray()) {
+      const QJsonObject entry = value.toObject();
+      if (entry.value(QStringLiteral("motions")).toArray().isEmpty()) continue;
+      const JointHighlight joint = jointHighlightOf(entry, QString());
+      const bool moves = std::any_of(joint.sides.cbegin(), joint.sides.cend(), [&](const JointSide& side) {
+        return !own.isEmpty() && (side.path == path || side.ownPath.contains(own));
+      });
+      if (moves) {
+        const SelectionItem jointItem{SelectKind::Feature, joint.uid, QString(), QString()};
+        qDebug().noquote() << QStringLiteral("Move: %1 drives %2 (Preferences)").arg(own, joint.name);
+        QTimer::singleShot(0, this, [this, jointItem] {
+          startCommand(QStringLiteral("assemble.drive_joint"), {jointItem}, nullptr);
+        });
+        return;
+      }
+    }
+  }
   m_messages->commandStarted(); // an edit too (mitcad#1042)
   markActiveCommand(def.id); // PureCAD: Highlight active commands
   // A panel works in the 3D view: back from a drawing (mitcad#707).
@@ -3528,15 +3557,86 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
     // the scene.
     beginCommandSketches(editUid, Selection(), def.name);
   }
-  auto* session = new CommandSession(def, *this, editUid, m_documentSession);
+  // PureCAD: Preferences › Design › Invert joint selection order: a new
+  // Joint asks for Origin B (the component that stays) first. The session
+  // keeps a reference: the reordered definition lives in the window.
+  const CommandDef* used = &def;
+  if (editUid.isEmpty() && (def.id == QLatin1String("assemble.joint") || def.id == QLatin1String("assemble.as_built_joint")) &&
+      QSettings().value(QStringLiteral("design/invertJointOrder"), false).toBool()) {
+    m_invertedJoint = std::make_unique<CommandDef>(def);
+    auto& inputs = m_invertedJoint->inputs;
+    const auto a = std::find_if(inputs.begin(), inputs.end(), [](const InputDef& i) { return i.id == QLatin1String("a"); });
+    const auto b = std::find_if(inputs.begin(), inputs.end(), [](const InputDef& i) { return i.id == QLatin1String("b"); });
+    if (a != inputs.end() && b != inputs.end() && a < b) {
+      std::rotate(a, b, b + 1); // b moved in front of a
+      used = m_invertedJoint.get();
+      qDebug().noquote() << QStringLiteral("Joint: Origin B picked first (Preferences)");
+    }
+  }
+  // PureCAD: Preferences › Tools › Show moved parts' old place as a ghost:
+  // what Move moves, drawn faint where it was while the panel is open.
+  m_oldPlaceGhosts.clear();
+  if (editUid.isEmpty() && def.id == QLatin1String("solid.move") &&
+      QSettings().value(QStringLiteral("tools/movedGhost"), true).toBool()) {
+    for (const SelectionItem& item : preselection) {
+      if (item.kind == SelectKind::Body || item.kind == SelectKind::Component) m_oldPlaceGhosts.append(item);
+    }
+    showOldPlaceGhosts();
+  }
+  auto* session = new CommandSession(*used, *this, editUid, m_documentSession);
   if (!analysis.isEmpty()) {
     session->editAnalysis(analysis);
   }
   // Started by Repeat: the panel starts from the settings of the command's
   // last OK, its selections empty (mitcad#1686).
-  if (editUid.isEmpty() && analysis.isEmpty() && def.id == m_repeatCommand) {
+  // PureCAD: Preferences › Tools › Remember dialog values: every new run of
+  // a command starts from its last OK's settings, as Repeat does.
+  const bool remembers = QSettings().value(QStringLiteral("tools/rememberDialogValues"), false).toBool();
+  if (editUid.isEmpty() && analysis.isEmpty() && (def.id == m_repeatCommand || remembers)) {
     if (const auto found = m_repeatSettings.constFind(def.id); found != m_repeatSettings.cend()) {
       session->setRepeatSettings(found.value());
+    }
+  }
+  // PureCAD: Preferences › Tools › Turn the view to isometric when Extrude
+  // opens, and Go back to the earlier view when it closes.
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.extrude")) {
+    const QSettings store;
+    if (store.value(QStringLiteral("tools/extrudeReturnView"), false).toBool()) {
+      m_extrudeCamera = m_viewer->camera();
+    }
+    if (store.value(QStringLiteral("tools/extrudeIsometric"), false).toBool()) {
+      m_viewer->lookHome();
+    }
+  }
+  // PureCAD: Preferences › Tools › New extrusion distance: Fixed (a length
+  // of one's own; 0, the default, starts at zero and waits for one, as
+  // before) or The last used (the last OK's distance).
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.extrude") && !remembers &&
+      def.id != m_repeatCommand) {
+    const QSettings store;
+    const int mode = store.value(QStringLiteral("tools/newExtrudeDistance"), 0).toInt();
+    const double fixed = store.value(QStringLiteral("tools/fixedExtrudeDistance"), 0.0).toDouble();
+    PanelSettings start;
+    if (mode == 0 && fixed > 0.0) {
+      start.values.insert(QStringLiteral("distance"), QStringLiteral("%1 mm").arg(fixed));
+    } else if (mode == 1) {
+      if (const auto found = m_repeatSettings.constFind(def.id); found != m_repeatSettings.cend()) {
+        const QString last = found.value().values.value(QStringLiteral("distance"));
+        if (!last.isEmpty()) start.values.insert(QStringLiteral("distance"), last);
+      }
+    }
+    if (!start.values.isEmpty()) session->setRepeatSettings(start);
+  }
+  // PureCAD: Preferences › Tools › Use the previous Solid Fillet radius default.
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.fillet") &&
+      QSettings().value(QStringLiteral("tools/previousFilletDefault"), false).toBool()) {
+    if (const auto found = m_repeatSettings.constFind(def.id); found != m_repeatSettings.cend()) {
+      const QString last = found.value().values.value(QStringLiteral("radius"));
+      if (!last.isEmpty()) {
+        PanelSettings start;
+        start.values.insert(QStringLiteral("radius"), last);
+        session->setRepeatSettings(start);
+      }
     }
   }
   m_repeatCommand.clear();
@@ -3850,6 +3950,37 @@ bool MainWindow::chooseInCommand(const QString& command, const QString& input, c
 void MainWindow::onCommandFinished(bool committed) {
   clearNativeCommandContinuation();
   markActiveCommand(QString()); // PureCAD
+  // PureCAD: Tools › Hole › Group holes made together: the run's holes,
+  // the last one too, one timeline group once the run ends.
+  if (m_holeRunContinues) {
+    m_holeRunContinues = false; // the next hole of the run is starting
+  } else if (!m_holeRun.isEmpty()) {
+    const QStringList earlier = m_holeRun;
+    const QStringList start = m_holeRunStart;
+    m_holeRun.clear();
+    if (QSettings().value(QStringLiteral("tools/holeGroupTogether"), false).toBool()) {
+      QTimer::singleShot(0, this, [this, earlier, start, committed] {
+        QStringList run = earlier;
+        if (committed) {
+          for (const QString& uid : timelineUids()) {
+            if (!start.contains(uid) && !run.contains(uid)) run << uid; // the last hole
+          }
+        }
+        if (run.size() > 1 && !modelBusy()) {
+          runModelCommand({{QStringLiteral("cmd"), QStringLiteral("group_features")},
+                           {QStringLiteral("features"), QJsonArray::fromStringList(run)}});
+        }
+      });
+    }
+  }
+  if (!m_oldPlaceGhosts.isEmpty()) { // PureCAD: Tools › old place ghost gone
+    m_oldPlaceGhosts.clear();
+    m_viewer->setOldPlaceGhosts({});
+  }
+  if (m_extrudeCamera) { // PureCAD: Tools › Go back to the earlier view
+    m_viewer->setCamera(*m_extrudeCamera);
+    m_extrudeCamera.reset();
+  }
 #ifdef MITCAD_MACOS_NATIVE_UI
   if (m_nativeWindow) {
     m_nativeWindow->setInspectorView(nullptr);
@@ -4033,6 +4164,16 @@ void MainWindow::cancel() {
     if (stepped) {
       return;
     }
+    // PureCAD: Preferences › Sketch › Esc twice finishes the sketch: a
+    // second Esc within 0.6 s, with nothing left to cancel, finishes it.
+    if (m_selection.isEmpty() && QSettings().value(QStringLiteral("sketchPrefs/doubleEscFinishes"), false).toBool()) {
+      if (m_sketchEscTimer.isValid() && m_sketchEscTimer.elapsed() < 600) {
+        m_sketchEscTimer.invalidate();
+        finishSketch();
+        return;
+      }
+      m_sketchEscTimer.start();
+    }
     if (!m_selection.isEmpty() || !sketch::escLeavesUnchangedSketch()) {
       setSelection({});
       return;
@@ -4049,7 +4190,158 @@ void MainWindow::cancel() {
     finishEditInPlace();
     return;
   }
+  // PureCAD: Preferences › Graphics › Status chips › Esc closes analyses:
+  // with nothing selected, Esc hides the analysis shown.
+  if (m_mode == Mode::Idle && m_selection.isEmpty() && hideShownAnalysis(QStringLiteral("graphics/chipEscClosesAnalyses"))) {
+    return;
+  }
   clearSelection();
+}
+
+// PureCAD: the timeline's features by uid, in order.
+QStringList MainWindow::timelineUids() const {
+  QStringList uids;
+  for (const auto& feature : m_snapshot.features) uids << feature.uid;
+  return uids;
+}
+
+// PureCAD: the old place ghosts of what Move moves (startFeatureCommand,
+// pickComing).
+void MainWindow::showOldPlaceGhosts() {
+  std::vector<TopoDS_Shape> shapes;
+  for (const SelectionItem& item : std::as_const(m_oldPlaceGhosts)) {
+    shapes.push_back(itemShape(item));
+  }
+  m_viewer->setOldPlaceGhosts(shapes);
+}
+
+// PureCAD: Preferences › Design › Full kernel check. After every step:
+// every body shown is checked (BRepCheck) after each change; Once per
+// feature: a body is checked once per shape it takes; Off: none. A body
+// that fails is named in a warning. On the idle loop, so the view shows
+// first.
+void MainWindow::checkBodies(const std::vector<BodyDisplay>& bodies) {
+  const int mode = std::clamp(QSettings().value(QStringLiteral("design/kernelCheck"), 1).toInt(), 0, 2);
+  if (mode == 2) return;
+  std::vector<std::pair<QString, TopoDS_Shape>> pending;
+  for (const BodyDisplay& body : bodies) {
+    if (body.style != BodyDisplay::Style::Normal || !body.shape) continue;
+    const TopoDS_Shape& shape = body.shape->occt();
+    if (shape.IsNull()) continue;
+    const quintptr key = reinterpret_cast<quintptr>(shape.TShape().get());
+    if (mode == 1 && m_checkedShapes.contains(key)) continue;
+    m_checkedShapes.insert(key);
+    pending.emplace_back(QString::fromStdString(body.uid), shape);
+  }
+  if (pending.empty()) return;
+  QTimer::singleShot(0, this, [this, pending] {
+    QStringList failed;
+    for (const auto& [uid, shape] : pending) {
+      try {
+        if (!BRepCheck_Analyzer(shape).IsValid()) {
+          const auto found = m_snapshot.bodies.constFind(uid);
+          failed << (found != m_snapshot.bodies.cend() && !found->name.isEmpty() ? found->name : uid);
+        }
+      } catch (const Standard_Failure&) {
+        failed << uid;
+      }
+    }
+    qDebug().noquote() << QStringLiteral("Kernel check: %1 body(ies), %2")
+                              .arg(pending.size())
+                              .arg(failed.isEmpty() ? QStringLiteral("all valid") : failed.join(QStringLiteral(", ")));
+    if (!failed.isEmpty()) {
+      showStatus(tr("Kernel check: %1 not valid").arg(failed.join(QStringLiteral(", "))), NoticeLevel::Warning);
+    }
+  });
+}
+
+// PureCAD: Preferences › Graphics › Profile operations: profiles selected
+// on an idle view bring a small bar of what they make (Extrude, Revolve,
+// Sweep, Loft) beside the pointer.
+void MainWindow::updateProfileOperations() {
+  const bool profiles = m_mode == Mode::Idle && !m_selection.isEmpty() &&
+                        std::all_of(m_selection.cbegin(), m_selection.cend(),
+                                    [](const SelectionItem& item) { return item.kind == SelectKind::Profile; });
+  if (!profiles || !QSettings().value(QStringLiteral("graphics/profileOperations"), false).toBool()) {
+    if (m_profileBar != nullptr) m_profileBar->hide();
+    return;
+  }
+  if (m_profileBar == nullptr) {
+    m_profileBar = new QFrame(m_viewer);
+    m_profileBar->setObjectName(QStringLiteral("profileOperations"));
+    auto* row = new QHBoxLayout(m_profileBar);
+    row->setContentsMargins(4, 4, 4, 4);
+    row->setSpacing(2);
+    for (const char* id : {"solid.extrude", "solid.revolve", "solid.sweep", "solid.loft"}) {
+      QAction* action = m_registry->action(QString::fromLatin1(id));
+      if (action == nullptr) continue;
+      auto* button = new QToolButton(m_profileBar);
+      button->setDefaultAction(action);
+      button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+      button->setIconSize(QSize(22, 22));
+      button->setAutoRaise(true);
+      connect(button, &QToolButton::clicked, m_profileBar, &QWidget::hide);
+      row->addWidget(button);
+    }
+  }
+  const bool dark = isDarkTheme();
+  m_profileBar->setStyleSheet(QStringLiteral("QFrame#profileOperations { background: %1; border: 1px solid %2; border-radius: 10px; }")
+                                  .arg(dark ? QStringLiteral("#2a313b") : QStringLiteral("#ffffff"),
+                                       dark ? QStringLiteral("#46505e") : QStringLiteral("#c9d0da")));
+  m_profileBar->adjustSize();
+  QPoint at = m_viewer->mapFromGlobal(QCursor::pos()) + QPoint(18, 18);
+  at.setX(std::clamp(at.x(), 8, std::max(8, m_viewer->width() - m_profileBar->width() - 8)));
+  at.setY(std::clamp(at.y(), 8, std::max(8, m_viewer->height() - m_profileBar->height() - 8)));
+  m_profileBar->move(at);
+  m_profileBar->show();
+  m_profileBar->raise();
+}
+
+// PureCAD: hides the analysis shown (it stays in the Analysis folder) when
+// the switch `key` is on (empty: always); whether one was hidden.
+bool MainWindow::hideShownAnalysis(const QString& key) {
+  const QString name = m_snapshot.shownAnalysis().value(QStringLiteral("name")).toString();
+  if (name.isEmpty() || !canChangeModel()) return false;
+  if (!key.isEmpty() && !QSettings().value(key, false).toBool()) return false;
+  return runModelCommand({{QStringLiteral("cmd"), QStringLiteral("set_analysis_visible")},
+                          {QStringLiteral("name"), name},
+                          {QStringLiteral("visible"), false}});
+}
+
+// PureCAD: Preferences › Graphics › Status chips › Analysis and Section: a
+// chip over the view's top left naming the analysis shown; its × hides it.
+void MainWindow::updateAnalysisChip() {
+  const QJsonObject shown = m_snapshot.shownAnalysis();
+  const QString name = shown.value(QStringLiteral("name")).toString();
+  const bool section = shown.value(QStringLiteral("type")).toString() == QStringLiteral("section");
+  const QSettings store;
+  const bool wanted = !name.isEmpty() &&
+                      store.value(section ? QStringLiteral("graphics/chipSection") : QStringLiteral("graphics/chipAnalysis"),
+                                  true).toBool();
+  if (!wanted) {
+    if (m_analysisChip != nullptr) m_analysisChip->hide();
+    return;
+  }
+  if (m_analysisChip == nullptr) {
+    m_analysisChip = new QToolButton(m_viewer);
+    m_analysisChip->setObjectName(QStringLiteral("analysisChip"));
+    m_analysisChip->setCursor(Qt::PointingHandCursor);
+    m_analysisChip->setToolTip(tr("Hide the analysis (it stays in the Browser's Analysis folder)"));
+    connect(m_analysisChip, &QToolButton::clicked, this, [this] { hideShownAnalysis(QString()); });
+  }
+  const bool dark = isDarkTheme();
+  m_analysisChip->setStyleSheet(QStringLiteral("QToolButton#analysisChip { background: %1; color: %2; border: 1px solid %3;"
+                                               " border-radius: 12px; padding: 3px 12px; }"
+                                               "QToolButton#analysisChip:hover { background: %4; }")
+                                    .arg(dark ? QStringLiteral("#2a313b") : QStringLiteral("#ffffff"),
+                                         dark ? QStringLiteral("#e6eaf0") : QStringLiteral("#16243a"),
+                                         dark ? QStringLiteral("#46505e") : QStringLiteral("#c9d0da"),
+                                         dark ? QStringLiteral("#353e4a") : QStringLiteral("#e4eaf4")));
+  m_analysisChip->setText((section ? tr("Section: %1") : tr("Analysis: %1")).arg(name) + QStringLiteral("   \u2715"));
+  m_analysisChip->adjustSize();
+  m_analysisChip->move(16, m_viewer->overlayInsets().top() + 16);
+  m_analysisChip->show();
+  m_analysisChip->raise();
 }
 
 void MainWindow::clearSelection() {
@@ -4300,6 +4592,7 @@ void MainWindow::followAnalyses() {
   setSection(plane.isObject() ? plane : QJsonValue());
   // A shown Print Analysis' overhangs and thin walls (mitcad#620).
   followPrintAnalysis();
+  updateAnalysisChip(); // PureCAD
 }
 
 bool MainWindow::sectionShown() const {
@@ -4469,7 +4762,9 @@ void MainWindow::showThreads(const std::vector<BodyDisplay>& bodies) {
         return feature.type == QStringLiteral("thread") || feature.type == QStringLiteral("hole");
       });
   QJsonArray threads;
-  if (threaded) {
+  // PureCAD: Preferences › Graphics › Cosmetic thread markings (on by
+  // default, as MitCad draws them).
+  if (threaded && QSettings().value(QStringLiteral("graphics/cosmeticThreads"), true).toBool()) {
     try {
       // Only the cosmetic ones, which the view draws: measuring modelled
       // threads cost an open 0.3-0.6 s (mitcad#878).
@@ -5566,6 +5861,7 @@ void MainWindow::showBodies() {
   ScopedTiming threads("bodies threads");
   showThreads(bodies);
   threads.finish();
+  checkBodies(bodies); // PureCAD: Preferences › Design › Full kernel check
   // The design printer's build volume, when shown (mitcad#640).
   if (m_viewController != nullptr && m_viewController->buildVolumeShown()) {
     m_viewController->refreshBuildVolume();
@@ -7099,6 +7395,79 @@ void MainWindow::onPicked(const Selection& items, Qt::KeyboardModifiers modifier
     return;
   }
   if (m_session) {
+    // PureCAD: Preferences › Tools › Extrude to a picked target: in Extrude
+    // with its profiles chosen, a click on a vertex, or on a body's face,
+    // makes the extent To that object.
+    if (!window && items.size() == 1 && m_session->def().id == QLatin1String("solid.extrude") &&
+        (items.first().kind == SelectKind::Vertex || items.first().kind == SelectKind::Face) &&
+        QSettings().value(QStringLiteral("tools/extrudeToTarget"), false).toBool()) {
+      const SelectionItem target = items.first();
+      const bool taken = m_session->changeInputs(
+          [target](CommandState& state, const CommandContext&) {
+            if (state.items(QStringLiteral("profiles")).isEmpty() ||
+                state.items(QStringLiteral("profiles")).contains(target)) {
+              return false;
+            }
+            if (target.kind == SelectKind::Face) {
+              // A face on the profiles' own body is a profile pick, not a target.
+              for (const SelectionItem& profile : state.items(QStringLiteral("profiles"))) {
+                if (profile.kind == SelectKind::Face && profile.owner == target.owner) return false;
+              }
+            }
+            state.setChoice(QStringLiteral("extent"), QStringLiteral("to_object"));
+            state.setItems(QStringLiteral("object"), {target});
+            return true;
+          },
+          QStringLiteral("extrude to %1").arg(target.logDescription()));
+      if (taken) return;
+    }
+    // PureCAD: Preferences › Tools › Hole › Move by click or drag: with the
+    // hole placed on a face, a click elsewhere on that face moves it there.
+    if (!window && items.size() == 1 && items.first().kind == SelectKind::Face &&
+        m_session->def().id == QLatin1String("solid.hole") &&
+        m_session->state().object(QStringLiteral("at_form")).value(QStringLiteral("form")).toString() == QStringLiteral("face") &&
+        m_session->state().items(QStringLiteral("at")).contains(items.first()) &&
+        QSettings().value(QStringLiteral("tools/holeMoveByClick"), false).toBool() &&
+        !QSettings().value(QStringLiteral("tools/holeSeveralOnFace"), false).toBool()) {
+      m_session->changeInputs(
+          [](CommandState& state, const CommandContext&) {
+            state.setItems(QStringLiteral("at"), {});
+            return true;
+          },
+          QStringLiteral("hole moved by a click"));
+      if (m_session->activateSelection(QStringLiteral("at"))) {
+        m_session->picked(items, modifiers, window, click);
+        return;
+      }
+    }
+    // PureCAD: Preferences › Tools › Hole › Several holes on one face: with
+    // a hole placed on a face, a click on a face makes that hole (OK) and
+    // starts the next one there with the same settings (Repeat's); Group
+    // holes made together groups them in the timeline when the run ends.
+    if (!window && items.size() == 1 && items.first().kind == SelectKind::Face &&
+        m_session->def().id == QLatin1String("solid.hole") &&
+        m_session->state().object(QStringLiteral("at_form")).value(QStringLiteral("form")).toString() == QStringLiteral("face") &&
+        QSettings().value(QStringLiteral("tools/holeSeveralOnFace"), false).toBool()) {
+      const QStringList before = timelineUids();
+      const CommandDef* hole = &m_session->def();
+      if (m_session->commit()) {
+        for (const QString& uid : timelineUids()) {
+          if (!before.contains(uid)) m_holeRun << uid;
+        }
+        m_holeRunContinues = true;
+        m_repeatCommand = hole->id; // the next one starts as this one was
+        const Selection pick = items;
+        QTimer::singleShot(0, this, [this, pick, modifiers, click] {
+          if (m_session != nullptr || m_mode != Mode::Idle) return;
+          if (const CommandDef* def = m_registry->find(QStringLiteral("solid.hole"))) {
+            m_holeRunStart = timelineUids();
+            startFeatureCommand(*def);
+            if (m_session != nullptr) m_session->picked(pick, modifiers, false, click);
+          }
+        });
+        return;
+      }
+    }
     m_session->picked(items, modifiers, window, click);
     return;
   }
@@ -7191,7 +7560,11 @@ void MainWindow::onPicked(const Selection& items, Qt::KeyboardModifiers modifier
     const SelectionItem& item = items.first();
     // A block's instance is picked as one (mitcad#2110).
     const Selection whole = sketching ? m_sketch->instanceSelection(item) : Selection();
-    if (add && next.contains(item)) {
+    // PureCAD: Preferences › Sketch › Shift adds only; Ctrl / Cmd toggles.
+    const bool addsOnly = !sketching && modifiers.testFlag(Qt::ShiftModifier) &&
+                          !modifiers.testFlag(Qt::ControlModifier) &&
+                          QSettings().value(QStringLiteral("sketchPrefs/shiftAddsOnly"), false).toBool();
+    if (add && !addsOnly && next.contains(item)) {
       next.removeAll(item);
       for (const SelectionItem& member : whole) {
         next.removeAll(member);
@@ -7249,6 +7622,37 @@ void MainWindow::setSelection(const Selection& items) {
   m_idleCardMs = 0;
   m_idleMeasureMs = 0;
   updateIdleView();
+  // PureCAD: Preferences › Graphics › Quick measurement in the view's corner.
+  if (changed) {
+    QString quick;
+    if (m_mode != Mode::Sketch && !modelBusy() &&
+        QSettings().value(QStringLiteral("graphics/quickMeasurement"), false).toBool()) {
+      quick = quickMeasurement(
+          m_selection, [this](const QJsonObject& request) { return queryObject(request); }, lengthUnit());
+    }
+    m_viewer->setQuickMeasurement(quick);
+    // PureCAD: Preferences › Graphics › Show hidden edges of selected bodies.
+    std::set<std::string> dashed;
+    if (QSettings().value(QStringLiteral("graphics/hiddenEdgesOfSelected"), false).toBool()) {
+      for (const SelectionItem& item : m_selection) {
+        if (item.kind == SelectKind::Body) dashed.insert(item.owner.toStdString());
+      }
+    }
+    m_viewer->setHiddenEdgesOf(dashed);
+    updateProfileOperations(); // PureCAD
+    // PureCAD: Preferences › Tools › Direct interaction: one face picked on
+    // an idle view brings Press Pull's arrow on it at once, to drag.
+    if (m_mode == Mode::Idle && !m_session && m_selection.size() == 1 &&
+        m_selection.first().kind == SelectKind::Face &&
+        QSettings().value(QStringLiteral("tools/directInteraction"), false).toBool()) {
+      const Selection face = m_selection;
+      QTimer::singleShot(0, this, [this, face] {
+        if (m_mode == Mode::Idle && !m_session && m_selection == face) {
+          startCommand(QStringLiteral("solid.press_pull"), face, nullptr);
+        }
+      });
+    }
+  }
   const qint64 viewMs = selectionClock.restart();
   m_sketch->refreshView();
   if (m_sketch3d != nullptr && m_sketch3d->isActive()) {
@@ -8458,7 +8862,11 @@ void MainWindow::enterSketch(const QString& uid, bool existing, const QString& p
   if (m_floating != nullptr) {
     m_floating->layoutNow();
   }
-  m_viewer->lookAtSketchPlane(true, sketchFace(uid));
+  // PureCAD: Preferences › Sketch › Turn the view to face the sketch (on by
+  // default); off, the view stays as it is.
+  if (QSettings().value(QStringLiteral("sketchPrefs/turnToFace"), true).toBool()) {
+    m_viewer->lookAtSketchPlane(true, sketchFace(uid));
+  }
   {
     // For UI tests: the sketch's frame in the design and the direction the
     // view looks along (against the frame's normal).
@@ -8578,6 +8986,11 @@ void MainWindow::leaveSketchMode() {
   // opened (mitcad#1592: that one's top view came back). A 2D sketch puts
   // back the view it was opened from.
   const bool spatial = m_sketch3d != nullptr && m_sketch3d->isActive();
+  // PureCAD: Preferences › Sketch › When the sketch ends: 0 back to the
+  // view before it (as before), 1 the view as it is, 2 back unless the view
+  // was turned off the sketch's plane.
+  const int sketchEnds = QSettings().value(QStringLiteral("sketchPrefs/whenSketchEnds"), 0).toInt();
+  const bool turnedOff = sketchEnds == 2 && std::abs(m_viewer->viewDirection().Dot(m_sketch->model().frame.normal())) < 0.999;
   m_sketch->leave();
   if (m_sketch3d != nullptr) {
     m_sketch3d->leave(); // a 3D sketch's context (mitcad#1524)
@@ -8587,7 +9000,7 @@ void MainWindow::leaveSketchMode() {
   }
   m_sketchOccurrence.clear();
   m_mode = Mode::Idle;
-  if (spatial) {
+  if (spatial || sketchEnds == 1 || turnedOff) {
     m_viewer->keepCamera();
   } else {
     m_viewer->restoreCamera();
@@ -9815,6 +10228,11 @@ bool MainWindow::installEmptyDocument(const QString& name, QString* error) {
   m_documentName = name;
   updateWindowTitle();
   qInfo().noquote() << QStringLiteral("New design in %1").arg(units);
+  // PureCAD: Preferences › Design › Hide the Origin folder in new designs:
+  // the origin starts hidden (its eye off; the Browser's Show brings it back).
+  if (QSettings().value(QStringLiteral("design/hideOriginFolder"), false).toBool()) {
+    runModelCommand({{QStringLiteral("cmd"), QStringLiteral("set_origin_visible")}, {QStringLiteral("visible"), false}});
+  }
   return true;
 }
 

@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "CommandSession.hpp"
+#include "ValueStep.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -15,6 +16,7 @@
 #include <Bnd_Box.hxx>
 #include <TopLoc_Location.hxx>
 
+#include <QSettings>
 #include <QApplication>
 #include <QEvent>
 #include <QJsonArray>
@@ -2495,6 +2497,7 @@ void CommandSession::stepValueBox(bool back) {
 }
 
 void CommandSession::stepBoxValue(double by, const QString& how) {
+  if (!valueSteppingOn()) return; // PureCAD: Design › Step values
   if (!m_valueBox) {
     return;
   }
@@ -5871,6 +5874,16 @@ void CommandSession::createCursorBox() {
       break;
     }
   }
+  // PureCAD: Preferences › Tools › Tool at the cursor: every command's first
+  // value follows the cursor in a box to type it in.
+  if (m_cursorKey.isEmpty() && QSettings().value(QStringLiteral("tools/toolAtCursor"), false).toBool()) {
+    for (const Slot& slot : slotsOf(false)) {
+      if (slot.def->type == InputDef::Type::Value) {
+        m_cursorKey = slot.key;
+        break;
+      }
+    }
+  }
   if (m_cursorKey.isEmpty()) {
     return;
   }
@@ -6377,6 +6390,16 @@ bool CommandSession::ask(const QString& key, const QString& message) {
   showPanelMessage(QString(), NoticeLevel::Hint);
   qDebug().noquote() << QStringLiteral("Panel %1 asks: %2").arg(m_def.name, message);
   m_host.showHint(message);
+  updateHighlights();
+  return true;
+}
+
+bool CommandSession::activateSelection(const QString& key) {
+  const auto slot = slotOf(key);
+  if (m_done || !slot || slot->def->type != InputDef::Type::Selection || !isShown(*slot)) {
+    return false;
+  }
+  activate(key);
   updateHighlights();
   return true;
 }

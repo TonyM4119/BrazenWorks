@@ -71,6 +71,8 @@
 #include <typeinfo>
 #include <utility>
 
+#include <QFileInfo>
+#include <QSettings>
 #include <QApplication>
 #include <QCursor>
 #include <QGuiApplication>
@@ -261,6 +263,18 @@ const Quantity_Color kConstructionColor = viewRole(ColorRole::SketchConstruction
 const Quantity_Color kProfileFill = viewRole(ColorRole::ProfileFill);
 const Quantity_Color kPreviewColor = viewRole(ColorRole::PreviewAdd);
 const Quantity_Color kCutPreviewColor = viewRole(ColorRole::PreviewRemove);
+// PureCAD: Preferences › Graphics › Tint new surface in a preview, Show
+// removed material in red, and Section hatch by part (applyGraphicsSettings).
+bool g_tintNewSurface = true;
+bool g_removedMaterialRed = true;
+bool g_hatchByPart = true;
+bool g_keepDarkShapes = false; // PureCAD: Graphics › Keep the shape of dark parts
+Quantity_Color addPreviewColor() {
+  return g_tintNewSurface ? kPreviewColor : Quantity_Color(0.72, 0.74, 0.77, Quantity_TOC_RGB);
+}
+Quantity_Color cutPreviewColor() {
+  return g_removedMaterialRed ? kCutPreviewColor : addPreviewColor();
+}
 // A split's extended tool (mitcad#712): the orange of the panel's second
 // selection input, the splitting tool's.
 const Quantity_Color kExtendedToolColor = viewRole(ColorRole::ExtendedTool);
@@ -1355,7 +1369,7 @@ occ::handle<AIS_Shape> makeBodyObject(const geometry::Shape& named, BodyDisplay:
   };
   if (style == BodyDisplay::Style::New) {
     occ::handle<AIS_Shape> body = object();
-    body->SetColor(kPreviewColor);
+    body->SetColor(addPreviewColor());
     behindSection(body, sectioned);
     body->SetTransparency(0.5);
     return body;
@@ -1363,7 +1377,7 @@ occ::handle<AIS_Shape> makeBodyObject(const geometry::Shape& named, BodyDisplay:
   if (style == BodyDisplay::Style::Tool || style == BodyDisplay::Style::CutTool) {
     // As the command's tool preview (setPreview), but pickable (mitcad#561).
     occ::handle<AIS_Shape> body = object();
-    body->SetColor(style == BodyDisplay::Style::CutTool ? kCutPreviewColor : kPreviewColor);
+    body->SetColor(style == BodyDisplay::Style::CutTool ? cutPreviewColor() : addPreviewColor());
     behindSection(body, sectioned);
     body->SetTransparency(0.5);
     return body;
@@ -1495,6 +1509,17 @@ void drawWithoutMeshing(const occ::handle<AIS_Shape>& object) {
   }
 }
 
+// PureCAD: Preferences › Graphics › Vertex markers: a body's vertices drawn
+// as small points (applyGraphicsSettings sets it).
+bool g_vertexMarkers = false;
+void applyVertexMarkers(const occ::handle<AIS_Shape>& body) {
+  const occ::handle<Prs3d_Drawer>& drawer = body->Attributes();
+  drawer->SetVertexDrawMode(g_vertexMarkers ? Prs3d_VDM_All : Prs3d_VDM_Isolated);
+  if (g_vertexMarkers) {
+    drawer->SetPointAspect(new Prs3d_PointAspect(Aspect_TOM_BALL, Quantity_Color(0.15, 0.2, 0.3, Quantity_TOC_RGB), 0.6));
+  }
+}
+
 occ::handle<AIS_Shape> makeBody(const geometry::Shape& named, BodyDisplay::Style style, const QColor& color,
                                 const Appearance* appearance,
                                 const std::vector<BodyDisplay::FaceLook>& faceLooks, VisualStyle visual,
@@ -1505,6 +1530,7 @@ occ::handle<AIS_Shape> makeBody(const geometry::Shape& named, BodyDisplay::Style
   if (!drawerMeshes(named)) {
     body->Attributes()->SetAutoTriangulation(false);
   }
+  applyVertexMarkers(body);
   return body;
 }
 
@@ -1917,8 +1943,12 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
   m_viewer = new V3d_Viewer(driver);
   // A key light from the upper left of the camera instead of OCCT's default
   // headlight, which lights all three faces of an isometric view equally.
-  m_viewer->AddLight(new V3d_AmbientLight(Quantity_Color(0.35, 0.35, 0.35, Quantity_TOC_RGB)));
-  m_viewer->AddLight(new V3d_DirectionalLight(gp_Dir(0.3, -0.5, -1.0), Quantity_NOC_WHITE, true));
+  m_ambientLight = new V3d_AmbientLight(Quantity_Color(0.35, 0.35, 0.35, Quantity_TOC_RGB));
+  m_keyLight = new V3d_DirectionalLight(gp_Dir(0.3, -0.5, -1.0), Quantity_NOC_WHITE, true);
+  // PureCAD: a soft fill from the other side, on with studio lighting.
+  m_fillLight = new V3d_DirectionalLight(gp_Dir(-0.6, 0.4, -0.3), Quantity_Color(0.35, 0.35, 0.38, Quantity_TOC_RGB), true);
+  m_viewer->AddLight(m_ambientLight);
+  m_viewer->AddLight(m_keyLight);
   m_viewer->SetLightOn();
   // The layout grid under everything else: drawn first, without depth.
   Graphic3d_ZLayerSettings underlay;
@@ -3144,6 +3174,19 @@ void OcctViewer::applyBackground() {
     m_view->SetBgGradientStyle(Aspect_GradientFillMethod_None);
     m_view->SetBackgroundColor(occtColor(m_backgroundTop));
   }
+  // PureCAD: Preferences › Appearance › Picture: a picture of one's own over
+  // the background, stretched to the view.
+  const QString picture = QSettings().value(QStringLiteral("appearance/picture")).toString();
+  const QString shown = !picture.isEmpty() && QFileInfo(picture).isReadable() ? picture : QString();
+  if (shown != m_backgroundPicture) {
+    m_backgroundPicture = shown;
+    if (shown.isEmpty()) {
+      m_view->SetBackgroundImage(occ::handle<Graphic3d_Texture2D>(), Aspect_FM_NONE, false);
+    } else {
+      m_view->SetBackgroundImage(QFileInfo(shown).absoluteFilePath().toLocal8Bit().constData(), Aspect_FM_STRETCH,
+                                 false);
+    }
+  }
 }
 
 void OcctViewer::showBody(BodyEntry& entry) {
@@ -3261,14 +3304,21 @@ void OcctViewer::showBody(BodyEntry& entry) {
   const TopoDS_Shape edges = entry.edges ? entry.edges->drawn() : edgesOf(shape);
   // The dashed edges behind faces in the hidden-edge styles only; Wireframe
   // with Visible Edges Only has the edges in sight alone (mitcad#2155).
-  if (drawsHiddenEdges(m_visualStyle)) {
+  if (drawsHiddenEdges(m_visualStyle) || m_hiddenEdgesShown.count(entry.uid) > 0) { // PureCAD: or selected
     entry.hiddenEdges = new AIS_Shape(edges);
     drawWithoutMeshing(entry.hiddenEdges);
     setEdgeStyle(entry.hiddenEdges, kHiddenEdgeColor, 1.0, Aspect_TOL_DASH);
   }
   entry.visibleEdges = new AIS_Shape(edges);
   drawWithoutMeshing(entry.visibleEdges);
-  setEdgeStyle(entry.visibleEdges, paperFaces(m_visualStyle) ? wireColor(color) : kEdgeColor, 1.0);
+  // PureCAD: Preferences › Graphics › Keep the shape of dark parts: a dark
+  // body's edges light enough to show its outline against its own faces.
+  const bool darkBody = g_keepDarkShapes && !paperFaces(m_visualStyle) && color.lightnessF() < 0.3;
+  setEdgeStyle(entry.visibleEdges,
+               paperFaces(m_visualStyle) ? wireColor(color)
+               : darkBody                ? Quantity_Color(0.62, 0.65, 0.70, Quantity_TOC_RGB)
+                                         : kEdgeColor,
+               1.0);
   for (const auto& [object, layer] :
        {std::pair{entry.hiddenEdges, m_hiddenLayer}, std::pair{entry.visibleEdges, m_edgeLayer}}) {
     if (object.IsNull()) {
@@ -3983,8 +4033,9 @@ void OcctViewer::refreshSketchHighlightLines() {
 }
 
 bool OcctViewer::hasSketchHalo(const SketchEntityLook& look) const {
+  // PureCAD: Preferences › Graphics › Sketch halo: on every background.
   return !look.point && !look.reference && !look.construction && (look.centerline || look.constrained) &&
-         (m_backgroundDark || look.darkFace);
+         (m_backgroundDark || look.darkFace || m_sketchHaloEverywhere);
 }
 
 void OcctViewer::updateSketchHalo(const occ::handle<AIS_Shape>& object, const SketchEntityLook& look) {
@@ -5389,9 +5440,9 @@ void OcctViewer::setPreview(const TopoDS_Shape& shape, PreviewStyle style) {
       logPreviewLook(QStringLiteral("extended tool"), m_cullSeeThrough && cullHiddenBackFaces(m_preview));
       m_context->Display(m_preview, AIS_Shaded, -1, false);
     } else {
-      m_preview->SetColor(style == PreviewStyle::Remove         ? kCutPreviewColor
+      m_preview->SetColor(style == PreviewStyle::Remove         ? cutPreviewColor()
                           : style == PreviewStyle::Interference ? viewRole(ColorRole::Interference, m_backgroundDark)
-                                                                : kPreviewColor);
+                                                                : addPreviewColor());
       m_preview->SetTransparency(0.5);
       // A Join/Cut tool shares faces with the previewed body (the walls of a
       // cut hole); pull it towards the viewer so it wins the depth test there.
@@ -9162,6 +9213,10 @@ void OcctViewer::setGridUnit(const QString& unit) {
 }
 
 void OcctViewer::setGridPlane(const gp_Ax3& plane) {
+  // PureCAD: on the XY plane (no sketch, no ruler elsewhere), Grid follows
+  // the view may turn it onto the origin plane the view faces most.
+  m_gridHome = plane.Location().Distance(gp::Origin()) < 1e-9 && plane.Direction().IsEqual(gp::DZ(), 1e-9) &&
+               plane.XDirection().IsEqual(gp::DX(), 1e-9);
   m_gridPlane = plane;
   gp_Trsf placement;
   placement.SetDisplacement(gp_Ax3(), plane);
@@ -9192,6 +9247,26 @@ double OcctViewer::gridStep() const {
 }
 
 void OcctViewer::updateGrid(bool force) {
+  if (m_gridHome && m_gridShown) {
+    gp_Ax3 want; // XY
+    if (m_gridFollowsView && !m_view.IsNull()) {
+      const gp_Dir look = m_view->Camera()->Direction();
+      const double x = std::abs(look.X()), y = std::abs(look.Y()), z = std::abs(look.Z());
+      if (y > z && y >= x) {
+        want = gp_Ax3(gp::Origin(), -gp::DY(), gp::DX());
+      } else if (x > z && x > y) {
+        want = gp_Ax3(gp::Origin(), gp::DX(), gp::DY());
+      }
+    }
+    if (!want.Direction().IsEqual(m_gridPlane.Direction(), 1e-9) ||
+        !want.XDirection().IsEqual(m_gridPlane.XDirection(), 1e-9)) {
+      m_gridPlane = want;
+      gp_Trsf placement;
+      placement.SetDisplacement(gp_Ax3(), want);
+      m_grid->SetLocalTransformation(placement);
+      force = true;
+    }
+  }
   if (!m_gridShown || m_gridOnCurvedFace || m_view->Window().IsNull() || showsRenderedImage()) {
     if (m_context->IsDisplayed(m_grid)) {
       m_context->Erase(m_grid, false);
@@ -9273,7 +9348,7 @@ void OcctViewer::setPlaneRuler(const QString& originPlane) {
   if (frame) {
     // The layout grid onto the plane: the plane a sketch would be drawn on.
     if (!m_rulerMovedGrid) {
-      m_gridPlaneBeforeRuler = m_gridPlane;
+      m_gridPlaneBeforeRuler = m_gridHome ? gp_Ax3() : m_gridPlane; // PureCAD: not a followed plane
       m_rulerMovedGrid = true;
     }
     m_rulerFrame = *frame;
@@ -9356,6 +9431,104 @@ void OcctViewer::updatePlaneRuler() {
     }
     m_rulerLabels->setShown(true);
   }
+}
+
+// PureCAD: Preferences › Graphics › View angles: the camera's turn about Z
+// and its height above the XY plane, in the view's lower left corner.
+void OcctViewer::paintViewAngles(QPainter& painter) {
+  if (m_view.IsNull() || m_view->Window().IsNull() || showsRenderedImage()) {
+    return;
+  }
+  const gp_Dir look = m_view->Camera()->Direction(); // from the eye to the target
+  const gp_Vec toEye = -gp_Vec(look);
+  double azimuth = std::atan2(toEye.Y(), toEye.X()) * 180.0 / 3.14159265358979323846;
+  if (azimuth < 0.0) azimuth += 360.0;
+  const double elevation = std::asin(std::clamp(toEye.Z(), -1.0, 1.0)) * 180.0 / 3.14159265358979323846;
+  const QString text = tr("Azimuth %1°   Elevation %2°").arg(azimuth, 0, 'f', 1).arg(elevation, 0, 'f', 1);
+  painter.setRenderHint(QPainter::Antialiasing);
+  QFont font = this->font();
+  font.setPointSizeF(std::max(7.0, font.pointSizeF() * 0.9));
+  painter.setFont(font);
+  const QFontMetricsF metrics(font);
+  const QRectF box(12.0, height() - m_overlayInsets.bottom() - 12.0 - (metrics.height() + 8.0),
+                   metrics.horizontalAdvance(text) + 16.0, metrics.height() + 8.0);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(m_backgroundDark ? QColor(20, 24, 30, 170) : QColor(255, 255, 255, 190));
+  painter.drawRoundedRect(box, 6.0, 6.0);
+  painter.setPen(m_backgroundDark ? QColor(230, 234, 240) : QColor(40, 48, 60));
+  painter.drawText(box, Qt::AlignCenter, text);
+}
+
+// PureCAD: Preferences › Graphics › Show hidden edges of selected bodies:
+// those bodies drawn again with their dashed edges behind faces.
+void OcctViewer::setHiddenEdgesOf(const std::set<std::string>& bodies) {
+  if (bodies == m_hiddenEdgesShown) return;
+  std::set<std::string> changed;
+  std::set_symmetric_difference(bodies.begin(), bodies.end(), m_hiddenEdgesShown.begin(), m_hiddenEdgesShown.end(),
+                                std::inserter(changed, changed.end()));
+  m_hiddenEdgesShown = bodies;
+  for (auto& [key, entry] : m_bodies) {
+    if (changed.count(entry.uid) > 0 && !entry.object.IsNull()) {
+      removeBody(entry);
+      showBody(entry);
+    }
+  }
+  sceneChanged();
+}
+
+void OcctViewer::setOldPlaceGhosts(const std::vector<TopoDS_Shape>& shapes) {
+  for (const occ::handle<AIS_Shape>& ghost : m_oldPlaceGhosts) {
+    m_context->Remove(ghost, false);
+  }
+  m_oldPlaceGhosts.clear();
+  for (const TopoDS_Shape& shape : shapes) {
+    if (shape.IsNull()) continue;
+    occ::handle<AIS_Shape> ghost = new AIS_Shape(shape);
+    ghost->SetColor(Quantity_Color(0.62, 0.66, 0.72, Quantity_TOC_RGB));
+    ghost->SetTransparency(0.8);
+    m_context->Display(ghost, AIS_Shaded, -1, false);
+    m_context->Deactivate(ghost);
+    m_oldPlaceGhosts.push_back(ghost);
+  }
+  sceneChanged();
+}
+
+void OcctViewer::hoverAt(const QPoint& position) {
+  if (m_view.IsNull() || m_view->Window().IsNull()) return;
+  const NCollection_Vec2<int> pixel = toDevicePixels(QPointF(position));
+  m_context->MoveTo(pixel.x(), pixel.y(), m_view, false);
+  m_hoverMoved = true;
+  requestFrame();
+}
+
+void OcctViewer::setQuickMeasurement(const QString& text) {
+  if (text == m_quickText) return;
+  m_quickText = text;
+  if (!m_quickLayer && !text.isEmpty()) {
+    m_quickLayer = addPaintLayer(
+        QStringLiteral("quick measurement"), [this](QPainter& painter) { paintQuickMeasurement(painter); }, this);
+  }
+  if (m_quickLayer) {
+    m_quickLayer->setShown(!text.isEmpty());
+    m_quickLayer->update();
+  }
+  if (!text.isEmpty()) qDebug().noquote() << QStringLiteral("Quick measurement: %1").arg(text);
+}
+
+void OcctViewer::paintQuickMeasurement(QPainter& painter) {
+  if (m_quickText.isEmpty() || showsRenderedImage()) return;
+  painter.setRenderHint(QPainter::Antialiasing);
+  QFont font = this->font();
+  painter.setFont(font);
+  const QFontMetricsF metrics(font);
+  const double w = metrics.horizontalAdvance(m_quickText) + 20.0;
+  const double h = metrics.height() + 10.0;
+  const QRectF box(width() - m_overlayInsets.right() - 12.0 - w, height() - m_overlayInsets.bottom() - 12.0 - h, w, h);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(m_backgroundDark ? QColor(20, 24, 30, 190) : QColor(255, 255, 255, 215));
+  painter.drawRoundedRect(box, 6.0, 6.0);
+  painter.setPen(m_backgroundDark ? QColor(230, 234, 240) : QColor(30, 38, 50));
+  painter.drawText(box, Qt::AlignCenter, m_quickText);
 }
 
 void OcctViewer::paintPlaneNames(QPainter& painter) {
@@ -9547,7 +9720,7 @@ void OcctViewer::setSectionCaps(const std::vector<SectionCap>& caps, const gp_Ax
     const QColor color = caps[i].color.isValid() ? caps[i].color : kCapColor;
     const QColor hatchColor = capHatchColor(color);
     // The components' caps hatch in turn at 45 and 135 degrees, as drawings do.
-    const bool mirrored = i % 2 == 1;
+    const bool mirrored = g_hatchByPart && i % 2 == 1; // PureCAD: One style or By part
     occ::handle<AIS_Shape> object = new AIS_Shape(caps[i].faces);
     object->SetColor(occtColor(color));
     // In the colour itself, as the timeline shows it: light does not darken
@@ -11145,6 +11318,73 @@ void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
                               : Graphic3d_RenderingParams::PerfCounters_FrameRate;
   params.StatsPosition = new Graphic3d_TransformPers(Graphic3d_TMF_2d, Aspect_TOTP_RIGHT_UPPER,
                                                      Graphic3d_Vec2i(cubeAreaSize() + 20, 30));
+  // PureCAD: Sketch halo on every background, the sketch's lines restyled.
+  if (m_sketchHaloEverywhere != settings.sketchHalo) {
+    m_sketchHaloEverywhere = settings.sketchHalo;
+    restyleSketchEntities();
+  }
+  // PureCAD: preview tints and the section hatch, for the next preview/section.
+  g_tintNewSurface = settings.tintNewSurface;
+  g_removedMaterialRed = settings.removedMaterialRed;
+  g_hatchByPart = settings.hatchByPart;
+  if (g_keepDarkShapes != settings.keepDarkShapes) {
+    g_keepDarkShapes = settings.keepDarkShapes;
+    for (auto& [key, entry] : m_bodies) {
+      if (!entry.object.IsNull()) {
+        removeBody(entry);
+        showBody(entry);
+      }
+    }
+  }
+  // PureCAD: View angles in the corner.
+  if (settings.viewAngles && !m_viewAngles) {
+    m_viewAngles = addPaintLayer(
+        QStringLiteral("view angles"), [this](QPainter& painter) { paintViewAngles(painter); }, this);
+  }
+  if (m_viewAngles) {
+    m_viewAngles->setShown(settings.viewAngles);
+  }
+  if (m_gridFollowsView != settings.gridFollowsView) { // PureCAD: Grid follows the view
+    m_gridFollowsView = settings.gridFollowsView;
+    updateGrid(true);
+  }
+  // PureCAD: Vertex markers, on the bodies in the view too.
+  if (g_vertexMarkers != settings.vertexMarkers) {
+    g_vertexMarkers = settings.vertexMarkers;
+    for (auto& [uid, entry] : m_bodies) {
+      if (!entry.object.IsNull()) {
+        applyVertexMarkers(entry.object);
+        m_context->Redisplay(entry.object, false);
+      }
+    }
+  }
+  // PureCAD: Studio lighting: a fill light beside the key light and a lower
+  // ambient; off, the key light and a brighter ambient, flatter. Ground
+  // shadow: the key light casts shadows (OCCT's shadow maps), from the view
+  // as the light follows it, or from above the model when it stays put
+  // (Shadow follows the model). Off in safe graphics mode.
+  if (!m_viewer.IsNull() && !m_keyLight.IsNull()) {
+    const bool safe = settings.safeGraphicsMode;
+    m_ambientLight->SetColor(settings.studioLighting ? Quantity_Color(0.35, 0.35, 0.35, Quantity_TOC_RGB)
+                                                      : Quantity_Color(0.5, 0.5, 0.5, Quantity_TOC_RGB));
+    if (settings.studioLighting != m_fillOn) {
+      if (settings.studioLighting) {
+        m_viewer->AddLight(m_fillLight);
+        m_viewer->SetLightOn(m_fillLight);
+      } else {
+        m_viewer->SetLightOff(m_fillLight);
+        m_viewer->DelLight(m_fillLight);
+      }
+      m_fillOn = settings.studioLighting;
+    }
+    const bool shadows = settings.groundShadow && !safe;
+    m_keyLight->SetHeadlight(!settings.groundShadowFollowsModel);
+    m_keyLight->SetDirection(settings.groundShadowFollowsModel ? gp_Dir(0.25, 0.35, -1.0) : gp_Dir(0.3, -0.5, -1.0));
+    m_keyLight->SetCastShadows(shadows);
+    params.IsShadowEnabled = shadows;
+    params.ShadowMapResolution = 2048;
+    m_viewer->UpdateLights();
+  }
   m_view->Invalidate();
   requestFrame();
   qDebug().noquote() << QStringLiteral("View graphics: render scale %1%2, frame rate %3")

@@ -1,9 +1,13 @@
 // SPDX-License-Identifier: MIT
 #include "mitcad/io/exchange.hpp"
 
+#include <cstdlib>
 #include <algorithm>
 #include <cctype>
 
+#include <ShapeFix_Shape.hxx>
+#include <Standard_Failure.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepTools.hxx>
 #include <BRep_Builder.hxx>
 #include <TopoDS_Compound.hxx>
@@ -51,12 +55,54 @@ Format require_format(const std::string& path) {
 
 } // namespace
 
+namespace detail {
+
+// PureCAD: Preferences › Design › Heal imported parts that fail the check:
+// the app sets PURECAD_HEAL_IMPORTS=1; a body BRepCheck finds invalid goes
+// through ShapeFix_Shape, and the fixed shape is kept when it is valid.
+std::vector<Body> heal_if_asked(std::vector<Body> bodies) {
+  std::string on;
+#ifdef _MSC_VER
+  char* value = nullptr;
+  std::size_t length = 0;
+  if (_dupenv_s(&value, &length, "PURECAD_HEAL_IMPORTS") == 0 && value != nullptr) {
+    on = value;
+    std::free(value);
+  }
+#else
+  if (const char* value = std::getenv("PURECAD_HEAL_IMPORTS")) {
+    on = value;
+  }
+#endif
+  if (on != "1") {
+    return bodies;
+  }
+  for (Body& body : bodies) {
+    try {
+      if (body.shape.IsNull() || BRepCheck_Analyzer(body.shape).IsValid()) {
+        continue;
+      }
+      ShapeFix_Shape fix(body.shape);
+      fix.Perform();
+      const TopoDS_Shape fixed = fix.Shape();
+      if (!fixed.IsNull() && BRepCheck_Analyzer(fixed).IsValid()) {
+        body.shape = fixed;
+      }
+    } catch (const Standard_Failure&) {
+      // Kept as read.
+    }
+  }
+  return bodies;
+}
+
+} // namespace detail
+
 std::vector<Body> read_file(const std::string& path, const Message_ProgressRange& range) {
   switch (require_format(path)) {
   case Format::Step:
-    return read_step(path, range);
+    return detail::heal_if_asked(read_step(path, range));
   case Format::Iges:
-    return read_iges(path, range);
+    return detail::heal_if_asked(read_iges(path, range));
   case Format::Stl:
     return {read_stl(path)};
   case Format::Obj:
@@ -66,7 +112,7 @@ std::vector<Body> read_file(const std::string& path, const Message_ProgressRange
     if (!BRepTools::Read(shape, path.c_str(), BRep_Builder()) || shape.IsNull()) {
       throw Error("cannot read BREP file " + path);
     }
-    return {Body{detail::file_stem(path), shape, std::nullopt, {}, {}}};
+    return detail::heal_if_asked({Body{detail::file_stem(path), shape, std::nullopt, {}, {}}});
   }
   }
   return {};

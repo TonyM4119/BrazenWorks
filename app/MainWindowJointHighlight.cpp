@@ -25,12 +25,17 @@
 #include <BRepBndLib.hxx>
 #include <BRepBuilderAPI_MakeEdge.hxx>
 #include <Bnd_Box.hxx>
+#include <Standard_Failure.hxx>
+#include <gp_Ax2.hxx>
+#include <gp_Circ.hxx>
+#include <gp_Dir.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
 #include <QJsonArray>
 #include <QJsonObject>
+#include <QSettings>
 #include <QtLogging>
 
 #include "commands/CommandSupport.hpp"
@@ -184,6 +189,47 @@ void MainWindow::appendJointHighlight(const JointHighlight& joint, bool preview,
 
 void MainWindow::addJointHighlights(std::vector<HighlightDisplay>& highlights) {
   QStringList lines;
+  // PureCAD: Preferences › Graphics › Joint symbols (Ring and axis, Ring,
+  // Axis, None): every joint's symbol at its frame while nothing runs;
+  // Highlight moving joints: a joint that moves in the accent's orange, a
+  // rigid one in grey.
+  if (m_mode == Mode::Idle) {
+    const QSettings store;
+    const int symbols = std::clamp(store.value(QStringLiteral("graphics/jointSymbols"), 3).toInt(), 0, 3);
+    const bool moving = store.value(QStringLiteral("graphics/highlightMovingJoints"), true).toBool();
+    if (symbols != 3) {
+      for (const QJsonValue& value : m_snapshot.joints.value(QStringLiteral("joints")).toArray()) {
+        const JointHighlight joint = jointHighlightOf(value.toObject(), QString());
+        if (!joint.isValid() || joint.kind == QStringLiteral("constraint")) continue;
+        const auto framed = std::find_if(joint.sides.cbegin(), joint.sides.cend(),
+                                         [](const JointSide& side) { return side.frame.has_value(); });
+        if (framed == joint.sides.cend()) continue;
+        const gp_Trsf placement = placementOf(joint.placing).Transformation();
+        const gp_Pnt origin = framePoint(framed->frame->origin).Transformed(placement);
+        gp_Vec z = frameVector(framed->frame->z).Transformed(placement);
+        if (z.Magnitude() < 1e-9) continue;
+        const QColor ink = moving && joint.kind != QStringLiteral("rigid") ? QColor(0xe0, 0x6c, 0x1a)
+                                                                           : QColor(0x8a, 0x94, 0xa3);
+        const double size = 6.0;
+        std::vector<TopoDS_Shape> drawn;
+        if (symbols == 0 || symbols == 1) {
+          try {
+            drawn.push_back(BRepBuilderAPI_MakeEdge(gp_Circ(gp_Ax2(origin, gp_Dir(z)), size)).Edge());
+          } catch (const Standard_Failure&) {
+          }
+        }
+        if (symbols == 0 || symbols == 2) {
+          const TopoDS_Shape axis = axisShape(origin.Translated(-z.Normalized() * size), z, 2.0 * size);
+          if (!axis.IsNull()) drawn.push_back(axis);
+        }
+        for (const TopoDS_Shape& shape : drawn) {
+          HighlightDisplay symbol{SelectionItem(), shape, ink};
+          symbol.pickable = false;
+          highlights.push_back(symbol);
+        }
+      }
+    }
+  }
   if (m_mode == Mode::Idle) {
     for (const SelectionItem& item : std::as_const(m_selection)) {
       if (item.kind != SelectKind::Feature) {

@@ -44,10 +44,10 @@ struct GraphicsSettings {
   bool chipLiveDetails = true;
   bool chipFoldItems = true;
   bool chipEscClosesAnalyses = false;
-  int jointSymbols = 0;           // 0 Ring and axis, 1 Ring, 2 Axis, 3 None
+  int jointSymbols = 3;           // 0 Ring and axis, 1 Ring, 2 Axis, 3 None (PureCAD: None keeps the view as before)
   bool highlightMovingJoints = true;
   // SURFACES AND EDGES
-  bool cosmeticThreads = false;
+  bool cosmeticThreads = true;   // PureCAD: on, as MitCad draws them
   bool sketchHalo = false;
   bool hatchByPart = true;        // Section hatch: One style or By part
   bool tintNewSurface = true;

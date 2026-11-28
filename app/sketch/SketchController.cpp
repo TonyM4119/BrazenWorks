@@ -9,6 +9,7 @@
 #include <tuple>
 #include <utility>
 
+#include <QElapsedTimer>
 #include <QAction>
 #include <QCoreApplication>
 #include <QGuiApplication>
@@ -45,6 +46,19 @@
 
 namespace mitcad::sketch {
 namespace {
+
+// PureCAD: Preferences › Sketch › Center and midpoint guides, read at most
+// once a second.
+bool sketchMidpointSnaps() {
+  static QElapsedTimer age;
+  static bool on = true;
+  if (!age.isValid() || age.elapsed() > 1000) {
+    on = QSettings().value(QStringLiteral("sketchPrefs/centerGuides"), true).toBool();
+    age.start();
+  }
+  return on;
+}
+
 
 // Shift+Return and Shift+Enter in a sketch value editor (mitcad#2090):
 // accepted as Enter accepts it, marked to replace what blocks the new
@@ -3822,6 +3836,7 @@ void SketchController::updateCursor(const QPointF& position) {
     // is held.
     settings.extensions = m_extensionSnap && !dragsFreely(QGuiApplication::keyboardModifiers());
     settings.acquired = m_acquired;
+    settings.midpoints = sketchMidpointSnaps(); // PureCAD
     m_snap = snap(settings, *raw, position);
   } else {
     m_snap = Snap();

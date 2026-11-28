@@ -14,6 +14,7 @@
 #include <QDialog>
 #include <QElapsedTimer>
 #include <QHash>
+#include <QSet>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMainWindow>
@@ -68,6 +69,7 @@ class QMenu;
 class QResizeEvent;
 class QStackedWidget;
 class QTimer;
+class QFrame;
 class QToolButton;
 
 namespace mitcad {
@@ -198,6 +200,23 @@ class MainWindow : public QMainWindow, public SketchHost, public DocumentHost {
   Q_OBJECT
 
 public:
+  // PureCAD: Design › Update changed links when a tab comes back.
+  void checkLinksOnReturn() { checkLinkedFiles(); }
+  // PureCAD: Layout › Remember each design's toolbar tab (off: a design shown
+  // takes the tab of the one before) and Keep dialogs and tools open when
+  // switching designs (off: the one left closes its command).
+  QString toolbarTab() const;
+  void showToolbarTab(const QString& tab);
+  void cancelOnLeave();
+  // PureCAD: components copied in one design, pasted in another
+  // (DocumentHost); at the origin or where they were (Preferences › Design ›
+  // Paste components from another design at the origin).
+  void copiedOccurrence(const QString& path, const QString& name) override;
+  QString otherDesignCopy() const override;
+  void pasteFromOtherDesign() override;
+  // PureCAD: Layout › Double-click renames tab: a new name for the design
+  // (its file renamed in its folder once saved).
+  void renameFromTab();
   // With demo set, starts with a dimensioned block instead of an empty part.
   explicit MainWindow(bool demo = false, QWidget* parent = nullptr, bool nativeUi = false);
   ~MainWindow() override;
@@ -611,6 +630,9 @@ public:
 protected:
   void keyPressEvent(QKeyEvent* event) override;
   void closeEvent(QCloseEvent* event) override;
+  // PureCAD: Preferences › Layout › Pause drawing while the window is
+  // dragged (Windows: between the system's start and end of a move or size).
+  bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
   // Files dropped on the window are opened or imported (U6).
   void dragEnterEvent(QDragEnterEvent* event) override;
   // Each move over the window accepted as the enter was (mitcad#2289): a
@@ -1306,6 +1328,24 @@ private:
   // Whether the analysis shown is a section (Flip and Remove Section
   // Analysis).
   bool sectionShown() const;
+  // PureCAD: Graphics › Status chips (the analysis shown named over the
+  // view, Esc hiding it).
+  bool hideShownAnalysis(const QString& key);
+  void updateAnalysisChip();
+  QToolButton* m_analysisChip = nullptr;
+  void updateProfileOperations(); // PureCAD: Graphics › Profile operations
+  QFrame* m_profileBar = nullptr;
+  void checkBodies(const std::vector<BodyDisplay>& bodies); // PureCAD: Design › Full kernel check
+  QSet<quintptr> m_checkedShapes;
+  std::unique_ptr<CommandDef> m_invertedJoint; // PureCAD: Design › Invert joint selection order
+  Selection m_oldPlaceGhosts; // PureCAD: Tools › moved parts' old place
+  void showOldPlaceGhosts();
+  // PureCAD: Tools › Hole › Several holes on one face / Group holes made
+  // together: the holes of one run, and whether the next one is starting.
+  QStringList timelineUids() const;
+  QStringList m_holeRun;
+  bool m_holeRunContinues = false;
+  QStringList m_holeRunStart;
   // Print Analysis kept in the document (mitcad#620,
   // MainWindowPrintAnalysis.cpp): the shown one's overhangs and thin walls
   // over the bodies, computed again when it, its bodies or the design
@@ -1604,6 +1644,9 @@ private:
   // PureCAD: Preferences › Layout › Highlight active commands: the running
   // command's toolbar buttons tinted while it runs (empty: none).
   void markActiveCommand(const QString& id);
+  QElapsedTimer m_sketchEscTimer; // PureCAD: Sketch › Esc twice finishes
+  bool m_dragPaused = false;      // PureCAD: Layout › Pause drawing while dragged
+  std::optional<CameraState> m_extrudeCamera; // PureCAD: Tools › back to the view before Extrude
   // What the panel asks for (paths relative to the project at `root`).
   void createDesignInProject(const QString& root, const QString& path);
   void createFolderInProject(const QString& root, const QString& path);
@@ -2503,6 +2546,8 @@ private:
   // it and the toolbar panel rows of createFloatingPanels(); in the Docked layout at the window's top
   // with the panel under it (createDockedTopBar).
   TitleBar* m_titleRow = nullptr;
+  QTimer* m_topBarWatch = nullptr; // PureCAD: Layout › Top bar at top edge
+  bool m_topBarRevealed = false;
   // The Docked top bar (createDockedTopBar): the toolbar panel's holder under the title row, hidden
   // over the Start page as the Floating layout hides the panel; the parts as last logged.
   QWidget* m_dockedPanel = nullptr;
@@ -2849,6 +2894,10 @@ private:
     gp_Pnt target;   // where it was dragged to, in the parent's coordinates
     std::vector<BodyDisplay> bodies; // as shown when the drag began
     QString contact; // the contact that stops it now (mitcad#454), if any
+    // PureCAD: Design › Ball joint trackball: the ball's centre (parent's
+    // coordinates) and where the pointer began, when the part turns so.
+    std::optional<gp_Pnt> ballCenter;
+    QPoint pressedAt;
   };
   std::optional<OccurrenceDragState> m_drag;
   QString m_dragHint; // the hover's drag hint shown (mitcad#150)

@@ -20,14 +20,14 @@ struct DesignPrefs {
   int lengthDecimals = 2;
   int angleDecimals = 1;
   int parameterRows = 50;
-  bool stepValues = false;
+  bool stepValues = true;           // values step as they always did (ValueStep.hpp)
   bool valuesBesideHandles = true;
   int kernelCheck = 1;              // 0 After every step, 1 Once per feature, 2 Off
   bool thirdAngle = false;          // projection of new drawings (metric default: first angle)
   QString partTemplate = QStringLiteral("ISO A3");
   QString assemblyTemplate = QStringLiteral("ISO A2");
   int sheetColor = 0;               // 0 White, 1 Cream, 2 Gray, 3 Dark
-  int sheetsSection = 0;            // 0 Multiple sheets only, 1 Always, 2 Never
+  int sheetsSection = 1;            // 0 Multiple sheets only, 1 Always (as before), 2 Never
   int trueSize = 1000;              // calibration × 1000
   bool yUp = false;                 // orientation of new designs
   bool offerStandUp = true;
@@ -45,8 +45,8 @@ struct DesignPrefs {
   bool originAxesAcross = false;
   bool originItemUnderPointer = true;
   bool updateLinks = true;
-  bool doubleClickActivates = true;
-  bool insertListsOpenFirst = true;
+  bool doubleClickActivates = false;  // a double-click renames, as before (BrowserController)
+  bool insertListsOpenFirst = false; // PureCAD: off keeps the file dialog first, as before
   bool tabsNamedAfterFile = true;
   bool invertJointOrder = false;
   bool ballJointTrackball = true;
@@ -69,6 +69,8 @@ struct DesignPrefs {
     flag("stepValues", s.stepValues);
     flag("valuesBesideHandles", s.valuesBesideHandles);
     number("kernelCheck", s.kernelCheck, 0, 2);
+    // PureCAD: until chosen here, the New Drawing dialog's last projection.
+    s.thirdAngle = !store.value(QStringLiteral("drawing/firstAngle"), false).toBool();
     flag("thirdAngle", s.thirdAngle);
     text("partTemplate", s.partTemplate);
     text("assemblyTemplate", s.assemblyTemplate);
@@ -99,7 +101,12 @@ struct DesignPrefs {
     flag("pasteAtOrigin", s.pasteAtOrigin);
     return s;
   }
+  // PureCAD: Heal imported parts: the geometry's import reads the switch
+  // from the environment (geometry/io exchange.cpp heal_if_asked).
+  static void applyImportHealing(bool on) { qputenv("PURECAD_HEAL_IMPORTS", on ? "1" : "0"); }
+
   void save() const {
+    applyImportHealing(healImports);
     QSettings store;
     const QString g = QStringLiteral("design/");
     const auto put = [&](const char* n, const QVariant& v) { store.setValue(g + QLatin1String(n), v); };
@@ -109,6 +116,10 @@ struct DesignPrefs {
     put("stepValues", stepValues);
     put("valuesBesideHandles", valuesBesideHandles);
     put("kernelCheck", kernelCheck);
+    // PureCAD: a changed projection becomes the New Drawing dialog's choice.
+    if (store.value(g + QStringLiteral("thirdAngle"), false).toBool() != thirdAngle) {
+      store.setValue(QStringLiteral("drawing/firstAngle"), !thirdAngle);
+    }
     put("thirdAngle", thirdAngle);
     put("partTemplate", partTemplate);
     put("assemblyTemplate", assemblyTemplate);

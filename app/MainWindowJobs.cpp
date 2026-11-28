@@ -11,6 +11,7 @@
 #include <memory>
 #include <thread>
 
+#include <QSettings>
 #include <QApplication>
 #include <QElapsedTimer>
 #include <QEventLoop>
@@ -114,6 +115,13 @@ void MainWindow::waitForJob(const QString& label, ModelJob& job, const QElapsedT
       });
       dialog->showProgress(job.stage(), job.control().progress(), clock.elapsed());
       showDialog(dialog.get());
+      // PureCAD: Preferences › Layout › Operations in the view: the progress
+      // over the middle of the 3D view rather than the window's.
+      if (m_viewer != nullptr && m_viewer->isVisible() && blocked == nullptr &&
+          QSettings().value(QStringLiteral("layout/operationsInView"), true).toBool()) {
+        const QPoint middle = m_viewer->mapToGlobal(m_viewer->rect().center());
+        dialog->move(middle - QPoint(dialog->width() / 2, dialog->height() / 2));
+      }
       // The dialog takes clicks; the cursor says so.
       cursor.release();
       qDebug().noquote() << QStringLiteral("Progress dialog shown: %1").arg(label);

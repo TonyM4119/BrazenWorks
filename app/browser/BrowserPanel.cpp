@@ -12,6 +12,7 @@
 #include <utility>
 #include <vector>
 
+#include <QSettings>
 #include <QApplication>
 #include <QCursor>
 #include <QFont>
@@ -2874,6 +2875,17 @@ void BrowserPanel::addComponentRows(QTreeWidgetItem* parent, const DocumentSnaps
     for (const QString& uid : std::as_const(looseBodies)) {
       addBodyRow(bodyFolders.value(snapshot.bodies.value(uid).folder, bodies), uid);
     }
+    // PureCAD: Preferences › Layout › Bodies folders: Always (as before),
+    // only for Several bodies, or Never: the folder's rows then stand in
+    // its place under the component.
+    const int folders = QSettings().value(QStringLiteral("layout/bodiesFolders"), 0).toInt();
+    if (looseBodies.size() == bodyIds.size() && (folders == 2 || (folders == 1 && looseBodies.size() <= 1))) {
+      QTreeWidgetItem* holder = parent != nullptr ? parent : bodies->treeWidget()->invisibleRootItem();
+      const int at = holder->indexOfChild(bodies);
+      const QList<QTreeWidgetItem*> rows = bodies->takeChildren();
+      holder->insertChildren(at, rows);
+      bodies->setHidden(true); // kept (the rows' maps know it), empty and hidden
+    }
   }
   if (!envelope.isEmpty()) {
     return;
@@ -3664,6 +3676,20 @@ void BrowserPanel::rebuild(const DocumentSnapshot& snapshot, bool originShown) {
   }
 
   addComponentRows(rootItem, snapshot, rootNode.uid, QString(), true, uses);
+  // PureCAD: Preferences › Layout › Origin and bodies on top: the Bodies
+  // folder right under Origin, above the sets, Center of Mass and sketches.
+  if (QSettings().value(QStringLiteral("layout/originAndBodiesOnTop"), false).toBool()) {
+    for (int i = 0; i < rootItem->childCount(); ++i) {
+      if (nodeOf(rootItem->child(i)).type == BrowserNode::Type::Bodies) {
+        const int to = rootItem->indexOfChild(origin) + 1;
+        if (i > to) {
+          QTreeWidgetItem* row = rootItem->takeChild(i);
+          rootItem->insertChild(to, row);
+        }
+        break;
+      }
+    }
+  }
 
   // The occurrences, each with its component's rows; those in folders
   // (mitcad#2103) under their folders' rows, which come first.

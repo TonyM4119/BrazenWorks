@@ -86,5 +86,6 @@ private:
   bool m_closePosted = false;
   QString m_loggedTab; // logShownTab's last line
   QString m_loggedWidths; // and its last line of the title row's tabs
+  QPointer<MainWindow> m_shownDocument; // PureCAD: the design shown before a tab change
 };
 } // namespace mitcad

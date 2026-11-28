@@ -10,10 +10,13 @@
 #include <utility>
 #include <vector>
 
+#include <QHash>
 #include <QDebug>
 #include <QFontMetricsF>
 #include <QPaintDevice>
 #include <QPainter>
+#include <QDateTime>
+#include <QSettings>
 #include <QPainterPath>
 #include <QRegularExpression>
 #include <QSet>
@@ -120,7 +123,62 @@ QRectF clearOfCards(QRectF block, const QRectF& free, const std::vector<QRect>& 
   return start;
 }
 
-constexpr double kGlyphSize = 15.0;
+// PureCAD: Preferences › Sketch › Dimension color: the user's own color for
+// driving dimensions while chosen, else the theme's (kDimensionColor).
+QColor userDimensionColor(const QColor& theme) {
+  static QColor chosen;
+  static qint64 readAt = -1;
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  if (readAt < 0 || now - readAt > 1000) { // read again at most once a second
+    const QSettings store;
+    chosen = store.value(QStringLiteral("sketchPrefs/dimensionColorCustom"), false).toBool()
+                 ? QColor(store.value(QStringLiteral("sketchPrefs/dimensionColor"), QStringLiteral("#822a6e")).toString())
+                 : QColor();
+    readAt = now;
+  }
+  return chosen.isValid() ? chosen : theme;
+}
+
+// PureCAD: Preferences › Sketch › Conflicting constraints in red (on by
+// default).
+bool conflictColoring() {
+  static bool on = true;
+  static qint64 readAt = -1;
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  if (readAt < 0 || now - readAt > 1000) {
+    on = QSettings().value(QStringLiteral("sketchPrefs/conflictColor"), true).toBool();
+    readAt = now;
+  }
+  return on;
+}
+
+// PureCAD: a Preferences › Sketch switch, read again at most once a second.
+bool sketchSwitch(const char* key, bool otherwise) {
+  struct Read {
+    bool on;
+    qint64 at;
+  };
+  static QHash<QString, Read> cache;
+  const QString name = QStringLiteral("sketchPrefs/") + QLatin1String(key);
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  auto found = cache.find(name);
+  if (found == cache.end() || now - found->at > 1000) {
+    found = cache.insert(name, {QSettings().value(name, otherwise).toBool(), now});
+  }
+  return found->on;
+}
+
+// PureCAD: Preferences › Sketch › Constraint glyph size (percent of 15 px).
+double glyphSizeNow() {
+  static double size = 15.0;
+  static qint64 readAt = -1;
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  if (readAt < 0 || now - readAt > 1000) { // read again at most once a second
+    size = 15.0 * std::clamp(QSettings().value(QStringLiteral("sketchPrefs/glyphSize"), 100).toInt(), 50, 300) / 100.0;
+    readAt = now;
+  }
+  return size;
+}
 constexpr double kGlyphStep = 17.0;
 constexpr double kArrowLength = 8.0;
 
@@ -801,7 +859,11 @@ DimensionShape dimensionShape(const DimensionData& d, const SketchModel& model,
 SketchOverlay::SketchOverlay(SketchController& controller, OcctViewer& view)
     : QObject(&view), m_c(controller), m_view(view), m_font(view.font()) {
   setObjectName(QStringLiteral("sketchOverlay"));
-  m_font.setPointSizeF(9.0 * uiTextScale()); // at Text size (mitcad#1556)
+  // At Text size (mitcad#1556); PureCAD: and Preferences › Sketch ›
+  // Dimension text size (percent), read as each sketch opens.
+  m_font.setPointSizeF(9.0 * uiTextScale() *
+                       std::clamp(QSettings().value(QStringLiteral("sketchPrefs/dimensionTextSize"), 100).toInt(), 50, 300) /
+                       100.0);
   // Drawn by the view itself (mitcad#2296).
   m_layer = view.addPaintLayer(QStringLiteral("sketch overlay"), [this](QPainter& painter) { paint(painter); }, this);
   connect(&m_c.viewer(), &OcctViewer::backgroundToneChanged, this, &SketchOverlay::logDimensionHalos);
@@ -1342,7 +1404,7 @@ std::vector<SketchOverlay::Glyph> SketchOverlay::glyphs() const {
       const QPointF first = center - along * (index * kGlyphStep);
       const QPointF last = first + along * ((count - 1) * kGlyphStep);
       const auto box = [](const QPointF& at) {
-        return QRectF(at.x() - kGlyphSize / 2, at.y() - kGlyphSize / 2, kGlyphSize, kGlyphSize);
+        return QRectF(at.x() - glyphSizeNow() / 2, at.y() - glyphSizeNow() / 2, glyphSizeNow(), glyphSizeNow());
       };
       const QRectF row = box(first).united(box(last));
       const std::vector<QPointF> own =
@@ -1351,7 +1413,7 @@ std::vector<SketchOverlay::Glyph> SketchOverlay::glyphs() const {
       placedRows.push_back(row.translated(offset->second));
     }
     center += offset->second;
-    g.rect = QRectF(center.x() - kGlyphSize / 2, center.y() - kGlyphSize / 2, kGlyphSize, kGlyphSize);
+    g.rect = QRectF(center.x() - glyphSizeNow() / 2, center.y() - glyphSizeNow() / 2, glyphSizeNow(), glyphSizeNow());
     result.push_back(g);
   }
   return result;
@@ -1545,6 +1607,9 @@ void SketchOverlay::paintGlyph(QPainter& painter, const Glyph& glyph, bool selec
 
 void SketchOverlay::paintDimensionHalo(QPainter& painter, const DimensionShape& placed,
                                        const QColor& halo) {
+  if (!sketchSwitch("dimensionRim", true)) {
+    return; // PureCAD: Preferences › Sketch › Rim under dimensions
+  }
   const DimensionShape shape = onDevicePixels(placed, painter);
   painter.setPen(QPen(halo, kDimensionHaloWidth, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
   painter.setBrush(Qt::NoBrush);
@@ -1591,11 +1656,11 @@ std::pair<QColor, QColor> SketchOverlay::dimensionColors(bool driven, bool inact
   const QColor color = hovered    ? kHoverColor
                        : inactive ? kInactiveColor
                        : driven   ? kDrivenColor
-                                  : kDimensionColor;
+                                  : userDimensionColor(kDimensionColor);
   const QColor lines = !dark || hovered ? color
                        : inactive       ? kInactiveColorDark
                        : driven         ? kDrivenColorDark
-                                        : kDimensionColorDark;
+                                        : userDimensionColor(kDimensionColorDark);
   return {color, lines};
 }
 
@@ -1919,7 +1984,7 @@ void SketchOverlay::paintPreview(QPainter& painter, const ToolPreview& preview) 
     // typed values are below right of it).
     const QPointF at = preview.glyphAt ? m_c.toScreen(*preview.glyphAt) + QPointF(8, -24)
                                        : m_c.cursor() + QPointF(-34, -30);
-    glyph.rect = QRectF(at.x(), at.y(), kGlyphSize, kGlyphSize);
+    glyph.rect = QRectF(at.x(), at.y(), glyphSizeNow(), glyphSizeNow());
     paintGlyph(painter, glyph, false, true);
   }
   // The auto constraints the next click adds, in a row below right of
@@ -1929,7 +1994,7 @@ void SketchOverlay::paintPreview(QPainter& painter, const ToolPreview& preview) 
     for (int i = 0; i < preview.marks.size(); ++i) {
       Glyph glyph;
       glyph.type = preview.marks.at(i);
-      glyph.rect = QRectF(at.x() + i * (kGlyphSize + 3), at.y(), kGlyphSize, kGlyphSize);
+      glyph.rect = QRectF(at.x() + i * (glyphSizeNow() + 3), at.y(), glyphSizeNow(), glyphSizeNow());
       paintGlyph(painter, glyph, false, true);
     }
   }
@@ -2199,7 +2264,7 @@ void SketchOverlay::paint(QPainter& painter) {
       const bool selected = isSelected(QStringLiteral("dimension"), layout.id);
       const bool driven = d != nullptr && d->driven;
       const bool inactive = d != nullptr && !d->active;
-      const bool conflicted = conflicts.contains(layout.id);
+      const bool conflicted = conflictColoring() && conflicts.contains(layout.id);
       const bool hovered = hover == layout.id || (conflicted && conflictHovered);
       const bool marked = selected || hovered || conflicted;
       painter.setOpacity(dimmed[i] ? kThroughOpacity : 1.0);
@@ -2208,23 +2273,36 @@ void SketchOverlay::paint(QPainter& painter) {
                            : conflicted ? kConflictColor
                            : inactive ? kInactiveColor
                            : driven ? kDrivenColor
-                                    : kDimensionColor;
+                                    : userDimensionColor(kDimensionColor);
       const QColor lines = !dark || marked ? color
                            : inactive      ? kInactiveColorDark
                            : driven        ? kDrivenColorDark
-                                           : kDimensionColorDark;
+                                           : userDimensionColor(kDimensionColorDark);
       paintDimension(painter, layout.shape, layout.textRect, color, lines, driven, inactive);
     }
     painter.setOpacity(1.0);
   }
   logInactive();
   if (m_c.showConstraints()) {
+    // PureCAD: Preferences › Sketch › Hide glyphs when zoomed out: a glyph
+    // that would sit on one already drawn (the sketch shrunk on screen) is
+    // left out unless it is selected, hovered or in conflict.
+    const bool thinOut = sketchSwitch("hideGlyphsZoomedOut", true);
+    std::vector<QRectF> drawnGlyphs;
     for (const Glyph& g : glyphs()) {
       const bool selected = g.constraint.isEmpty() ? isSelected(QStringLiteral("fix"), g.entity)
                                                    : isSelected(QStringLiteral("constraint"), g.constraint);
-      const bool conflicted = !g.constraint.isEmpty() && conflicts.contains(g.constraint);
+      const bool conflicted = conflictColoring() && !g.constraint.isEmpty() && conflicts.contains(g.constraint);
       const bool hovered = (g.constraint.isEmpty() ? hover == g.entity : hover == g.constraint) ||
                            (conflicted && conflictHovered);
+      if (thinOut && !selected && !hovered && !conflicted) {
+        const QRectF core = g.rect.adjusted(2, 2, -2, -2);
+        if (std::any_of(drawnGlyphs.begin(), drawnGlyphs.end(),
+                        [&core](const QRectF& other) { return other.intersects(core); })) {
+          continue;
+        }
+      }
+      drawnGlyphs.push_back(g.rect);
       const bool dimmed =
           !selected && !hovered && !conflicted &&
           behindBodies(QStringLiteral("glyph %1 %2 %3").arg(g.constraint, g.entity, g.type), g.rect.center());
@@ -2350,7 +2428,8 @@ SketchOverlay::BadgeLayout SketchOverlay::badgeLayout() const {
   const int bottomInset = m_view.overlayInsets().bottom();
   const int topInset = m_view.overlayInsets().top();
   const std::vector<QRect> covered = m_view.coveredRects();
-  const QString pointer = m_c.pointerText();
+  // PureCAD: Preferences › Sketch › Cursor coordinates.
+  const QString pointer = sketchSwitch("cursorCoordinates", true) ? m_c.pointerText() : QString();
   out.pointer = pointer;
   // The pointer's place in the sketch's coordinates (mitcad#254), above the
   // badge, at least as wide as a place of three digits so that it does not

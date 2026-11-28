@@ -42,6 +42,8 @@ void startThemePreference();
 // palette, window #… over the platform's light one)" or
 // "Theme: system (light)" once it is settled.
 void applyThemePreference(ThemeChoice choice);
+// PureCAD: the imported theme file (.qss) applied, or taken off.
+void applyThemeFile();
 
 // For tests (MITCAD_TEST_COLOR_SCHEME once the window shows, mitcad#2404;
 // not the test driver's color-scheme step, which stands for the desktop's

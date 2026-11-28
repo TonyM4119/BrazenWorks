@@ -1,6 +1,8 @@
 // SPDX-License-Identifier: MIT
 #include "ValueStep.hpp"
 
+#include <QSettings>
+
 #include <algorithm>
 #include <cmath>
 
@@ -93,6 +95,8 @@ QString valueStepHint(bool macKeys) {
   return macKeys ? QCoreApplication::translate("ValueStep", "Up/Down steps the value; Shift ×10, Option ×0.1")
                  : QCoreApplication::translate("ValueStep", "Up/Down steps the value; Shift ×10, Ctrl ×0.1");
 }
+
+bool valueSteppingOn() { return QSettings().value(QStringLiteral("design/stepValues"), true).toBool(); }
 
 std::optional<QString> steppedValue(const QString& text, ParameterKind kind, double step,
                                     const ValueStepLimit& limit, double bareUnit) {

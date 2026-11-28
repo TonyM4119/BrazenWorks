@@ -279,7 +279,7 @@ StepRead read_step_structured(const std::string& path, bool keep_assembly,
       return read;
     }
   }
-  read.bodies = detail::document_bodies(document);
+  read.bodies = detail::heal_if_asked(detail::document_bodies(document)); // PureCAD
   if (read.bodies.empty()) {
     throw Error("STEP file " + path + " has no shapes");
   }

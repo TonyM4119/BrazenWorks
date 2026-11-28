@@ -505,6 +505,9 @@ public:
   // selection still needed, else its first. False when the command has
   // ended or no such input is shown.
   bool pickInWindow(const QString& key);
+  // PureCAD: the shown selection input `key` becomes the active one, as a
+  // click on its row makes it (Tools › Hole › Move by click or drag).
+  bool activateSelection(const QString& key);
   // The key of the selection input that takes the view's picks now; empty
   // when none does.
   const QString& activeSelection() const { return m_active; }

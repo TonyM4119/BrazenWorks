@@ -10,9 +10,12 @@
 #include <optional>
 #include <utility>
 
+#include <IntCurvesFace_ShapeIntersector.hxx>
+#include <gp_Lin.hxx>
 #include <QJsonArray>
 #include <QJsonDocument>
 #include <QKeySequence>
+#include <QSettings>
 #include <QtLogging>
 
 #include "CommandFactories.hpp"
@@ -22,6 +25,43 @@
 
 namespace mitcad::cmd {
 namespace {
+
+// PureCAD: Preferences › Tools › Extrude arrow stops at faces: the
+// distances along the arrow's line, both ways, where it meets the faces
+// of the design's bodies; kept for the same line while the panel is open.
+std::vector<double> faceStops(const gp_Pnt& origin, const gp_Dir& direction, const CommandContext& context) {
+  if (!QSettings().value(QStringLiteral("tools/extrudeArrowStops"), false).toBool()) {
+    return {};
+  }
+  static QString lastKey;
+  static std::vector<double> last;
+  const QString key = QStringLiteral("%1 %2 %3 %4 %5 %6")
+                          .arg(origin.X()).arg(origin.Y()).arg(origin.Z())
+                          .arg(direction.X()).arg(direction.Y()).arg(direction.Z());
+  if (key == lastKey) {
+    return last;
+  }
+  std::vector<double> stops;
+  try {
+    for (const QJsonValue& value : context.queryArray(QStringLiteral("bodies"))) {
+      const QString uid = value.toObject().value(QStringLiteral("uid")).toString();
+      const std::shared_ptr<geometry::Shape> shape = uid.isEmpty() ? nullptr : context.bodyShape(uid);
+      if (!shape || shape->occt().IsNull()) continue;
+      IntCurvesFace_ShapeIntersector hits;
+      hits.Load(shape->occt(), 1e-6);
+      hits.Perform(gp_Lin(origin, direction), -1e6, 1e6);
+      for (int i = 1; hits.IsDone() && i <= hits.NbPnt(); ++i) {
+        if (std::abs(hits.WParameter(i)) > 1e-6) stops.push_back(hits.WParameter(i));
+      }
+    }
+  } catch (const std::exception&) {
+    // Standard_Failure is a std::exception too (OCCT 8): no stops then.
+  }
+  std::sort(stops.begin(), stops.end());
+  lastKey = key;
+  last = stops;
+  return stops;
+}
 
 const QString kDistance = QStringLiteral("distance");
 const QString kToObject = QStringLiteral("to_object");
@@ -240,6 +280,7 @@ QVector<InputDef> sideInputs(const QString& suffix, std::function<bool(const Com
             if (!turned && state.choice(QStringLiteral("start")) == QStringLiteral("offset")) {
               handle.clearPast = 1;
             }
+            handle.stops = faceStops(base->first, direction, context); // PureCAD
             return handle;
           }),
   };

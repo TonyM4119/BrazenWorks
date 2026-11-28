@@ -170,7 +170,7 @@ Snap snap(const SnapSettings& settings, const V2& raw, const QPointF& screen) {
     if (d <= kNearPixels) {
       nearby.push_back(&c);
     }
-    if (c.isLine() || c.isArc()) {
+    if (settings.midpoints && (c.isLine() || c.isArc())) {
       const V2 middle = c.curve.middle();
       const double dm = screenDistance(toScreen(middle), screen);
       if (dm <= kSpecialPixels) {
@@ -181,7 +181,7 @@ Snap snap(const SnapSettings& settings, const V2& raw, const QPointF& screen) {
         best.offer(1, dm, s);
       }
     }
-    if (c.isCircular() || c.isEllipse()) {
+    if (settings.midpoints && (c.isCircular() || c.isEllipse())) {
       for (int q = 0; q < 4; ++q) {
         const double t = q * kPi / 2.0;
         if (!c.curve.contains(t) && !c.curve.contains(t + kTwoPi)) {

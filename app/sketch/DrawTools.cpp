@@ -8,6 +8,8 @@
 #include <optional>
 #include <vector>
 
+#include <QSettings>
+#include <QGuiApplication>
 #include <QObject>
 #include <QtLogging>
 
@@ -1338,6 +1340,14 @@ protected:
     }
     if (const auto height = m_c.fieldValue(QStringLiteral("height"))) {
       p.y = a.y + (p.y >= a.y ? 1.0 : -1.0) * *height * scale;
+    }
+    // PureCAD: Preferences › Sketch › Shift makes a rectangle a square.
+    if (!m_c.fieldValue(QStringLiteral("width")) && !m_c.fieldValue(QStringLiteral("height")) &&
+        QGuiApplication::keyboardModifiers().testFlag(Qt::ShiftModifier) &&
+        QSettings().value(QStringLiteral("sketchPrefs/shiftSquare"), false).toBool()) {
+      const double side = std::max(std::abs(p.x - a.x), std::abs(p.y - a.y));
+      p.x = a.x + (p.x >= a.x ? side : -side);
+      p.y = a.y + (p.y >= a.y ? side : -side);
     }
     return p;
   }

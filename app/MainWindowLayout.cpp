@@ -6,6 +6,16 @@
 // again whenever the page's settings are saved.
 #include "MainWindow.hpp"
 
+#include <QCursor>
+#include <QSettings>
+#include <QJsonObject>
+#include <QJsonArray>
+#include <QLineEdit>
+#include <QDir>
+#include <QFileInfo>
+#include <QFile>
+#include <QRegularExpression>
+#include <QInputDialog>
 #include <QEvent>
 #include <QLabel>
 #include <QStatusBar>
@@ -18,11 +28,13 @@
 #include "framework/FloatingLayout.hpp"
 #include "framework/IconSizeStyle.hpp"
 #include "framework/Ribbon.hpp"
+#include "framework/TitleBar.hpp"
 #include "framework/GlassCard.hpp"
 #include "browser/BrowserController.hpp"
 #include "browser/BrowserPanel.hpp"
 #include "browser/TimelineWidget.hpp"
 #include "view/LayoutPreferences.hpp"
+#include "view/GraphicsSettings.hpp"
 #include "view/LayoutSettings.hpp"
 #include "view/NavigationBar.hpp"
 
@@ -90,6 +102,33 @@ NavigationIdle* idleOf(GlassCard* card) {
 } // namespace
 
 void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
+  // PureCAD: Window › Top bar: Always, or At top edge: hidden until the
+  // pointer comes to the view's top edge, then over the view until it
+  // leaves the bar.
+  if (m_titleRow != nullptr && m_floating != nullptr) {
+    if (layout.topBarAtEdge && m_topBarWatch == nullptr) {
+      m_topBarWatch = new QTimer(this);
+      m_topBarWatch->setInterval(120);
+      connect(m_topBarWatch, &QTimer::timeout, this, [this] {
+        if (m_titleRow == nullptr || m_floating == nullptr || !isActiveWindow()) return;
+        const QPoint at = m_floating->mapFromGlobal(QCursor::pos());
+        const bool inside = m_floating->rect().contains(at);
+        const bool overBar = m_titleRow->isVisible() && m_titleRow->rect().contains(m_titleRow->mapFromGlobal(QCursor::pos()));
+        const bool wanted = inside && (at.y() <= 6 || overBar);
+        if (wanted != m_topBarRevealed) {
+          m_topBarRevealed = wanted;
+          m_floating->setRowHidden(m_titleRow, !wanted, true);
+        }
+      });
+      m_topBarRevealed = false;
+      m_floating->setRowHidden(m_titleRow, true, true);
+      m_topBarWatch->start();
+    } else if (!layout.topBarAtEdge && m_topBarWatch != nullptr) {
+      m_topBarWatch->deleteLater();
+      m_topBarWatch = nullptr;
+      m_floating->setRowHidden(m_titleRow, false);
+    }
+  }
   // Window › Keep on top of other windows. Changing a window's flags hides
   // it; it shows again where it was.
   const bool onTop = windowFlags().testFlag(Qt::WindowStaysOnTopHint);
@@ -121,9 +160,10 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
   }
   // Window › Menus: List or Large icons (menus made from now on).
   IconSizeStyle::setLargeMenuIcons(layout.largeMenuIcons);
-  // Window › Ribbon.
+  // Window › Ribbon; Toolbar tabs › Keep the Sketch tab shown.
   if (m_ribbon != nullptr) {
     m_ribbon->setGroupsShown(layout.ribbon);
+    m_ribbon->setKeepSketchTab(layout.keepSketchTab);
   }
   // Window › Ribbon › Only when hovered: View › Toolbar Panel hidden, shown
   // at the view's top edge (MainWindowToolbarPanel.cpp).
@@ -214,6 +254,13 @@ void MainWindow::followLayoutSettings() {
       self->applyLayoutSettings(layout);
     }
   });
+  // PureCAD: what Preferences › Graphics draws through the window's own
+  // highlights (joint symbols) drawn again once it is saved.
+  graphicsSettingsListeners().push_back([self](const GraphicsSettings&) {
+    if (self != nullptr && !self->modelBusy()) {
+      self->updateIdleView();
+    }
+  });
 }
 
 void MainWindow::markActiveCommand(const QString& id) {
@@ -242,6 +289,122 @@ void MainWindow::markActiveCommand(const QString& id) {
                             QStringLiteral(" QToolButton { background: %1; border-radius: 6px; }")
                                 .arg(tint.name(QColor::HexArgb)));
     }
+  }
+}
+
+bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) {
+#ifdef Q_OS_WIN
+  if (eventType == "windows_generic_MSG" && message != nullptr && m_viewer != nullptr) {
+    // A MSG starts with its window and its message id (no <windows.h> here).
+    struct MessageHead {
+      void* window;
+      unsigned int id;
+    };
+    constexpr unsigned int kEnterSizeMove = 0x0231; // WM_ENTERSIZEMOVE
+    constexpr unsigned int kExitSizeMove = 0x0232;  // WM_EXITSIZEMOVE
+    const unsigned int id = static_cast<const MessageHead*>(message)->id;
+    if (id == kEnterSizeMove && LayoutSettings::load().pauseDrawingWhileDragged) {
+      m_dragPaused = true;
+      m_viewer->setUpdatesEnabled(false);
+    } else if (id == kExitSizeMove && m_dragPaused) {
+      m_dragPaused = false;
+      m_viewer->setUpdatesEnabled(true);
+      m_viewer->update();
+    }
+  }
+#endif
+  return QMainWindow::nativeEvent(eventType, message, result);
+}
+
+// PureCAD: Preferences › Layout › Double-click renames tab.
+void MainWindow::renameFromTab() {
+  const QString current = documentName();
+  bool ok = false;
+  const QString typed =
+      QInputDialog::getText(this, tr("Rename Design"), tr("Name:"), QLineEdit::Normal, current, &ok).trimmed();
+  if (!ok || typed.isEmpty() || typed == current) return;
+  static const QRegularExpression bad(QStringLiteral(R"([\\/:*?"<>|])"));
+  if (typed.contains(bad)) {
+    showError(tr("A name cannot hold any of \\ / : * ? \" < > |"));
+    return;
+  }
+  if (m_filePath.isEmpty()) {
+    m_documentName = typed;
+    updateWindowTitle();
+    qInfo().noquote() << QStringLiteral("Design renamed from its tab: %1 -> %2").arg(current, typed);
+    return;
+  }
+  const QFileInfo was(m_filePath);
+  const QString moved = was.dir().filePath(typed + QLatin1Char('.') + was.suffix());
+  if (QFileInfo::exists(moved)) {
+    showError(tr("%1 already exists in this folder").arg(QFileInfo(moved).fileName()));
+    return;
+  }
+  if (!QFile::rename(m_filePath, moved)) {
+    showError(tr("Could not rename %1").arg(was.fileName()));
+    return;
+  }
+  openDesignMoved(moved);
+}
+
+namespace {
+// PureCAD: the component copied last, in whichever design.
+struct CrossCopy {
+  QPointer<MainWindow> source;
+  QString path; // the occurrence, uids from the root
+  QString name;
+};
+CrossCopy& crossCopy() {
+  static CrossCopy copy;
+  return copy;
+}
+} // namespace
+
+void MainWindow::copiedOccurrence(const QString& path, const QString& name) {
+  crossCopy() = CrossCopy{this, path, name};
+}
+
+QString MainWindow::otherDesignCopy() const {
+  const CrossCopy& copy = crossCopy();
+  return copy.source != nullptr && copy.source != this ? copy.name : QString();
+}
+
+void MainWindow::pasteFromOtherDesign() {
+  const CrossCopy copy = crossCopy();
+  if (copy.source == nullptr || copy.source == this || !canChangeModel()) return;
+  const QString file = copy.source->documentFilePath();
+  if (file.isEmpty() || copy.source->isWindowModified()) {
+    showError(tr("Save %1 first: the component is pasted from its saved file.").arg(copy.source->documentName()));
+    return;
+  }
+  QJsonObject command{{QStringLiteral("cmd"), QStringLiteral("insert_component")},
+                      {QStringLiteral("path"), QFileInfo(file).absoluteFilePath()},
+                      {QStringLiteral("link"), true},
+                      {QStringLiteral("parts"), QJsonObject{{QStringLiteral("occurrences"), QJsonArray{copy.path}}}}};
+  if (!QSettings().value(QStringLiteral("design/pasteAtOrigin"), false).toBool()) {
+    // Where it was in its design: its placement there.
+    const gp_Trsf where = copy.source->m_placements.value(copy.path);
+    QJsonArray rows;
+    for (int r = 1; r <= 3; ++r) {
+      rows.append(QJsonArray{where.Value(r, 1), where.Value(r, 2), where.Value(r, 3), where.Value(r, 4)});
+    }
+    command.insert(QStringLiteral("transform"), rows);
+  }
+  if (runModelCommand(command)) {
+    qInfo().noquote() << QStringLiteral("Pasted %1 from %2").arg(copy.name, file);
+  }
+}
+
+QString MainWindow::toolbarTab() const { return m_ribbon != nullptr ? m_ribbon->currentTab() : QString(); }
+
+void MainWindow::showToolbarTab(const QString& tab) {
+  if (m_ribbon != nullptr && !tab.isEmpty() && m_mode != Mode::Sketch) m_ribbon->showTab(tab);
+}
+
+void MainWindow::cancelOnLeave() {
+  if (m_session && !modelBusy()) {
+    qInfo().noquote() << QStringLiteral("Command closed on leaving the design (Preferences)");
+    m_session->cancel();
   }
 }
 

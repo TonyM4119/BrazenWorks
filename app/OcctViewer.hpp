@@ -49,6 +49,7 @@
 #include <TopoDS_Shape.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
+#include <Graphic3d_CLight.hxx>
 #include <gp_Ax3.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Pnt2d.hxx>
@@ -697,6 +698,10 @@ public:
   // A click on the cube's arrow `id` (up, down, left, right, cw, ccw).
   void pressCubeArrow(const QString& id);
   QMargins overlayInsets() const { return m_overlayInsets; }
+  // PureCAD: Graphics › Quick measurement: the selection's line in the
+  // view's lower right corner; empty hides it.
+  void setQuickMeasurement(const QString& text);
+  void setHiddenEdgesOf(const std::set<std::string>& bodies); // PureCAD: Graphics › hidden edges of selected
   // The width that the sketch's badge takes at the bottom left, from the
   // view's left edge to the right edge of the badge and the pointer's place
   // above it (0: none; right of a card along the left edge when it keeps
@@ -780,6 +785,12 @@ public:
   // behind. Logs "View ghosts: ..." when the list changes (`only O1/O4`
   // for an entry of own bodies).
   void setGhosts(const QStringList& occurrences);
+  // PureCAD: Tools › Show moved parts' old place as a ghost: shapes drawn
+  // faint and unpickable where they were; empty takes them away.
+  void setOldPlaceGhosts(const std::vector<TopoDS_Shape>& shapes);
+  // PureCAD: what is under `position` (view pixels) lit as the pointer's hover
+  // is, while a handle's drag holds the mouse (Tools › Highlight under Move).
+  void hoverAt(const QPoint& position);
   // What the view draws normally while a component other than the root is
   // active (mitcad#420): the bodies, sketches, profiles and construction
   // items of `occurrences` (the active component's occurrences, paths from
@@ -1907,6 +1918,8 @@ private:
   // Fork: the root origin planes' names (XY, XZ, YZ) written on each plane
   // drawn, lying in it, as Fusion's (a paint layer over the view).
   void paintPlaneNames(QPainter& painter);
+  void paintViewAngles(QPainter& painter); // PureCAD: Graphics › View angles
+  void paintQuickMeasurement(QPainter& painter);
   void remove(const occ::handle<AIS_Shape>& object);
   void activatePicking(const occ::handle<AIS_Shape>& object);
   void activateAllPicking();
@@ -1983,6 +1996,14 @@ private:
   std::unique_ptr<QWindow> m_glxWindow;
 #endif
   occ::handle<V3d_Viewer> m_viewer;
+  // PureCAD: the lights Preferences › Graphics sets (applyGraphicsSettings):
+  // the ambient, the key light (it casts the shadow) and a fill light for
+  // studio lighting.
+  occ::handle<Graphic3d_CLight> m_ambientLight;
+  occ::handle<Graphic3d_CLight> m_keyLight;
+  occ::handle<Graphic3d_CLight> m_fillLight;
+  bool m_fillOn = false;
+  bool m_sketchHaloEverywhere = false; // PureCAD: Graphics › Sketch halo
   occ::handle<V3d_View> m_view;
   occ::handle<AIS_InteractiveContext> m_context;
   occ::handle<AIS_ViewCube> m_orientationCube;
@@ -2456,6 +2477,9 @@ private:
   QString m_gridUnit = QStringLiteral("mm"); // the design's length unit (mitcad#1210)
   occ::handle<LayoutGrid> m_grid;
   gp_Ax3 m_gridPlane;
+  bool m_gridHome = true;          // PureCAD: the grid on XY, free to follow the view
+  bool m_gridFollowsView = false;  // PureCAD: Graphics › Grid follows the view
+  QString m_backgroundPicture;     // PureCAD: Appearance › Picture, as shown
   Graphic3d_ZLayerId m_gridLayer = Graphic3d_ZLayerId_UNKNOWN;
   int m_gridRebuilds = 0; // updateGrid's rebuilds so far (a 3D mouse motion's log counts them)
   // Fork: the plane ruler (setPlaneRuler): the plane, the grid's plane before
@@ -2468,6 +2492,11 @@ private:
   occ::handle<PlaneRulerAxes> m_rulerAxes3d;
   QPointer<ViewPaintLayer> m_rulerLabels;
   QPointer<ViewPaintLayer> m_planeNames; // Fork: paintPlaneNames
+  QPointer<ViewPaintLayer> m_viewAngles; // PureCAD: paintViewAngles
+  QPointer<ViewPaintLayer> m_quickLayer; // PureCAD: paintQuickMeasurement
+  QString m_quickText;
+  std::vector<occ::handle<AIS_Shape>> m_oldPlaceGhosts; // PureCAD: setOldPlaceGhosts
+  std::set<std::string> m_hiddenEdgesShown; // PureCAD: setHiddenEdgesOf
   struct RulerAxis {
     gp_Dir direction;
     double min = 0.0; // mm along it the plane reaches

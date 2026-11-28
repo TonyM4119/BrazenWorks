@@ -32,8 +32,8 @@ struct LayoutSettings {
   bool statusBar = false;
   bool operationsInView = true;         // a running operation's progress over the view
   bool waitForFiles = false;            // a file opens before the window takes input
-  bool keepToolsOpenAcrossDesigns = false;
-  bool rememberTabPerDesign = false;
+  bool keepToolsOpenAcrossDesigns = true;  // PureCAD: each design keeps its own, as before
+  bool rememberTabPerDesign = true;  // PureCAD: each design keeps its own tab, as before
   bool doubleClickRenamesTab = true;
   bool pauseDrawingWhileDragged = false;
   bool windowButtons = true;            // minimize, maximize and close in the title bar
@@ -58,7 +58,7 @@ struct LayoutSettings {
   bool partsLibrary = false;
   bool browserTree = true;
   bool sketchesUnderFeature = false;    // Sketches in History: In order or Under their feature
-  int bodiesFolders = 1;                // 0 Always, 1 Several, 2 Never
+  int bodiesFolders = 0;                // 0 Always (as before), 1 Several, 2 Never
   bool playHistoryButton = true;
   bool foldHistoryGroups = false;
   bool folderIconFromFeatures = false;

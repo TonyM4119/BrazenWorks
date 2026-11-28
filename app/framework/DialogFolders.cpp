@@ -44,6 +44,14 @@ QString dialogStartFolder(QSettings& settings, DialogGroup group, const QString&
   if (!remembered.isEmpty() && QFileInfo(remembered).isDir()) {
     return remembered;
   }
+  // PureCAD: Preferences › Design › Designs folder and Exports folder, in
+  // place of the caller's folder when nothing is remembered yet.
+  const QString chosen = group == DialogGroup::Open     ? settings.value(QStringLiteral("design/designsFolder")).toString()
+                         : group == DialogGroup::Export ? settings.value(QStringLiteral("design/exportsFolder")).toString()
+                                                        : QString();
+  if (!chosen.isEmpty() && QFileInfo(chosen).isDir()) {
+    return chosen;
+  }
   return fallback;
 }
 

@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QSettings>
 #include <QStringList>
 #include <QToolTip>
 #include <QtLogging>
@@ -642,6 +643,15 @@ ManipulatorOverlay::DragValue ManipulatorOverlay::valueAt(const Handle& handle, 
     // The step fixed when the drag began (mitcad#1431); a value asked
     // for outside a drag at the step it would take now.
     const double step = m_dragStep > 0.0 ? m_dragStep : arrowStep(handle).step;
+    // PureCAD: an arrow's stops (faces it passes) take the value within 8 px.
+    if (!m.stops.empty()) {
+      const double reach = 8.0 * pixelSize(m.origin) / factor;
+      for (const double stop : m.stops) {
+        if (stop >= m.minimum && std::abs(stop - raw) <= reach) {
+          return {stop, raw};
+        }
+      }
+    }
     return {std::max(m.minimum, std::round(raw / step) * step), raw};
   }
   const double angle = ringAngle(handle, position);
@@ -665,7 +675,19 @@ ManipulatorOverlay::DragValue ManipulatorOverlay::valueAt(const Handle& handle, 
     const double step = niceHandleStep(3.0 * pixelSize(m.origin));
     return {step > 0.0 ? std::round(raw / step) * step : raw, raw};
   }
-  const double degree = kPi / 180.0;
+  double degree = kPi / 180.0;
+  // PureCAD: Preferences › Tools › Near-axis and Far-axis steps. With the
+  // pointer inside the ring the coarse step, outside it the fine one; whole
+  // degrees as before until the preference has been saved.
+  const QSettings store;
+  if (store.contains(QStringLiteral("tools/nearAxisStep"))) {
+    const QPointF c = m_viewer.toWidgetF(m.origin);
+    const QPointF rim = m_viewer.toWidgetF(m.origin.Translated(gp_Vec(m.reference) * ringRadius(m))) - c;
+    const bool insideRing = std::hypot(position.x() - c.x(), position.y() - c.y()) <= std::hypot(rim.x(), rim.y());
+    const double chosen = insideRing ? store.value(QStringLiteral("tools/nearAxisStep"), 10.0).toDouble()
+                               : store.value(QStringLiteral("tools/farAxisStep"), 0.1).toDouble();
+    if (chosen > 0.0) degree = chosen * kPi / 180.0;
+  }
   return {std::round(raw / degree) * degree, raw};
 }
 
@@ -861,6 +883,12 @@ bool ManipulatorOverlay::viewerEvent(QEvent* event) {
     if (m_drag >= 0) {
       Handle& handle = m_handles[static_cast<std::size_t>(m_drag)];
       const DragValue value = valueAt(handle, e->position());
+      // PureCAD: Preferences › Tools › Highlight what is under the pointer
+      // while Move's arrows drag a component: its large handles' drags.
+      if (handle.manipulator.large && m_command == QLatin1String("solid.move") &&
+          QSettings().value(QStringLiteral("tools/highlightUnderMove"), false).toBool()) {
+        m_viewer.hoverAt(m_viewer.mapFromGlobal(mapToGlobal(e->position().toPoint())));
+      }
       if (std::exchange(m_firstMove, false) && handle.manipulator.kind == Manipulator::Kind::Arrow) {
         // For UI tests (mitcad#2508): how far the drag's first move took
         // the pointer along the arrow and the value's point, in pixels on

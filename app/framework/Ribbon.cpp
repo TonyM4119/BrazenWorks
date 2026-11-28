@@ -31,6 +31,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMargins>
+#include <QSettings>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPaintEvent>
@@ -359,6 +360,39 @@ void drawChevron(QPainter& painter, const QPointF& center, const QColor& color) 
 // pointer is not on the button, on every platform. The drawn state logged
 // for the UI tests: "Ribbon SKETCH/CREATE/Rectangles after its menu: not
 // hovered" (a split button's place, a group caption's "SKETCH/MODIFY").
+// PureCAD: Preferences › Layout › Panel menus open on hover: a group's ˅
+// opens its menu once the pointer rests on it, read when the pointer comes.
+class HoverOpensMenu : public QObject {
+public:
+  explicit HoverOpensMenu(QToolButton* button) : QObject(button), m_button(button) {
+    m_wait.setSingleShot(true);
+    m_wait.setInterval(250);
+    QObject::connect(&m_wait, &QTimer::timeout, this, [this] {
+      if (m_button->underMouse() && m_button->isEnabled() && QApplication::activePopupWidget() == nullptr) {
+        m_button->showMenu();
+      }
+    });
+    button->installEventFilter(this);
+  }
+
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    if (watched == m_button) {
+      if (event->type() == QEvent::Enter &&
+          QSettings().value(QStringLiteral("layout/panelMenusOnHover"), false).toBool()) {
+        m_wait.start();
+      } else if (event->type() == QEvent::Leave) {
+        m_wait.stop();
+      }
+    }
+    return QObject::eventFilter(watched, event);
+  }
+
+private:
+  QToolButton* m_button;
+  QTimer m_wait;
+};
+
 void endHoverAfterMenu(QToolButton* button, QMenu* menu, const QString& place) {
   QObject::connect(menu, &QMenu::aboutToHide, button, [button, place] {
     // After the menu's own hide and the events it sends.
@@ -3621,7 +3655,15 @@ QWidget* Ribbon::createGroup(const QString& tab, const QString& group, GroupInfo
   const LayoutGroup* layoutGroup = m_layout.group(tab, group);
   const std::vector<LayoutEntry> noEntries;
   bool separator = false; // a separator before the next entry
-  const auto separate = [&separator, menu] {
+  // PureCAD: Preferences › Layout › Group Construct tools by entity type:
+  // off, the CONSTRUCT menu is one list (no sections for planes, axes and
+  // points).
+  const bool flat = group == QLatin1String("CONSTRUCT") &&
+                    !QSettings().value(QStringLiteral("layout/groupConstructByEntity"), true).toBool();
+  const auto separate = [&separator, menu, flat] {
+    if (flat) {
+      separator = false;
+    }
     if (separator && !menu->isEmpty()) {
       menu->addSeparator();
     }
@@ -3786,6 +3828,7 @@ QWidget* Ribbon::finishGroup(QWidget* widget, QWidget* row, QToolButton* menuBut
   menuButton->setFocusPolicy(Qt::NoFocus);
   menuButton->setMenu(menu);
   endHoverAfterMenu(menuButton, menu, key(tab, group));
+  new HoverOpensMenu(menuButton); // PureCAD
   m_groupButtons.insert(key(tab, group), menuButton);
   // Its right-click: the group's own menu of the layout (mitcad#1991), its
   // order among the tab's groups and the buttons the user removed.
@@ -5255,7 +5298,7 @@ void Ribbon::applyWorkspaceTabs() {
   // A tab with its own row (setTabRow) shows it in place of the tabs.
   updateTabRow();
   const QString shown = workspace();
-  const bool sketching = tabOfPage(kSketchPage) >= 0;
+  const bool sketching = m_sketching;
   if (auto* selector = static_cast<WorkspaceButton*>(m_workspaceButton)) {
     selector->setWorkspace(workspaceTitle(shown), workspaceIcon(shown));
     // Locked while sketching (a sketch is the model's, mitcad#1990).
@@ -5295,7 +5338,7 @@ void Ribbon::followCurrentTab() {
 }
 
 void Ribbon::setWorkspace(const QString& workspace) {
-  if (!m_workspaces || tabOfPage(kSketchPage) >= 0) {
+  if (!m_workspaces || m_sketching) {
     return;
   }
   qDebug().noquote() << QStringLiteral("Ribbon workspace chosen: %1").arg(workspace);
@@ -5760,9 +5803,55 @@ void Ribbon::paintEvent(QPaintEvent* event) {
   painter.fillRect(QRect(0, height() - 1, width(), 1), cardBorderColor(palette()));
 }
 
-void Ribbon::setSketchMode(bool sketching) {
+void Ribbon::setKeepSketchTab(bool keep) {
+  if (m_keepSketchTab == keep) return;
+  m_keepSketchTab = keep;
+  if (m_sketching) return; // the sketch's own tab, as it is
   const int shown = tabOfPage(kSketchPage);
+  if (keep && shown < 0) {
+    // PureCAD: the SKETCH tab kept between sketches, at the row's end and not
+    // switched to; its tools are off until a sketch is open.
+    const QScopedValueRollback<bool> applying(m_applyingWorkspace, true);
+    const int index = m_tabs->addTab(displayName(kSketch));
+    m_tabs->setTabData(index, kSketchPage);
+    m_tabs->setTabTextColor(index, accentColor(palette()));
+    m_tabs->setTabToolTip(index, tr("Sketch: the sketch tools, on while a sketch is open"));
+  } else if (!keep && shown >= 0) {
+    const QScopedValueRollback<bool> applying(m_applyingWorkspace, true);
+    removeTabShowing(shown, m_tabs->tabData(m_tabs->currentIndex()).toInt() == kSketchPage
+                                ? m_pageBeforeSketch
+                                : m_tabs->tabData(m_tabs->currentIndex()).toInt());
+  }
+  applyWorkspaceTabs();
+}
+
+void Ribbon::setSketchMode(bool sketching) {
+  int shown = tabOfPage(kSketchPage);
+  if (sketching && !m_sketching && shown >= 0) {
+    // The kept tab (setKeepSketchTab) becomes the sketch's.
+    m_sketching = true;
+    m_pageBeforeSketch = m_tabs->tabData(m_tabs->currentIndex()).toInt();
+    if (m_pageBeforeSketch == kStartPage || m_pageBeforeSketch == kSketchPage) {
+      m_pageBeforeSketch =
+          m_workspaces ? m_workspacePage.value(m_workspace, firstPageOfWorkspace(m_workspace)) : kSolidPage;
+    }
+    m_tabs->setCurrentIndex(shown);
+    applyWorkspaceTabs();
+    emit sketchModeChanged(true);
+    return;
+  }
+  if (!sketching && m_sketching && m_keepSketchTab && shown >= 0) {
+    // Back to the tab it started from; the tab stays.
+    m_sketching = false;
+    const int back = tabOfPage(m_pageBeforeSketch);
+    if (back >= 0) m_tabs->setCurrentIndex(back);
+    followCurrentTab();
+    applyWorkspaceTabs();
+    emit sketchModeChanged(false);
+    return;
+  }
   if (sketching && shown < 0) {
+    m_sketching = true;
     // Back to the tab the sketch started from afterwards (SOLID or BUILD).
     m_pageBeforeSketch = m_tabs->tabData(m_tabs->currentIndex()).toInt();
     // Not to the Start tab (mitcad#1258): a sketch is the model's (the
@@ -5780,6 +5869,7 @@ void Ribbon::setSketchMode(bool sketching) {
     applyWorkspaceTabs();
     emit sketchModeChanged(true);
   } else if (!sketching && shown >= 0) {
+    m_sketching = false;
     {
       // The tab Qt picks while SKETCH goes is not shown, not even for a
       // moment (removeTabShowing): the one it started from is.

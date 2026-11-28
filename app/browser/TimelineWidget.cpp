@@ -291,6 +291,15 @@ public:
 
   // Where the playback buttons step (mitcad#98): the boundaries of the
   // features shown, so that a run the filter hides is passed in one step.
+  // PureCAD: the position after the last feature of `component`; 0 when it
+  // has none.
+  int endOfComponent(const QString& component) const {
+    for (int i = static_cast<int>(m_items.size()) - 1; i >= 0; --i) {
+      if (m_items[i].feature.component == component) return i + 1;
+    }
+    return 0;
+  }
+
   int stepBefore(int g) const {
     for (int k = std::min(g, count() + 1) - 1; k > 0; --k) {
       if (shownBoundary(k)) {
@@ -1100,7 +1109,15 @@ TimelineWidget::TimelineWidget(const CommandContext& model, QWidget* parent)
          [this] { return m_strip->stepBefore(m_strip->marker()); });
   button("forward", QStyle::SP_MediaSeekForward, "forward.fill", tr("Step Forward"),
          [this] { return m_strip->stepAfter(m_strip->marker()); });
-  button("end", QStyle::SP_MediaSkipForward, "forward.end.fill", tr("Move to End"), [this] { return m_strip->count(); });
+  // PureCAD: Preferences › Layout › Go to end stops at the component's end:
+  // past the active component's last feature, while the marker is before it.
+  button("end", QStyle::SP_MediaSkipForward, "forward.end.fill", tr("Move to End"), [this] {
+    if (QSettings().value(QStringLiteral("layout/goToEndOfComponent"), false).toBool()) {
+      const int end = m_strip->endOfComponent(m_snapshot.activeComponent);
+      if (end > m_strip->marker()) return end;
+    }
+    return m_strip->count();
+  });
   // PureCAD: Play (Preferences › Layout › Play History button): the
   // design rebuilt step by step from the beginning, a step every 0.6 s, to
   // the end; a second click stops where it is.
