@@ -31,7 +31,7 @@ struct ToolsPrefs {
   bool placedSnapPoints = true;
   bool rememberDialogValues = false;
   bool previousFilletDefault = false;
-  bool jointMotionHandles = true;
+  bool jointMotionHandles = false; // PureCAD: off keeps Move as before
   bool movedGhost = true;
   bool highlightUnderMove = false;
   double nearAxisStep = 10.0;       // degrees

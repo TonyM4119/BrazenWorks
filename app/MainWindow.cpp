@@ -147,6 +147,7 @@
 #include "framework/SelectionCreate.hpp"
 #include "framework/TitleBar.hpp"
 #include "framework/ShortcutDialog.hpp"
+#include "framework/JointHighlight.hpp"
 #include "framework/Theme.hpp"
 #include "framework/Diagnostics.hpp"
 #include "framework/PaintWatch.hpp"
@@ -3481,6 +3482,31 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
                                      const QJsonObject& analysis) {
   if (!readOnlyCommand(def) && refuseReadOnly(editUid.isEmpty() ? def.id : QStringLiteral("editing %1").arg(editUid))) {
     return;
+  }
+  // PureCAD: Preferences › Tools › Use joint motion handles for Move: Move
+  // on one component a joint moves drives that joint instead, its handles
+  // only the motion the joint allows.
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.move") && m_selection.size() == 1 &&
+      m_selection.first().kind == SelectKind::Component &&
+      QSettings().value(QStringLiteral("tools/jointMotionHandles"), false).toBool()) {
+    const QString path = m_selection.first().occurrence;
+    const QString own = path.section(QLatin1Char('/'), -1);
+    for (const QJsonValue& value : m_snapshot.joints.value(QStringLiteral("joints")).toArray()) {
+      const QJsonObject entry = value.toObject();
+      if (entry.value(QStringLiteral("motions")).toArray().isEmpty()) continue;
+      const JointHighlight joint = jointHighlightOf(entry, QString());
+      const bool moves = std::any_of(joint.sides.cbegin(), joint.sides.cend(), [&](const JointSide& side) {
+        return !own.isEmpty() && (side.path == path || side.ownPath.contains(own));
+      });
+      if (moves) {
+        const SelectionItem jointItem{SelectKind::Feature, joint.uid, QString(), QString()};
+        qDebug().noquote() << QStringLiteral("Move: %1 drives %2 (Preferences)").arg(own, joint.name);
+        QTimer::singleShot(0, this, [this, jointItem] {
+          startCommand(QStringLiteral("assemble.drive_joint"), {jointItem}, nullptr);
+        });
+        return;
+      }
+    }
   }
   m_messages->commandStarted(); // an edit too (mitcad#1042)
   markActiveCommand(def.id); // PureCAD: Highlight active commands
