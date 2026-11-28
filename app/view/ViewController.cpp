@@ -2,6 +2,7 @@
 #include "ViewController.hpp"
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
+#include "LayoutPreferences.hpp" // Fork
 #include "GridSpacing.hpp"
 #include "DefaultView.hpp"
 #include "../platform/SpaceMouseDevice.hpp"
@@ -342,6 +343,11 @@ const PreferencePage kPreferencePages[] = {
      "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
      "drawings small_circles circles boost navigation_bar",
      "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
+    // Fork: SolidCraft's Layout page.
+    {"layout", QT_TRANSLATE_NOOP("View", "Layout"),
+     "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
+     "sub-tab history browser bodies folders dialogs ok cancel toolbar tabs ribbon navigation_bar idle fade",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Where the parts of the window sit."), "toolbar-panel"},
     // Folders of font files for sketch text (mitcad#473).
     {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
@@ -647,6 +653,20 @@ QVector<QPair<QString, QString>> mouseRows(const NavigationSettings& settings) {
     return {{QObject::tr("Right drag"), QObject::tr("Orbit")},
             {QObject::tr("Middle drag, Shift + right drag"), QObject::tr("Pan")},
             {wheel, QObject::tr("Zoom")}};
+  case NavigationScheme::MiddleOrbitShiftPan:
+  case NavigationScheme::AltShiftButtons:
+  case NavigationScheme::AltLeftRightPan:
+  case NavigationScheme::AltLeftKeys: {
+    // Fork: the newer mappings' rows from their bindings.
+    QVector<QPair<QString, QString>> result;
+    for (const NavigationBinding& binding : navigationBindings(scheme)) {
+      if (navigationBindingAllowed(binding) && binding.action != NavigationAction::None &&
+          binding.input != NavigationInput::TrackpadScroll)
+        result.append({navigationInputText(binding), navigationActionText(binding.action)});
+    }
+    result.append({wheel, QObject::tr("Zoom")});
+    return result;
+  }
   case NavigationScheme::MiddlePan:
   case NavigationScheme::Custom:
     break;
@@ -3699,6 +3719,75 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, quickAccess, applyQuickAccess);
   }
   groups.insert(QStringLiteral("display"), displayBox);
+
+  // Fork: Preferences › Layout (SolidCraft's Layout page): its own options
+  // (view/LayoutPreferences.hpp) and the Display page's rows about the
+  // window's layout, moved into its sections by their names.
+  QWidget* layoutBox = section(tr("Layout"));
+  auto* layoutColumn = new QVBoxLayout(layoutBox);
+  insetPreferencesGroup(layoutColumn, window == nullptr);
+  const QVector<QPair<QString, QString>> toolbarTabs{
+      {QStringLiteral("SOLID"), tr("Solid")},           {QStringLiteral("SURFACE"), tr("Surface")},
+      {QStringLiteral("ASSEMBLY"), tr("Assembly")},     {QStringLiteral("MESH"), tr("Mesh")},
+      {QStringLiteral("SHEET METAL"), tr("Sheet Metal")}, {QStringLiteral("PLASTIC"), tr("Plastic")},
+      {QStringLiteral("BUILD"), tr("Build")},           {QStringLiteral("MANAGE"), tr("Manage")}};
+  auto* layoutPage = new LayoutPreferences(toolbarTabs);
+  layoutColumn->addWidget(layoutPage);
+  {
+    using Section = LayoutPreferences::Section;
+    const QHash<QString, Section> moved{
+        {QStringLiteral("layout"), Section::Window},
+        {QStringLiteral("ribbonLabels"), Section::Window},
+        {QStringLiteral("menuBarVisible"), Section::Window},
+        {QStringLiteral("windowMenuBarVisible"), Section::Window},
+        {QStringLiteral("boostVisible"), Section::ToolbarTabs},
+        {QStringLiteral("discordVisible"), Section::ToolbarTabs},
+        {QStringLiteral("quickAccessVisible"), Section::ToolbarTabs},
+        {QStringLiteral("restoreDefaultLayout"), Section::ToolbarTabs},
+        {QStringLiteral("timelinePresentation"), Section::Panels},
+        {QStringLiteral("browserRowSpacing"), Section::Panels},
+        {QStringLiteral("browserBackground"), Section::Panels},
+        {QStringLiteral("browserRowsShare"), Section::Panels},
+        {QStringLiteral("browserBackgroundNote"), Section::Panels},
+        {QStringLiteral("ghostInactive"), Section::Panels},
+        {QStringLiteral("activePickPriority"), Section::Panels},
+        {QStringLiteral("navigationBar"), Section::NavigationBar}};
+    // The section of the first moved widget a row holds, in its label, its
+    // field or the layout of its field.
+    std::function<std::optional<Section>(QLayoutItem*)> sectionOf = [&](QLayoutItem* item) -> std::optional<Section> {
+      if (item == nullptr) return std::nullopt;
+      if (QWidget* widget = item->widget()) {
+        if (moved.contains(widget->objectName())) return moved.value(widget->objectName());
+        for (const QWidget* child : widget->findChildren<QWidget*>()) {
+          if (moved.contains(child->objectName())) return moved.value(child->objectName());
+        }
+      }
+      if (QLayout* inner = item->layout()) {
+        for (int i = 0; i < inner->count(); ++i) {
+          if (const auto found = sectionOf(inner->itemAt(i))) return found;
+        }
+      }
+      return std::nullopt;
+    };
+    for (int row = display->rowCount() - 1; row >= 0; --row) {
+      QLayoutItem* label = display->itemAt(row, QFormLayout::LabelRole);
+      QLayoutItem* field = display->itemAt(row, QFormLayout::FieldRole);
+      QLayoutItem* spanning = display->itemAt(row, QFormLayout::SpanningRole);
+      std::optional<Section> to = sectionOf(field);
+      if (!to) to = sectionOf(spanning);
+      if (!to) continue;
+      const QFormLayout::TakeRowResult taken = display->takeRow(row);
+      QWidget* labelWidget = taken.labelItem != nullptr ? taken.labelItem->widget() : nullptr;
+      layoutPage->addExisting(*to, labelWidget, taken.fieldItem);
+      Q_UNUSED(label);
+    }
+  }
+  if (window != nullptr) {
+    layoutPage->onChanged = [layoutPage] { layoutPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, layoutPage, [layoutPage] { layoutPage->commit(); });
+  }
+  groups.insert(QStringLiteral("layout"), layoutBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
