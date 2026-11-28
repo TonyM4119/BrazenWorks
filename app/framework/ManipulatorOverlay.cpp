@@ -683,8 +683,8 @@ ManipulatorOverlay::DragValue ManipulatorOverlay::valueAt(const Handle& handle, 
   if (store.contains(QStringLiteral("tools/nearAxisStep"))) {
     const QPointF c = m_viewer.toWidgetF(m.origin);
     const QPointF rim = m_viewer.toWidgetF(m.origin.Translated(gp_Vec(m.reference) * ringRadius(m))) - c;
-    const bool near = std::hypot(position.x() - c.x(), position.y() - c.y()) <= std::hypot(rim.x(), rim.y());
-    const double chosen = near ? store.value(QStringLiteral("tools/nearAxisStep"), 10.0).toDouble()
+    const bool insideRing = std::hypot(position.x() - c.x(), position.y() - c.y()) <= std::hypot(rim.x(), rim.y());
+    const double chosen = insideRing ? store.value(QStringLiteral("tools/nearAxisStep"), 10.0).toDouble()
                                : store.value(QStringLiteral("tools/farAxisStep"), 0.1).toDouble();
     if (chosen > 0.0) degree = chosen * kPi / 180.0;
   }

@@ -61,8 +61,20 @@ namespace detail {
 // the app sets PURECAD_HEAL_IMPORTS=1; a body BRepCheck finds invalid goes
 // through ShapeFix_Shape, and the fixed shape is kept when it is valid.
 std::vector<Body> heal_if_asked(std::vector<Body> bodies) {
-  const char* on = std::getenv("PURECAD_HEAL_IMPORTS");
-  if (on == nullptr || std::string(on) != "1") {
+  std::string on;
+#ifdef _MSC_VER
+  char* value = nullptr;
+  std::size_t length = 0;
+  if (_dupenv_s(&value, &length, "PURECAD_HEAL_IMPORTS") == 0 && value != nullptr) {
+    on = value;
+    std::free(value);
+  }
+#else
+  if (const char* value = std::getenv("PURECAD_HEAL_IMPORTS")) {
+    on = value;
+  }
+#endif
+  if (on != "1") {
     return bodies;
   }
   for (Body& body : bodies) {

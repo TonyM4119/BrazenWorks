@@ -11,7 +11,6 @@
 #include <utility>
 
 #include <IntCurvesFace_ShapeIntersector.hxx>
-#include <Standard_Failure.hxx>
 #include <gp_Lin.hxx>
 #include <QJsonArray>
 #include <QJsonDocument>
@@ -56,7 +55,7 @@ std::vector<double> faceStops(const gp_Pnt& origin, const gp_Dir& direction, con
       }
     }
   } catch (const std::exception&) {
-  } catch (const Standard_Failure&) {
+    // Standard_Failure is a std::exception too (OCCT 8): no stops then.
   }
   std::sort(stops.begin(), stops.end());
   lastKey = key;
