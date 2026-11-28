@@ -185,6 +185,7 @@ ui_step "top view (F9)"                  ui_key F9
 ui_expect_new "Camera direction 0 0 -1" "the opened design seen from the top"
 ui_mark
 ui_step "new design (Ctrl+N)"            ui_key ctrl+n
+ui_step "create new (Return)"             ui_key Return  # File › New asks what to create
 ui_expect_new "New design in " "New Design replaced the opened design"
 expect_default_view "New Design after a design turned to Top"
 expect_origin "$SHOWN_ON" "the new design shows its origin, its light bulb on"

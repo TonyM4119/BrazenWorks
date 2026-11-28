@@ -676,6 +676,7 @@ centred_round() {
   ui_start_app "$@"
   ui_mark
   ui_step "$layout: new design (Ctrl+N)" ui_key ctrl+n
+  ui_step "$layout: create new (Return)"             ui_key Return  # File › New asks what to create
   ui_expect_new "New document" "$layout: a new design"
   ui_expect_new "Opened the new design with Component1 active" "$layout: the new design has Component1 active"
   ui_wait_idle
