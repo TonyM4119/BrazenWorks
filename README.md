@@ -4,7 +4,8 @@ PureCAD is a free, open-source parametric CAD/CAM application for makers
 and shops, with a Fusion 360-style workflow. It is built on
 [MitCad](https://github.com/mitcad/Mitcad) and keeps everything MitCad
 does, then adds its own look, workflow and extras. Its license is the
-[MIT license](LICENSE).
+[GNU Affero General Public License, version 3 or later](LICENSE)
+(AGPL-3.0-or-later).
 
 - **Parametric modeling with a history.** Draw sketches with constraints
   and dimensions; features go on a timeline; parameters hold expressions.
@@ -90,6 +91,14 @@ in [docs/mitcad-readme.md](docs/mitcad-readme.md).
 
 ## License
 
-MIT ([LICENSE](LICENSE)), keeping MitCad's copyright notice as the license
-requires. Qt and OCCT are LGPL and linked dynamically. License policy:
+PureCAD is licensed under the GNU Affero General Public License, version 3
+or later (AGPL-3.0-or-later, [LICENSE](LICENSE)): anyone may use, study,
+change and share it, and anyone who shares a changed version, or runs one
+for others over a network, shares its source under the same license.
+
+PureCAD is based on MitCad, whose code is under the MIT license. MitCad's
+copyright notice and license are kept, as that license requires, in
+[LICENSE-MITCAD](LICENSE-MITCAD); files that came from MitCad keep their
+`SPDX-License-Identifier: MIT` line. Qt and OCCT are LGPL and linked
+dynamically. License policy:
 [docs/development.md](docs/development.md#licence-policy).

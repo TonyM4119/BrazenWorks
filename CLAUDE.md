@@ -13,7 +13,8 @@ and [docs/development.md](docs/development.md) before larger changes.
 
 - Everything in English: code, comments, UI texts, docs, commit messages.
 - Follow the [code conventions](docs/development.md#code-conventions)
-  (SPDX line in every new file, C++17 warning-free on MSVC `/W4` and GCC
+  (SPDX line in every new file: `AGPL-3.0-or-later` for PureCAD's own
+  files, MIT kept in files from MitCad; C++17 warning-free on MSVC `/W4` and GCC
   `-Wall -Wextra -Wpedantic` and AppleClang, Windows, Linux and macOS,
   metric defaults) and the
   [licence policy](docs/development.md#licence-policy).

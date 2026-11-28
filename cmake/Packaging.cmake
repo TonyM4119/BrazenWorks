@@ -92,7 +92,7 @@ include(InstallRequiredSystemLibraries)
 # --- Licences ------------------------------------------------------------
 # Mitcad's own licence, the bundled font and, from vcpkg, the licence text of
 # every ported library that ends up in bin (OCCT, FreeType, libpng, ...).
-install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" DESTINATION .)
+install(FILES "${PROJECT_SOURCE_DIR}/LICENSE" "${PROJECT_SOURCE_DIR}/LICENSE-MITCAD" DESTINATION .)
 install(FILES "${PROJECT_SOURCE_DIR}/packaging/windows/THIRD-PARTY-NOTICES.txt" DESTINATION .)
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/fonts/droid-sans/LICENSE.txt"
   DESTINATION licenses/droid-sans)

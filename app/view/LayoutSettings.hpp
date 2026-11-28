@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
 // Fork: Preferences › Layout's settings (SolidCraft's Layout page) that

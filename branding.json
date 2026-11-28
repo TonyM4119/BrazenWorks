@@ -1,5 +1,5 @@
 {
-  "comment": "The product's name and identity, in one place. CMake reads this file (cmake/Branding.cmake) and generates brand.hpp for the code; change a value here and rebuild. This app is based on MitCad (MIT licence): upstreamName is the name the MitCad code and its texts use, swapped for displayName in the interface at run time.",
+  "comment": "The product's name and identity, in one place. CMake reads this file (cmake/Branding.cmake) and generates brand.hpp for the code; change a value here and rebuild. This app (AGPL-3.0-or-later) is based on MitCad (MIT licence): upstreamName is the name the MitCad code and its texts use, swapped for displayName in the interface at run time.",
   "displayName": "PureCAD",
   "storedName": "PureCAD",
   "version": "0.1.0",

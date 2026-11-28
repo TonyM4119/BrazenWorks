@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Fork: the product's name in the interface. The MitCad code says
 // "MitCad" in its texts; BrandTranslator, asked before every other
 // translator, swaps the upstream name for the product's (branding.json),

@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Fork: the product's name and identity come from branding.json at
 # the top of the repository. This reads it once and generates brand.hpp
 # (namespace brand) in the build tree, on the include path of every target,

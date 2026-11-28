@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #include "view/PlaneRulerAxes.hpp"
 
 #include <Graphic3d_ArrayOfSegments.hxx>

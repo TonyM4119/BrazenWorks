@@ -1,5 +1,5 @@
 #!/usr/bin/env bash
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Fork: renders the product's icon (icon.svg, icon-small.svg in the folder
 # branding.json's iconDir names) into the PNG files the application loads
 # and the Windows icon icon.ico (the program file and the installer). The

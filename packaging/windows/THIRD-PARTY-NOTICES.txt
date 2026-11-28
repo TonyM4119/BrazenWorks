@@ -1,4 +1,6 @@
-MitCad is released under the MIT licence (see LICENSE). The Windows
+PureCAD is released under the GNU AGPL, version 3 or later (see LICENSE).
+It is based on MitCad, released under the MIT licence (see LICENSE-MITCAD).
+The Windows
 distribution also contains the following third-party components.
 
 Qt 6 (Qt6*.dll, plugins in bin)

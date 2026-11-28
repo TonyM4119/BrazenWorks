@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
 // Fork: the parts SolidCraft's Preferences pages are made of, shared by the
