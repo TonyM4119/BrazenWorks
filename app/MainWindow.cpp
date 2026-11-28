@@ -4108,7 +4108,59 @@ void MainWindow::cancel() {
     finishEditInPlace();
     return;
   }
+  // PureCAD: Preferences › Graphics › Status chips › Esc closes analyses:
+  // with nothing selected, Esc hides the analysis shown.
+  if (m_mode == Mode::Idle && m_selection.isEmpty() && hideShownAnalysis(QStringLiteral("graphics/chipEscClosesAnalyses"))) {
+    return;
+  }
   clearSelection();
+}
+
+// PureCAD: hides the analysis shown (it stays in the Analysis folder) when
+// the switch `key` is on (empty: always); whether one was hidden.
+bool MainWindow::hideShownAnalysis(const QString& key) {
+  const QString name = m_snapshot.shownAnalysis().value(QStringLiteral("name")).toString();
+  if (name.isEmpty() || !canChangeModel()) return false;
+  if (!key.isEmpty() && !QSettings().value(key, false).toBool()) return false;
+  return runModelCommand({{QStringLiteral("cmd"), QStringLiteral("set_analysis_visible")},
+                          {QStringLiteral("name"), name},
+                          {QStringLiteral("visible"), false}});
+}
+
+// PureCAD: Preferences › Graphics › Status chips › Analysis and Section: a
+// chip over the view's top left naming the analysis shown; its × hides it.
+void MainWindow::updateAnalysisChip() {
+  const QJsonObject shown = m_snapshot.shownAnalysis();
+  const QString name = shown.value(QStringLiteral("name")).toString();
+  const bool section = shown.value(QStringLiteral("type")).toString() == QStringLiteral("section");
+  const QSettings store;
+  const bool wanted = !name.isEmpty() &&
+                      store.value(section ? QStringLiteral("graphics/chipSection") : QStringLiteral("graphics/chipAnalysis"),
+                                  true).toBool();
+  if (!wanted) {
+    if (m_analysisChip != nullptr) m_analysisChip->hide();
+    return;
+  }
+  if (m_analysisChip == nullptr) {
+    m_analysisChip = new QToolButton(m_viewer);
+    m_analysisChip->setObjectName(QStringLiteral("analysisChip"));
+    m_analysisChip->setCursor(Qt::PointingHandCursor);
+    m_analysisChip->setToolTip(tr("Hide the analysis (it stays in the Browser's Analysis folder)"));
+    connect(m_analysisChip, &QToolButton::clicked, this, [this] { hideShownAnalysis(QString()); });
+  }
+  const bool dark = isDarkTheme();
+  m_analysisChip->setStyleSheet(QStringLiteral("QToolButton#analysisChip { background: %1; color: %2; border: 1px solid %3;"
+                                               " border-radius: 12px; padding: 3px 12px; }"
+                                               "QToolButton#analysisChip:hover { background: %4; }")
+                                    .arg(dark ? QStringLiteral("#2a313b") : QStringLiteral("#ffffff"),
+                                         dark ? QStringLiteral("#e6eaf0") : QStringLiteral("#16243a"),
+                                         dark ? QStringLiteral("#46505e") : QStringLiteral("#c9d0da"),
+                                         dark ? QStringLiteral("#353e4a") : QStringLiteral("#e4eaf4")));
+  m_analysisChip->setText((section ? tr("Section: %1") : tr("Analysis: %1")).arg(name) + QStringLiteral("   \u2715"));
+  m_analysisChip->adjustSize();
+  m_analysisChip->move(16, m_viewer->overlayInsets().top() + 16);
+  m_analysisChip->show();
+  m_analysisChip->raise();
 }
 
 void MainWindow::clearSelection() {
@@ -4359,6 +4411,7 @@ void MainWindow::followAnalyses() {
   setSection(plane.isObject() ? plane : QJsonValue());
   // A shown Print Analysis' overhangs and thin walls (mitcad#620).
   followPrintAnalysis();
+  updateAnalysisChip(); // PureCAD
 }
 
 bool MainWindow::sectionShown() const {

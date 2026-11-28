@@ -1314,6 +1314,11 @@ private:
   // Whether the analysis shown is a section (Flip and Remove Section
   // Analysis).
   bool sectionShown() const;
+  // PureCAD: Graphics › Status chips (the analysis shown named over the
+  // view, Esc hiding it).
+  bool hideShownAnalysis(const QString& key);
+  void updateAnalysisChip();
+  QToolButton* m_analysisChip = nullptr;
   // Print Analysis kept in the document (mitcad#620,
   // MainWindowPrintAnalysis.cpp): the shown one's overhangs and thin walls
   // over the bodies, computed again when it, its bodies or the design
