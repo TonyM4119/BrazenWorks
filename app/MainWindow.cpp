@@ -3542,6 +3542,17 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
       session->setRepeatSettings(found.value());
     }
   }
+  // PureCAD: Preferences › Tools › Turn the view to isometric when Extrude
+  // opens, and Go back to the earlier view when it closes.
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.extrude")) {
+    const QSettings store;
+    if (store.value(QStringLiteral("tools/extrudeReturnView"), false).toBool()) {
+      m_extrudeCamera = m_viewer->camera();
+    }
+    if (store.value(QStringLiteral("tools/extrudeIsometric"), false).toBool()) {
+      m_viewer->lookHome();
+    }
+  }
   // PureCAD: Preferences › Tools › New extrusion distance: Fixed (a length
   // of one's own; 0, the default, starts at zero and waits for one, as
   // before) or The last used (the last OK's distance).
@@ -3872,6 +3883,10 @@ bool MainWindow::chooseInCommand(const QString& command, const QString& input, c
 void MainWindow::onCommandFinished(bool committed) {
   clearNativeCommandContinuation();
   markActiveCommand(QString()); // PureCAD
+  if (m_extrudeCamera) { // PureCAD: Tools › Go back to the earlier view
+    m_viewer->setCamera(*m_extrudeCamera);
+    m_extrudeCamera.reset();
+  }
 #ifdef MITCAD_MACOS_NATIVE_UI
   if (m_nativeWindow) {
     m_nativeWindow->setInspectorView(nullptr);

@@ -1609,6 +1609,7 @@ private:
   void markActiveCommand(const QString& id);
   QElapsedTimer m_sketchEscTimer; // PureCAD: Sketch › Esc twice finishes
   bool m_dragPaused = false;      // PureCAD: Layout › Pause drawing while dragged
+  std::optional<CameraState> m_extrudeCamera; // PureCAD: Tools › back to the view before Extrude
   // What the panel asks for (paths relative to the project at `root`).
   void createDesignInProject(const QString& root, const QString& path);
   void createFolderInProject(const QString& root, const QString& path);
