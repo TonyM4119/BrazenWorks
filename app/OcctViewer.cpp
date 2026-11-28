@@ -459,6 +459,134 @@ QString overlaySymbol(const QString& id) {
   return {};
 }
 
+// Fork: the Axes view navigator (Preferences › Navigation › View navigator):
+// the model's axes from the camera, a coloured ball with its letter at each
+// positive end and a hollow ring at each negative one, the nearer drawn over
+// the farther; a click on one turns the view to look from it.
+class AxesNavigator : public QWidget {
+public:
+  using Turn = std::function<void(const gp_Dir& direction, const gp_Dir& up)>;
+  AxesNavigator(QWidget* parent, std::function<occ::handle<Graphic3d_Camera>()> camera, Turn turn)
+      : QWidget(parent), m_camera(std::move(camera)), m_turn(std::move(turn)) {
+    setObjectName(QStringLiteral("axesNavigator"));
+    setAttribute(Qt::WA_TranslucentBackground);
+    setMouseTracking(true);
+    setCursor(Qt::PointingHandCursor);
+  }
+
+protected:
+  struct End {
+    QPointF at;
+    double depth;
+    int axis;      // 0 X, 1 Y, 2 Z
+    bool positive;
+  };
+  QVector<End> ends() const {
+    QVector<End> result;
+    const occ::handle<Graphic3d_Camera> camera = m_camera();
+    if (camera.IsNull()) return result;
+    const gp_Dir dir = camera->Direction();
+    const gp_Dir up = camera->Up();
+    const gp_Dir right = dir.Crossed(up);
+    const QPointF c(width() / 2.0, height() / 2.0);
+    const double reach = std::min(width(), height()) / 2.0 - 14;
+    for (int axis = 0; axis < 3; ++axis) {
+      for (const bool positive : {true, false}) {
+        gp_Vec v(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
+        if (!positive) v.Reverse();
+        const double x = v.Dot(gp_Vec(right));
+        const double y = -v.Dot(gp_Vec(up));
+        result.append({c + QPointF(x, y) * reach * (positive ? 1.0 : 0.62), v.Dot(gp_Vec(dir)), axis, positive});
+      }
+    }
+    // The farther first, so that the nearer are drawn over them.
+    std::sort(result.begin(), result.end(), [](const End& a, const End& b) { return a.depth > b.depth; });
+    return result;
+  }
+  void paintEvent(QPaintEvent*) override {
+    QPainter p(this);
+    p.setRenderHint(QPainter::Antialiasing);
+    const QColor colours[3] = {QColor(0xc8282a), QColor(0x2e9e3e), QColor(0x1f4fb8)};
+    const char* names[3] = {"X", "Y", "Z"};
+    const QPointF c(width() / 2.0, height() / 2.0);
+    QColor disc = palette().color(QPalette::WindowText);
+    disc.setAlphaF(m_hover ? 0.10f : 0.05f);
+    p.setPen(Qt::NoPen);
+    p.setBrush(disc);
+    p.drawEllipse(c, width() / 2.0 - 4, height() / 2.0 - 4);
+    const auto list = ends();
+    for (const End& end : list) {
+      const QColor colour = colours[end.axis];
+      p.setPen(QPen(colour, 2.0));
+      p.drawLine(c, end.at);
+    }
+    QFont bold = font();
+    bold.setBold(true);
+    bold.setPointSizeF(std::max(7.0, bold.pointSizeF() * 0.85));
+    p.setFont(bold);
+    for (const End& end : list) {
+      const QColor colour = colours[end.axis];
+      const bool lit = m_hoverEnd && m_hoverEnd->first == end.axis && m_hoverEnd->second == end.positive;
+      if (end.positive) {
+        p.setPen(lit ? QPen(palette().color(QPalette::WindowText), 1.5) : Qt::NoPen);
+        p.setBrush(colour);
+        p.drawEllipse(end.at, 10.5, 10.5);
+        p.setPen(Qt::white);
+        p.drawText(QRectF(end.at.x() - 10, end.at.y() - 10, 20, 20), Qt::AlignCenter, QString::fromLatin1(names[end.axis]));
+      } else {
+        p.setPen(QPen(colour, lit ? 2.6 : 1.8));
+        p.setBrush(palette().color(QPalette::Base));
+        p.drawEllipse(end.at, 6.0, 6.0);
+      }
+    }
+  }
+  std::optional<std::pair<int, bool>> endAt(const QPointF& at) const {
+    const auto list = ends();
+    for (auto it = list.crbegin(); it != list.crend(); ++it) { // the nearest first
+      if (std::hypot(it->at.x() - at.x(), it->at.y() - at.y()) <= (it->positive ? 11.5 : 8.0)) {
+        return std::pair<int, bool>{it->axis, it->positive};
+      }
+    }
+    return std::nullopt;
+  }
+  void mouseMoveEvent(QMouseEvent* event) override {
+    const auto end = endAt(event->position());
+    if (end != m_hoverEnd) {
+      m_hoverEnd = end;
+      update();
+    }
+  }
+  void enterEvent(QEnterEvent*) override {
+    m_hover = true;
+    update();
+  }
+  void leaveEvent(QEvent*) override {
+    m_hover = false;
+    m_hoverEnd.reset();
+    update();
+  }
+  void mousePressEvent(QMouseEvent* event) override {
+    const auto end = endAt(event->position());
+    if (!end) {
+      event->ignore();
+      return;
+    }
+    // From the end clicked toward the origin; the up a standard view has.
+    const int axis = end->first;
+    const gp_Dir along(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
+    const gp_Dir direction = end->second ? along.Reversed() : along;
+    const gp_Dir up = axis == 2 ? gp_Dir(0, end->second ? 1 : -1, 0) : gp_Dir(0, 0, 1);
+    qDebug().noquote() << QStringLiteral("Axes navigator: %1%2").arg(end->second ? '+' : '-').arg(QLatin1Char("XYZ"[axis]));
+    m_turn(direction, up);
+  }
+
+private:
+  std::function<occ::handle<Graphic3d_Camera>()> m_camera;
+  Turn m_turn;
+  bool m_hover = false;
+  std::optional<std::pair<int, bool>> m_hoverEnd;
+};
+
 // A small round button over the view in the material of the floating
 // cards: a translucent fill, a hairline border and a soft shadow; the icon
 // is drawn by the tool button.
@@ -7790,6 +7918,10 @@ void OcctViewer::placeHomeButton() {
 }
 
 void OcctViewer::placeCubeArrows() {
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    const int side = 2 * cubeOffset();
+    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - side, m_overlayInsets.top(), side, side);
+  }
   // Around the cube's middle (cubeOffset from the corner), at the cube's
   // size (mitcad#2071).
   const QPoint middle(width() - m_overlayInsets.right() - cubeOffset(), m_overlayInsets.top() + cubeOffset());
@@ -10364,6 +10496,10 @@ void OcctViewer::readViewEglFrame(const occ::handle<OpenGl_Context>& gl) {
 #endif
 
 void OcctViewer::paintGL() {
+  // Fork: the Axes navigator follows the camera every frame.
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    m_axesNavigator->update();
+  }
 #ifdef MITCAD_OCCT_EGL
   if (m_viewEgl != nullptr && m_viewEgl->context != nullptr) {
     // Qt on X11 with GLX (mitcad#2292): OCCT draws in the view's own EGL
@@ -10854,9 +10990,23 @@ void OcctViewer::applyViewNavigator() {
     if (m_context->IsDisplayed(m_orientationCube)) {
       m_context->Erase(m_orientationCube, false);
     }
-    m_view->TriedronDisplay(Aspect_TOTP_RIGHT_UPPER, Quantity_NOC_GRAY30, 0.1, V3d_ZBUFFER);
+    if (m_axesNavigator == nullptr) {
+      m_axesNavigator = new AxesNavigator(
+          this, [this] { return m_view.IsNull() ? occ::handle<Graphic3d_Camera>() : m_view->Camera(); },
+          [this](const gp_Dir& direction, const gp_Dir& up) {
+            runViewOperation(QStringLiteral("axes navigator"), [this, direction, up] { turnTo(direction, up); });
+            fitAfterNavigator();
+          });
+    }
+    // Where the cube is: its middle cubeOffset from the corner.
+    const int side = 2 * cubeOffset();
+    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - side, m_overlayInsets.top(), side, side);
+    m_axesNavigator->show();
+    m_axesNavigator->raise();
   } else {
-    m_view->TriedronErase();
+    if (m_axesNavigator != nullptr) {
+      m_axesNavigator->hide();
+    }
     if (!m_context->IsDisplayed(m_orientationCube)) {
       m_context->Display(m_orientationCube, 0, 0, false);
     }
