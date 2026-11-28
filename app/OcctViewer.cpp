@@ -9493,6 +9493,14 @@ void OcctViewer::setOldPlaceGhosts(const std::vector<TopoDS_Shape>& shapes) {
   sceneChanged();
 }
 
+void OcctViewer::hoverAt(const QPoint& position) {
+  if (m_view.IsNull() || m_view->Window().IsNull()) return;
+  const NCollection_Vec2<int> pixel = toDevicePixels(QPointF(position));
+  m_context->MoveTo(pixel.x(), pixel.y(), m_view, false);
+  m_hoverMoved = true;
+  requestFrame();
+}
+
 void OcctViewer::setQuickMeasurement(const QString& text) {
   if (text == m_quickText) return;
   m_quickText = text;

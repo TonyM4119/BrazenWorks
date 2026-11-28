@@ -883,6 +883,12 @@ bool ManipulatorOverlay::viewerEvent(QEvent* event) {
     if (m_drag >= 0) {
       Handle& handle = m_handles[static_cast<std::size_t>(m_drag)];
       const DragValue value = valueAt(handle, e->position());
+      // PureCAD: Preferences › Tools › Highlight what is under the pointer
+      // while Move's arrows drag a component: its large handles' drags.
+      if (handle.manipulator.large && m_command == QLatin1String("solid.move") &&
+          QSettings().value(QStringLiteral("tools/highlightUnderMove"), false).toBool()) {
+        m_viewer.hoverAt(m_viewer.mapFromGlobal(mapToGlobal(e->position().toPoint())));
+      }
       if (std::exchange(m_firstMove, false) && handle.manipulator.kind == Manipulator::Kind::Arrow) {
         // For UI tests (mitcad#2508): how far the drag's first move took
         // the pointer along the arrow and the value's point, in pixels on

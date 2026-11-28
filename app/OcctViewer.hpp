@@ -788,6 +788,9 @@ public:
   // PureCAD: Tools › Show moved parts' old place as a ghost: shapes drawn
   // faint and unpickable where they were; empty takes them away.
   void setOldPlaceGhosts(const std::vector<TopoDS_Shape>& shapes);
+  // PureCAD: what is under `position` (view pixels) lit as the pointer's hover
+  // is, while a handle's drag holds the mouse (Tools › Highlight under Move).
+  void hoverAt(const QPoint& position);
   // What the view draws normally while a component other than the root is
   // active (mitcad#420): the bodies, sketches, profiles and construction
   // items of `occurrences` (the active component's occurrences, paths from
