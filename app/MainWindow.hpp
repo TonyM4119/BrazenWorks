@@ -198,6 +198,8 @@ class MainWindow : public QMainWindow, public SketchHost, public DocumentHost {
   Q_OBJECT
 
 public:
+  // PureCAD: Design › Update changed links when a tab comes back.
+  void checkLinksOnReturn() { checkLinkedFiles(); }
   // With demo set, starts with a dimensioned block instead of an empty part.
   explicit MainWindow(bool demo = false, QWidget* parent = nullptr, bool nativeUi = false);
   ~MainWindow() override;

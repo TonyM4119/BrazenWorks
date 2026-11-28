@@ -503,6 +503,11 @@ DocumentFrame::DocumentFrame(WindowManager& manager)
     m_stack->setCurrentIndex(index);
     updateActiveDocument();
     logShownTab();
+    // PureCAD: Preferences › Design › Update changed links when a tab comes back.
+    if (MainWindow* document = activeDocument();
+        document != nullptr && QSettings().value(QStringLiteral("design/updateLinks"), true).toBool()) {
+      document->checkLinksOnReturn();
+    }
   });
   // A click on the shown design's tab leaves the Start page for the
   // design: in the top bar's title row (mitcad#1990, both layouts since

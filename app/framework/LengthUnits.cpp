@@ -7,7 +7,9 @@
 #include <vector>
 
 #include <QChar>
+#include <QElapsedTimer>
 #include <QRegularExpression>
+#include <QSettings>
 
 namespace mitcad {
 namespace {
@@ -143,7 +145,27 @@ QString defaultLengthText(const QString& text, const QString& unit) {
   return plainDecimal(niceLength(millimetres, unit), 9) + QLatin1Char(' ') + unit;
 }
 
+namespace {
+// PureCAD: Preferences › Design › Length decimals, once saved; -1 keeps the
+// unit's own precision. Read at most once a second.
+int savedLengthDecimals() {
+  static QElapsedTimer age;
+  static int decimals = -1;
+  if (!age.isValid() || age.elapsed() > 1000) {
+    const QSettings store;
+    const QString key = QStringLiteral("design/lengthDecimals");
+    decimals = store.contains(key) ? std::clamp(store.value(key).toInt(), 0, 8) : -1;
+    age.start();
+  }
+  return decimals;
+}
+} // namespace
+
 QString lengthInUnit(double millimetres, const QString& unit) {
+  const int decimals = savedLengthDecimals();
+  if (decimals >= 0) {
+    return plainDecimal(millimetres / lengthUnitSize(unit), decimals) + QLatin1Char(' ') + unitName(unit);
+  }
   return coordinateInUnit(millimetres, unit) + QLatin1Char(' ') + unitName(unit);
 }
 

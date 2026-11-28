@@ -46,7 +46,7 @@ struct DesignPrefs {
   bool originItemUnderPointer = true;
   bool updateLinks = true;
   bool doubleClickActivates = false;  // a double-click renames, as before (BrowserController)
-  bool insertListsOpenFirst = true;
+  bool insertListsOpenFirst = false; // PureCAD: off keeps the file dialog first, as before
   bool tabsNamedAfterFile = true;
   bool invertJointOrder = false;
   bool ballJointTrackball = true;
@@ -69,6 +69,8 @@ struct DesignPrefs {
     flag("stepValues", s.stepValues);
     flag("valuesBesideHandles", s.valuesBesideHandles);
     number("kernelCheck", s.kernelCheck, 0, 2);
+    // PureCAD: until chosen here, the New Drawing dialog's last projection.
+    s.thirdAngle = !store.value(QStringLiteral("drawing/firstAngle"), false).toBool();
     flag("thirdAngle", s.thirdAngle);
     text("partTemplate", s.partTemplate);
     text("assemblyTemplate", s.assemblyTemplate);
@@ -109,6 +111,10 @@ struct DesignPrefs {
     put("stepValues", stepValues);
     put("valuesBesideHandles", valuesBesideHandles);
     put("kernelCheck", kernelCheck);
+    // PureCAD: a changed projection becomes the New Drawing dialog's choice.
+    if (store.value(g + QStringLiteral("thirdAngle"), false).toBool() != thirdAngle) {
+      store.setValue(QStringLiteral("drawing/firstAngle"), !thirdAngle);
+    }
     put("thirdAngle", thirdAngle);
     put("partTemplate", partTemplate);
     put("assemblyTemplate", assemblyTemplate);

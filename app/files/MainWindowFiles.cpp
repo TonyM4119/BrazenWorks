@@ -1756,6 +1756,12 @@ void MainWindow::insertComponent(const QString& given, const QJsonValue& at) {
     return;
   }
   QString path = given;
+  // PureCAD: Preferences › Design › Insert Design lists open designs first.
+  if (path.isEmpty() && at.isNull() && m_windowManager && m_windowManager->windows().size() > 1 &&
+      QSettings().value(QStringLiteral("design/insertListsOpenFirst"), false).toBool()) {
+    insertOpenDesign();
+    return;
+  }
   if (path.isEmpty() && m_project.hasHistory()) {
     // In a project: a design of the listed projects, the current one first
     // (mitcad#176); Another File... the file dialog.
