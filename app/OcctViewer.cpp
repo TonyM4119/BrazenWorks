@@ -490,7 +490,7 @@ protected:
     const gp_Dir right = dir.Crossed(up);
     const QPointF c(width() / 2.0, height() / 2.0);
     // SolidCraft's size: short axes, about two fifths of the area's radius.
-    const double reach = std::min(width(), height()) / 2.0 * 0.42;
+    const double reach = std::min(width(), height()) / 2.0 - kBall - 2;
     for (int axis = 0; axis < 3; ++axis) {
       for (const bool positive : {true, false}) {
         gp_Vec v(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
@@ -507,21 +507,21 @@ protected:
   // SolidCraft's look: thick axes, a large ball with its letter at each
   // positive end and a ring at each negative one, the ends that point away
   // faded, a dark dot in the middle, a faint disc behind while hovered.
-  static constexpr double kBall = 13.0;
-  static constexpr double kRing = 8.5;
+  static constexpr double kBall = 11.0;
+  static constexpr double kRing = 7.0;
   void paintEvent(QPaintEvent*) override {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
     const QColor colours[3] = {QColor(0xd1342c), QColor(0x2f9a3c), QColor(0x1d5fd6)};
     const char* names[3] = {"X", "Y", "Z"};
     const QPointF c(width() / 2.0, height() / 2.0);
-    QColor disc = palette().color(QPalette::WindowText);
-    disc.setAlphaF(m_hover ? 0.07f : 0.03f);
-    QColor ring = palette().color(QPalette::WindowText);
-    ring.setAlphaF(0.08f);
-    p.setPen(QPen(ring, 1.0));
-    p.setBrush(disc);
-    p.drawEllipse(c, width() / 2.0 - 6, height() / 2.0 - 6);
+    if (m_hover) {
+      QColor disc = palette().color(QPalette::WindowText);
+      disc.setAlphaF(0.06f);
+      p.setPen(Qt::NoPen);
+      p.setBrush(disc);
+      p.drawEllipse(c, width() / 2.0 - 1, height() / 2.0 - 1);
+    }
     const auto list = ends();
     const auto faded = [](QColor colour, const End& end) {
       if (end.depth > 0.05) colour.setAlphaF(0.45f); // pointing away from the eye
@@ -529,7 +529,7 @@ protected:
     };
     // The axes' lines from the middle, the farther first.
     for (const End& end : list) {
-      p.setPen(QPen(faded(colours[end.axis], end), 4.0, Qt::SolidLine, Qt::RoundCap));
+      p.setPen(QPen(faded(colours[end.axis], end), 3.0, Qt::SolidLine, Qt::RoundCap));
       const QPointF towards = end.at - c;
       const double length = std::hypot(towards.x(), towards.y());
       const double stop = end.positive ? kBall : kRing;
@@ -537,10 +537,9 @@ protected:
     }
     p.setPen(Qt::NoPen);
     p.setBrush(QColor(0x1e2328));
-    p.drawEllipse(c, 4.0, 4.0);
+    p.drawEllipse(c, 3.0, 3.0);
     QFont bold = font();
     bold.setBold(true);
-    bold.setPointSizeF(std::max(8.0, bold.pointSizeF() * 1.1));
     p.setFont(bold);
     for (const End& end : list) {
       const QColor colour = faded(colours[end.axis], end);
@@ -553,7 +552,7 @@ protected:
         p.drawText(QRectF(end.at.x() - kBall, end.at.y() - kBall, 2 * kBall, 2 * kBall), Qt::AlignCenter,
                    QString::fromLatin1(names[end.axis]));
       } else {
-        p.setPen(QPen(colour, lit ? 3.6 : 3.0));
+        p.setPen(QPen(colour, lit ? 3.0 : 2.4));
         QColor inside = palette().color(QPalette::Base);
         inside.setAlphaF(0.85f);
         p.setBrush(inside);
@@ -571,6 +570,10 @@ protected:
     return std::nullopt;
   }
   void mouseMoveEvent(QMouseEvent* event) override {
+    if (m_forwarding) {
+      forward(event);
+      return;
+    }
     const auto end = endAt(event->position());
     if (end != m_hoverEnd) {
       m_hoverEnd = end;
@@ -586,10 +589,25 @@ protected:
     m_hoverEnd.reset();
     update();
   }
+  // A press away from the balls and rings, and its moves and release, go to
+  // the view as a press on the cube's area: a drag orbits.
+  void forward(QMouseEvent* event) {
+    QWidget* view = parentWidget();
+    QMouseEvent copy(event->type(), view->mapFromGlobal(event->globalPosition()), event->globalPosition(),
+                     event->button(), event->buttons(), event->modifiers());
+    QCoreApplication::sendEvent(view, &copy);
+  }
+  void mouseReleaseEvent(QMouseEvent* event) override {
+    if (m_forwarding) {
+      forward(event);
+      if (event->buttons() == Qt::NoButton) m_forwarding = false;
+    }
+  }
   void mousePressEvent(QMouseEvent* event) override {
     const auto end = endAt(event->position());
-    if (!end) {
-      event->ignore();
+    if (!end || event->button() != Qt::LeftButton) {
+      m_forwarding = true;
+      forward(event);
       return;
     }
     // From the end clicked toward the origin; the up a standard view has.
@@ -605,6 +623,7 @@ private:
   std::function<occ::handle<Graphic3d_Camera>()> m_camera;
   Turn m_turn;
   bool m_hover = false;
+  bool m_forwarding = false;
   std::optional<std::pair<int, bool>> m_hoverEnd;
 };
 
@@ -7942,8 +7961,9 @@ void OcctViewer::placeHomeButton() {
 
 void OcctViewer::placeCubeArrows() {
   if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
-    const int side = 2 * cubeOffset();
-    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - side, m_overlayInsets.top(), side, side);
+    const int side = cubeScaled(92);
+    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - cubeOffset() - side / 2,
+                                 m_overlayInsets.top() + cubeOffset() - side / 2, side, side);
     m_axesNavigator->lower(); // under Home and the arrows placed below
   }
   // Around the cube's middle (cubeOffset from the corner), at the cube's
@@ -8091,7 +8111,7 @@ bool OcctViewer::isOnOrientationCube(const QPointF& position) {
   // balls and rings take their clicks before the view sees them.
   if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
     const QPointF middle = QRectF(m_axesNavigator->geometry()).center();
-    const double radius = m_axesNavigator->width() / 2.0 - 6;
+    const double radius = m_axesNavigator->width() / 2.0;
     return std::hypot(position.x() - middle.x(), position.y() - middle.y()) <= radius;
   }
   if (m_view->Window().IsNull() || !cubeArea().contains(position)) {
@@ -11030,8 +11050,9 @@ void OcctViewer::applyViewNavigator() {
           });
     }
     // Where the cube is: its middle cubeOffset from the corner.
-    const int side = 2 * cubeOffset();
-    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - side, m_overlayInsets.top(), side, side);
+    const int side = cubeScaled(92);
+    m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - cubeOffset() - side / 2,
+                                 m_overlayInsets.top() + cubeOffset() - side / 2, side, side);
     m_axesNavigator->show();
     m_axesNavigator->raise();
     // Home and the cube's arrows stay over it, so that their clicks reach them.
