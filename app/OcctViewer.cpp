@@ -1495,6 +1495,17 @@ void drawWithoutMeshing(const occ::handle<AIS_Shape>& object) {
   }
 }
 
+// PureCAD: Preferences › Graphics › Vertex markers: a body's vertices drawn
+// as small points (applyGraphicsSettings sets it).
+bool g_vertexMarkers = false;
+void applyVertexMarkers(const occ::handle<AIS_Shape>& body) {
+  const occ::handle<Prs3d_Drawer>& drawer = body->Attributes();
+  drawer->SetVertexDrawMode(g_vertexMarkers ? Prs3d_VDM_All : Prs3d_VDM_Isolated);
+  if (g_vertexMarkers) {
+    drawer->SetPointAspect(new Prs3d_PointAspect(Aspect_TOM_BALL, Quantity_Color(0.15, 0.2, 0.3, Quantity_TOC_RGB), 0.6));
+  }
+}
+
 occ::handle<AIS_Shape> makeBody(const geometry::Shape& named, BodyDisplay::Style style, const QColor& color,
                                 const Appearance* appearance,
                                 const std::vector<BodyDisplay::FaceLook>& faceLooks, VisualStyle visual,
@@ -1505,6 +1516,7 @@ occ::handle<AIS_Shape> makeBody(const geometry::Shape& named, BodyDisplay::Style
   if (!drawerMeshes(named)) {
     body->Attributes()->SetAutoTriangulation(false);
   }
+  applyVertexMarkers(body);
   return body;
 }
 
@@ -1917,8 +1929,12 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
   m_viewer = new V3d_Viewer(driver);
   // A key light from the upper left of the camera instead of OCCT's default
   // headlight, which lights all three faces of an isometric view equally.
-  m_viewer->AddLight(new V3d_AmbientLight(Quantity_Color(0.35, 0.35, 0.35, Quantity_TOC_RGB)));
-  m_viewer->AddLight(new V3d_DirectionalLight(gp_Dir(0.3, -0.5, -1.0), Quantity_NOC_WHITE, true));
+  m_ambientLight = new V3d_AmbientLight(Quantity_Color(0.35, 0.35, 0.35, Quantity_TOC_RGB));
+  m_keyLight = new V3d_DirectionalLight(gp_Dir(0.3, -0.5, -1.0), Quantity_NOC_WHITE, true);
+  // PureCAD: a soft fill from the other side, on with studio lighting.
+  m_fillLight = new V3d_DirectionalLight(gp_Dir(-0.6, 0.4, -0.3), Quantity_Color(0.35, 0.35, 0.38, Quantity_TOC_RGB), true);
+  m_viewer->AddLight(m_ambientLight);
+  m_viewer->AddLight(m_keyLight);
   m_viewer->SetLightOn();
   // The layout grid under everything else: drawn first, without depth.
   Graphic3d_ZLayerSettings underlay;
@@ -11145,6 +11161,43 @@ void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
                               : Graphic3d_RenderingParams::PerfCounters_FrameRate;
   params.StatsPosition = new Graphic3d_TransformPers(Graphic3d_TMF_2d, Aspect_TOTP_RIGHT_UPPER,
                                                      Graphic3d_Vec2i(cubeAreaSize() + 20, 30));
+  // PureCAD: Vertex markers, on the bodies in the view too.
+  if (g_vertexMarkers != settings.vertexMarkers) {
+    g_vertexMarkers = settings.vertexMarkers;
+    for (auto& [uid, entry] : m_bodies) {
+      if (!entry.object.IsNull()) {
+        applyVertexMarkers(entry.object);
+        m_context->Redisplay(entry.object, false);
+      }
+    }
+  }
+  // PureCAD: Studio lighting: a fill light beside the key light and a lower
+  // ambient; off, the key light and a brighter ambient, flatter. Ground
+  // shadow: the key light casts shadows (OCCT's shadow maps), from the view
+  // as the light follows it, or from above the model when it stays put
+  // (Shadow follows the model). Off in safe graphics mode.
+  if (!m_viewer.IsNull() && !m_keyLight.IsNull()) {
+    const bool safe = settings.safeGraphicsMode;
+    m_ambientLight->SetColor(settings.studioLighting ? Quantity_Color(0.35, 0.35, 0.35, Quantity_TOC_RGB)
+                                                      : Quantity_Color(0.5, 0.5, 0.5, Quantity_TOC_RGB));
+    if (settings.studioLighting != m_fillOn) {
+      if (settings.studioLighting) {
+        m_viewer->AddLight(m_fillLight);
+        m_viewer->SetLightOn(m_fillLight);
+      } else {
+        m_viewer->SetLightOff(m_fillLight);
+        m_viewer->DelLight(m_fillLight);
+      }
+      m_fillOn = settings.studioLighting;
+    }
+    const bool shadows = settings.groundShadow && !safe;
+    m_keyLight->SetHeadlight(!settings.groundShadowFollowsModel);
+    m_keyLight->SetDirection(settings.groundShadowFollowsModel ? gp_Dir(0.25, 0.35, -1.0) : gp_Dir(0.3, -0.5, -1.0));
+    m_keyLight->SetCastShadows(shadows);
+    params.IsShadowEnabled = shadows;
+    params.ShadowMapResolution = 2048;
+    m_viewer->UpdateLights();
+  }
   m_view->Invalidate();
   requestFrame();
   qDebug().noquote() << QStringLiteral("View graphics: render scale %1%2, frame rate %3")

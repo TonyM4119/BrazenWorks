@@ -49,6 +49,7 @@
 #include <TopoDS_Shape.hxx>
 #include <V3d_View.hxx>
 #include <V3d_Viewer.hxx>
+#include <Graphic3d_CLight.hxx>
 #include <gp_Ax3.hxx>
 #include <gp_Pnt.hxx>
 #include <gp_Pnt2d.hxx>
@@ -1983,6 +1984,13 @@ private:
   std::unique_ptr<QWindow> m_glxWindow;
 #endif
   occ::handle<V3d_Viewer> m_viewer;
+  // PureCAD: the lights Preferences › Graphics sets (applyGraphicsSettings):
+  // the ambient, the key light (it casts the shadow) and a fill light for
+  // studio lighting.
+  occ::handle<Graphic3d_CLight> m_ambientLight;
+  occ::handle<Graphic3d_CLight> m_keyLight;
+  occ::handle<Graphic3d_CLight> m_fillLight;
+  bool m_fillOn = false;
   occ::handle<V3d_View> m_view;
   occ::handle<AIS_InteractiveContext> m_context;
   occ::handle<AIS_ViewCube> m_orientationCube;
