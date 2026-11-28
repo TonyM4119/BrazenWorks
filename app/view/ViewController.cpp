@@ -785,6 +785,17 @@ protected:
 // Fork: a page's settings box shown as SolidCraft's page: no frame and no
 // title of its own (the page's title stands over it), and the boxes inside
 // it as sections, a caption in small capitals over a hairline.
+// Fork: SolidCraft's two tones of Preferences, the frame's grey and the
+// page panel's lighter one (the dialog's header, sidebar and foot; its page).
+QColor preferencesFrameTone(const QPalette& pal) {
+  const QColor window = pal.color(QPalette::Window);
+  return window.lightness() < 128 ? window.darker(125) : QColor(0xe3, 0xe6, 0xea);
+}
+QColor preferencesPaneTone(const QPalette& pal) {
+  const QColor window = pal.color(QPalette::Window);
+  return window.lightness() < 128 ? window.lighter(118) : QColor(0xf5, 0xf6, 0xf8);
+}
+
 void stylePreferencesPage(QWidget* page) {
   const QPalette pal = page->palette();
   const QString line = themeColor(ColorRole::Line, pal).name(QColor::HexArgb);
@@ -797,7 +808,7 @@ void stylePreferencesPage(QWidget* page) {
     }
     box->setStyleSheet(QStringLiteral("QGroupBox#%1 { border: none; margin: 0; padding: 0; }").arg(box->objectName()));
   }
-  const QString surface = themeColor(ColorRole::Surface, pal).name(QColor::HexArgb);
+  const QString surface = preferencesPaneTone(pal).name(); // fork: the page panel's tone
   const QString text = pal.color(QPalette::WindowText).name(QColor::HexArgb);
   Q_UNUSED(caption);
   for (QGroupBox* inner : page->findChildren<QGroupBox*>()) {
@@ -5015,6 +5026,10 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   outerLayout->setContentsMargins(1, 1, 1, 1);
   auto* card = new QFrame;
   card->setObjectName(QStringLiteral("preferencesCard"));
+  // SolidCraft's two tones: one grey for the frame (header, sidebar, foot)
+  // and a lighter one for the page's panel, which has no outline.
+  const QColor frameTone = preferencesFrameTone(dialog->palette());
+  const QColor paneTone = preferencesPaneTone(dialog->palette());
   // SolidCraft's fields: rounded, a hairline border, roomy.
   card->setStyleSheet(QStringLiteral("QFrame#preferencesCard { background: %1; border: 1px solid %2; border-radius: 12px; } "
                                      "#preferencesCard QComboBox, #preferencesCard QLineEdit { border: 1px solid %3; "
@@ -5026,14 +5041,14 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
                                      "#preferencesCard QPushButton { border: 1px solid %3; border-radius: 6px; padding: 5px 12px; "
                                      "background: %4; } #preferencesCard QPushButton:hover { background: %8; } "
                                      "#preferencesCard QPushButton:disabled { color: %6; }")
-                          .arg(dialog->palette().color(QPalette::Window).name(),
+                          .arg(frameTone.name(),
                                themeColor(ColorRole::Line, dialog->palette()).name(QColor::HexArgb),
                                dialog->palette().color(QPalette::Mid).name(), dialog->palette().color(QPalette::Base).name(),
                                dialog->palette().color(QPalette::Highlight).name(),
                                themeColor(ColorRole::TextSecondary, dialog->palette()).name(QColor::HexArgb),
                                dialog->palette().color(QPalette::Window).lightness() < 128 ? QStringLiteral("chevron-down-light")
                                                                                           : QStringLiteral("chevron-down"),
-                               dialog->palette().color(QPalette::Window).darker(104).name()));
+                               paneTone.darker(104).name()));
   outerLayout->addWidget(card);
   auto* layout = new QVBoxLayout(card);
   layout->setContentsMargins(0, 0, 0, 0);
@@ -5242,8 +5257,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   profile->setStyleSheet(QStringLiteral("QPushButton#preferencesProfile { text-align: left; border: 1px solid %1; "
                                         "border-radius: 10px; padding: 0; background: %2; } "
                                         "QPushButton#preferencesProfile::menu-indicator { image: none; width: 0; }")
-                             .arg(themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb),
-                                  themeColor(ColorRole::Surface, dialogPalette).name(QColor::HexArgb)));
+                             .arg(themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb), paneTone.name()));
   auto* profileMenu = new QMenu(profile);
   profileMenu->setObjectName(QStringLiteral("preferencesProfileMenu"));
   profile->setMenu(profileMenu);
@@ -5251,10 +5265,11 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   body->addLayout(sidebar);
   auto* pane = new QFrame;
   pane->setObjectName(QStringLiteral("preferencesPane"));
-  pane->setStyleSheet(QStringLiteral("QFrame#preferencesPane { background: %1; border: 1px solid %2; "
-                                     "border-radius: 8px; }")
-                          .arg(themeColor(ColorRole::Surface, dialogPalette).name(QColor::HexArgb),
-                               themeColor(ColorRole::Line, dialogPalette).name(QColor::HexArgb)));
+  // The page's panel in the lighter tone, its scroll areas showing it.
+  pane->setStyleSheet(QStringLiteral("QFrame#preferencesPane { background: %1; border: none; border-radius: 10px; } "
+                                     "#preferencesPane QScrollArea, #preferencesPane QScrollArea > QWidget > QWidget, "
+                                     "#preferencesPane QStackedWidget { background: transparent; }")
+                          .arg(paneTone.name()));
   auto* paneColumn = new QVBoxLayout(pane);
   paneColumn->setContentsMargins(24, 18, 24, 16);
   paneColumn->setSpacing(2);
