@@ -13,6 +13,7 @@
 
 #include <algorithm>
 #include <functional>
+#include <tuple>
 #include <utility>
 
 #include <QAbstractButton>
@@ -31,6 +32,7 @@
 #include <QSlider>
 #include <QStyle>
 #include <QVBoxLayout>
+#include <QVector>
 #include <QWidget>
 
 #include "../framework/UiSizes.hpp"
