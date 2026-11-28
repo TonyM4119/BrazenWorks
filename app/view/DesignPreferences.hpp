@@ -27,7 +27,7 @@ struct DesignPrefs {
   QString partTemplate = QStringLiteral("ISO A3");
   QString assemblyTemplate = QStringLiteral("ISO A2");
   int sheetColor = 0;               // 0 White, 1 Cream, 2 Gray, 3 Dark
-  int sheetsSection = 0;            // 0 Multiple sheets only, 1 Always, 2 Never
+  int sheetsSection = 1;            // 0 Multiple sheets only, 1 Always (as before), 2 Never
   int trueSize = 1000;              // calibration × 1000
   bool yUp = false;                 // orientation of new designs
   bool offerStandUp = true;

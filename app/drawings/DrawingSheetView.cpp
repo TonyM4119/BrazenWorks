@@ -7,6 +7,7 @@
 #include <limits>
 #include <utility>
 
+#include <QSettings>
 #include <QContextMenuEvent>
 #include <QEnterEvent>
 #include <QHideEvent>
@@ -1270,7 +1271,11 @@ void DrawingSheetView::paintSheet(const QSize& pixels, qreal ratio) {
   // The paper with a shadow.
   const QRectF paper(toWidget({0.0, m_height}), toWidget({m_width, 0.0}));
   painter.fillRect(paper.translated(3.0, 3.0), QColor(0, 0, 0, 40));
-  painter.fillRect(paper, Qt::white);
+  // PureCAD: Preferences › Design › Sheet color (White, Cream, Gray, Dark);
+  // the lines stay black, so Dark is a deep grey they still show on.
+  static const QColor papers[4] = {Qt::white, QColor(0xfb, 0xf6, 0xe9), QColor(0xe6, 0xe8, 0xeb),
+                                   QColor(0x9a, 0x9f, 0xa6)};
+  painter.fillRect(paper, papers[std::clamp(QSettings().value(QStringLiteral("design/sheetColor"), 0).toInt(), 0, 3)]);
   const QJsonObject dragged = m_draggedCallout.value(QStringLiteral("group")).toObject();
   paintItems(painter, m_groups, dragged.value(QStringLiteral("id")).toString());
   m_sheetPainted = true;
