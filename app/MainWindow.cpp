@@ -8458,7 +8458,11 @@ void MainWindow::enterSketch(const QString& uid, bool existing, const QString& p
   if (m_floating != nullptr) {
     m_floating->layoutNow();
   }
-  m_viewer->lookAtSketchPlane(true, sketchFace(uid));
+  // PureCAD: Preferences › Sketch › Turn the view to face the sketch (on by
+  // default); off, the view stays as it is.
+  if (QSettings().value(QStringLiteral("sketchPrefs/turnToFace"), true).toBool()) {
+    m_viewer->lookAtSketchPlane(true, sketchFace(uid));
+  }
   {
     // For UI tests: the sketch's frame in the design and the direction the
     // view looks along (against the frame's normal).

@@ -14,6 +14,8 @@
 #include <QFontMetricsF>
 #include <QPaintDevice>
 #include <QPainter>
+#include <QDateTime>
+#include <QSettings>
 #include <QPainterPath>
 #include <QRegularExpression>
 #include <QSet>
@@ -120,7 +122,21 @@ QRectF clearOfCards(QRectF block, const QRectF& free, const std::vector<QRect>& 
   return start;
 }
 
-constexpr double kGlyphSize = 15.0;
+// PureCAD: Preferences › Sketch › Conflicting constraints in red (on by
+// default).
+bool conflictColoring() { return QSettings().value(QStringLiteral("sketchPrefs/conflictColor"), true).toBool(); }
+
+// PureCAD: Preferences › Sketch › Constraint glyph size (percent of 15 px).
+double glyphSizeNow() {
+  static double size = 15.0;
+  static qint64 readAt = -1;
+  const qint64 now = QDateTime::currentMSecsSinceEpoch();
+  if (readAt < 0 || now - readAt > 1000) { // read again at most once a second
+    size = 15.0 * std::clamp(QSettings().value(QStringLiteral("sketchPrefs/glyphSize"), 100).toInt(), 50, 300) / 100.0;
+    readAt = now;
+  }
+  return size;
+}
 constexpr double kGlyphStep = 17.0;
 constexpr double kArrowLength = 8.0;
 
@@ -1342,7 +1358,7 @@ std::vector<SketchOverlay::Glyph> SketchOverlay::glyphs() const {
       const QPointF first = center - along * (index * kGlyphStep);
       const QPointF last = first + along * ((count - 1) * kGlyphStep);
       const auto box = [](const QPointF& at) {
-        return QRectF(at.x() - kGlyphSize / 2, at.y() - kGlyphSize / 2, kGlyphSize, kGlyphSize);
+        return QRectF(at.x() - glyphSizeNow() / 2, at.y() - glyphSizeNow() / 2, glyphSizeNow(), glyphSizeNow());
       };
       const QRectF row = box(first).united(box(last));
       const std::vector<QPointF> own =
@@ -1351,7 +1367,7 @@ std::vector<SketchOverlay::Glyph> SketchOverlay::glyphs() const {
       placedRows.push_back(row.translated(offset->second));
     }
     center += offset->second;
-    g.rect = QRectF(center.x() - kGlyphSize / 2, center.y() - kGlyphSize / 2, kGlyphSize, kGlyphSize);
+    g.rect = QRectF(center.x() - glyphSizeNow() / 2, center.y() - glyphSizeNow() / 2, glyphSizeNow(), glyphSizeNow());
     result.push_back(g);
   }
   return result;
@@ -1919,7 +1935,7 @@ void SketchOverlay::paintPreview(QPainter& painter, const ToolPreview& preview) 
     // typed values are below right of it).
     const QPointF at = preview.glyphAt ? m_c.toScreen(*preview.glyphAt) + QPointF(8, -24)
                                        : m_c.cursor() + QPointF(-34, -30);
-    glyph.rect = QRectF(at.x(), at.y(), kGlyphSize, kGlyphSize);
+    glyph.rect = QRectF(at.x(), at.y(), glyphSizeNow(), glyphSizeNow());
     paintGlyph(painter, glyph, false, true);
   }
   // The auto constraints the next click adds, in a row below right of
@@ -1929,7 +1945,7 @@ void SketchOverlay::paintPreview(QPainter& painter, const ToolPreview& preview) 
     for (int i = 0; i < preview.marks.size(); ++i) {
       Glyph glyph;
       glyph.type = preview.marks.at(i);
-      glyph.rect = QRectF(at.x() + i * (kGlyphSize + 3), at.y(), kGlyphSize, kGlyphSize);
+      glyph.rect = QRectF(at.x() + i * (glyphSizeNow() + 3), at.y(), glyphSizeNow(), glyphSizeNow());
       paintGlyph(painter, glyph, false, true);
     }
   }
@@ -2199,7 +2215,7 @@ void SketchOverlay::paint(QPainter& painter) {
       const bool selected = isSelected(QStringLiteral("dimension"), layout.id);
       const bool driven = d != nullptr && d->driven;
       const bool inactive = d != nullptr && !d->active;
-      const bool conflicted = conflicts.contains(layout.id);
+      const bool conflicted = conflictColoring() && conflicts.contains(layout.id);
       const bool hovered = hover == layout.id || (conflicted && conflictHovered);
       const bool marked = selected || hovered || conflicted;
       painter.setOpacity(dimmed[i] ? kThroughOpacity : 1.0);
@@ -2222,7 +2238,7 @@ void SketchOverlay::paint(QPainter& painter) {
     for (const Glyph& g : glyphs()) {
       const bool selected = g.constraint.isEmpty() ? isSelected(QStringLiteral("fix"), g.entity)
                                                    : isSelected(QStringLiteral("constraint"), g.constraint);
-      const bool conflicted = !g.constraint.isEmpty() && conflicts.contains(g.constraint);
+      const bool conflicted = conflictColoring() && !g.constraint.isEmpty() && conflicts.contains(g.constraint);
       const bool hovered = (g.constraint.isEmpty() ? hover == g.entity : hover == g.constraint) ||
                            (conflicted && conflictHovered);
       const bool dimmed =
