@@ -14,6 +14,7 @@
 #include <QDialog>
 #include <QElapsedTimer>
 #include <QHash>
+#include <QSet>
 #include <QJsonArray>
 #include <QJsonObject>
 #include <QMainWindow>
@@ -1322,6 +1323,8 @@ private:
   QToolButton* m_analysisChip = nullptr;
   void updateProfileOperations(); // PureCAD: Graphics › Profile operations
   QFrame* m_profileBar = nullptr;
+  void checkBodies(const std::vector<BodyDisplay>& bodies); // PureCAD: Design › Full kernel check
+  QSet<quintptr> m_checkedShapes;
   // Print Analysis kept in the document (mitcad#620,
   // MainWindowPrintAnalysis.cpp): the shown one's overhangs and thin walls
   // over the bodies, computed again when it, its bodies or the design

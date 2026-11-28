@@ -56,6 +56,7 @@
 #include <QtLogging>
 
 #include <AIS_AnimationCamera.hxx>
+#include <BRepCheck_Analyzer.hxx>
 #include <BRepAdaptor_Curve.hxx>
 #include <BRepAdaptor_Surface.hxx>
 #include <BRepBndLib.hxx>
@@ -4118,6 +4119,46 @@ void MainWindow::cancel() {
   clearSelection();
 }
 
+// PureCAD: Preferences › Design › Full kernel check. After every step:
+// every body shown is checked (BRepCheck) after each change; Once per
+// feature: a body is checked once per shape it takes; Off: none. A body
+// that fails is named in a warning. On the idle loop, so the view shows
+// first.
+void MainWindow::checkBodies(const std::vector<BodyDisplay>& bodies) {
+  const int mode = std::clamp(QSettings().value(QStringLiteral("design/kernelCheck"), 1).toInt(), 0, 2);
+  if (mode == 2) return;
+  std::vector<std::pair<QString, TopoDS_Shape>> pending;
+  for (const BodyDisplay& body : bodies) {
+    if (body.style != BodyDisplay::Style::Normal || !body.shape) continue;
+    const TopoDS_Shape& shape = body.shape->occt();
+    if (shape.IsNull()) continue;
+    const quintptr key = reinterpret_cast<quintptr>(shape.TShape().get());
+    if (mode == 1 && m_checkedShapes.contains(key)) continue;
+    m_checkedShapes.insert(key);
+    pending.emplace_back(QString::fromStdString(body.uid), shape);
+  }
+  if (pending.empty()) return;
+  QTimer::singleShot(0, this, [this, pending] {
+    QStringList failed;
+    for (const auto& [uid, shape] : pending) {
+      try {
+        if (!BRepCheck_Analyzer(shape).IsValid()) {
+          const auto found = m_snapshot.bodies.constFind(uid);
+          failed << (found != m_snapshot.bodies.cend() && !found->name.isEmpty() ? found->name : uid);
+        }
+      } catch (const Standard_Failure&) {
+        failed << uid;
+      }
+    }
+    qDebug().noquote() << QStringLiteral("Kernel check: %1 body(ies), %2")
+                              .arg(pending.size())
+                              .arg(failed.isEmpty() ? QStringLiteral("all valid") : failed.join(QStringLiteral(", ")));
+    if (!failed.isEmpty()) {
+      showStatus(tr("Kernel check: %1 not valid").arg(failed.join(QStringLiteral(", "))), NoticeLevel::Warning);
+    }
+  });
+}
+
 // PureCAD: Preferences › Graphics › Profile operations: profiles selected
 // on an idle view bring a small bar of what they make (Extrude, Revolve,
 // Sweep, Loft) beside the pointer.
@@ -5724,6 +5765,7 @@ void MainWindow::showBodies() {
   ScopedTiming threads("bodies threads");
   showThreads(bodies);
   threads.finish();
+  checkBodies(bodies); // PureCAD: Preferences › Design › Full kernel check
   // The design printer's build volume, when shown (mitcad#640).
   if (m_viewController != nullptr && m_viewController->buildVolumeShown()) {
     m_viewController->refreshBuildVolume();
