@@ -24,6 +24,7 @@
 #include <gp_Trsf.hxx>
 #include <gp_Vec.hxx>
 
+#include <QSettings>
 #include <QObject>
 #include <QStringList>
 #include <QtLogging>
@@ -379,6 +380,7 @@ struct FaceInfo {
   std::vector<std::pair<QJsonValue, place::Line>> edges;
   // What a click snaps to: vertices, centres, edges' middles.
   std::vector<gp_Pnt> snaps;
+  std::vector<gp_Pnt> centers; // PureCAD: circles' and arcs' centres alone
   gp_Pnt middle;
   bool body = false;   // a body's face: sides toward its middle
   bool origin = false; // an origin plane: distances without edges
@@ -439,6 +441,7 @@ std::optional<FaceInfo> faceInfo(const SelectionItem& item, const CommandContext
       }
     } else if (curve.GetType() == GeomAbs_Circle) {
       info.snaps.push_back(curve.Circle().Location());
+      info.centers.push_back(curve.Circle().Location());
     }
   }
   for (TopExp_Explorer vertices(*face, TopAbs_VERTEX); vertices.More(); vertices.Next()) {
@@ -704,8 +707,17 @@ bool placeOnFace(CommandState& state, const CommandContext& context, const Selec
   const double pixel = context.pixelSize(point);
   double step = !snapIt ? 1e-6 : std::isfinite(pixel) && pixel > 0.0 ? dragStep(pixel) : 0.01;
   if (snapIt) {
-    const double tolerance = std::isfinite(pixel) && pixel > 0.0 ? 10.0 * pixel : 0.5;
-    if (const auto snapped = place::snap(point, info->snaps, tolerance)) {
+    // PureCAD: Preferences › Tools › Snap to center, middle and end points
+    // when picking a place; Hole › Snap to centers: a hole (its Hole Tap
+    // Type in the state) snaps to circles' and arcs' centres, from farther.
+    const QSettings store;
+    const bool hole = !state.choice(QStringLiteral("tap")).isEmpty();
+    const bool centersOnly = hole && store.value(QStringLiteral("tools/holeSnapCenters"), false).toBool();
+    const bool points = store.value(QStringLiteral("tools/placedSnapPoints"), true).toBool();
+    const double tolerance = (std::isfinite(pixel) && pixel > 0.0 ? 10.0 * pixel : 0.5) * (centersOnly ? 2.0 : 1.0);
+    static const std::vector<gp_Pnt> none;
+    const std::vector<gp_Pnt>& candidates = centersOnly ? info->centers : points ? info->snaps : none;
+    if (const auto snapped = place::snap(point, candidates, tolerance)) {
       point = *snapped;
       step = 1e-6;
     }
