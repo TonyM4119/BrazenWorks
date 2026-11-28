@@ -172,7 +172,7 @@ QToolButton* NavigationBar::addCommand(const QString& id) {
   // The action gives the icon, the check, the enabled state and the
   // tooltip: the command's name, its tooltip and its shortcut.
   button->setDefaultAction(action);
-  button->setToolButtonStyle(Qt::ToolButtonIconOnly);
+  button->setToolButtonStyle(m_labels ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
   button->setFocusPolicy(Qt::NoFocus);
   styleButton(button);
   layout()->addWidget(button);
@@ -429,13 +429,34 @@ void NavigationBar::updateParametersButton() {
   }
 }
 
+void NavigationBar::setLook(bool compact, bool labels) {
+  if (compact == m_compact && labels == m_labels) {
+    return;
+  }
+  m_compact = compact;
+  m_labels = labels;
+  for (QToolButton* button : std::as_const(m_buttons)) {
+    if (button == nullptr) {
+      continue;
+    }
+    styleButton(button);
+    button->setToolButtonStyle(labels ? Qt::ToolButtonTextBesideIcon : Qt::ToolButtonIconOnly);
+  }
+  adjustSize();
+  if (m_holder != nullptr) {
+    m_holder->adjustSize();
+    m_holder->updateGeometry();
+  }
+  requestLog();
+}
+
 void NavigationBar::styleButton(QToolButton* button) const {
   if (m_presentation == Presentation::StatusBar) {
     button->setAutoRaise(true);
     button->setIconSize(uiIconSize(16, 16));
     return;
   }
-  button->setIconSize(uiIconSize(18, 18));
+  button->setIconSize(m_compact ? uiIconSize(14, 14) : uiIconSize(18, 18));
   setFlatCardButton(button);
 #ifndef MITCAD_MAC_UI
   // Checked as the Sketch Palette's buttons are: tinted and outlined in the

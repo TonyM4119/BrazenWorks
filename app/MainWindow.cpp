@@ -1070,6 +1070,7 @@ MainWindow::MainWindow(bool demo, QWidget* parent, bool nativeUi)
   // Look At, Fit, Visual Style and the grid's toggles at the bottom of the
   // view (mitcad#1086, MainWindowNavigationBar.cpp).
   createNavigationBar();
+  followLayoutSettings(); // fork: Preferences › Layout
   // The version over the view's lower right (mitcad#1209).
   m_versionWatermark = new VersionWatermark(m_viewer);
   m_search = new CommandSearch(*m_registry, this);
@@ -4063,7 +4064,10 @@ void MainWindow::openCommandSearch() {
     return;
   }
 #endif
-  m_search->popup(m_viewer->mapToGlobal(m_viewer->rect().center()));
+  // Fork: in the view's middle, or (Preferences › Layout) below its top.
+  const QRect view = m_viewer->rect();
+  const QPoint at = m_searchCentered ? view.center() : QPoint(view.center().x(), view.top() + view.height() / 5);
+  m_search->popup(m_viewer->mapToGlobal(at));
 }
 
 void MainWindow::editShortcuts(const QString& id) {
@@ -4724,6 +4728,7 @@ bool MainWindow::reportRecompute(const QJsonObject& result, double milliseconds)
   }
   m_statusLabel->setText(tr("Recomputed %n feature(s) in %1 ms", nullptr, recomputed)
                              .arg(milliseconds, 0, 'f', 1));
+  echoStatusLine(); // fork: Layout › Status bar
   qDebug().noquote() << m_statusLabel->text();
   // The drawings of an older design file whose views now keep the bodies
   // they showed (mitcad#1293): one information each, in the history too.
@@ -6635,6 +6640,7 @@ void MainWindow::showFeatureStatus(const QString& given, NoticeLevel level, cons
     setErrorStyleSheet(m_statusLabel, QString());
   }
   m_statusLabel->setText(message);
+  echoStatusLine(); // fork: Layout › Status bar
   const QIcon icon = noticeIcon(level);
   if (m_statusIcon == nullptr) {
     // (Not made yet: a message while the window is built.)

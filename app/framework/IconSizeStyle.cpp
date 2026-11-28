@@ -6,6 +6,7 @@
 #include <QAbstractItemView>
 #include <QApplication>
 #include <QComboBox>
+#include <QMenu>
 #include <QPainter>
 #include <QPalette>
 #include <QRect>
@@ -24,7 +25,21 @@ namespace mitcad {
 
 IconSizeStyle::IconSizeStyle(QStyle* base) : QProxyStyle(base) {}
 
+namespace {
+bool g_largeMenuIcons = false; // fork: Layout › Menus
+}
+
+void IconSizeStyle::setLargeMenuIcons(bool large) { g_largeMenuIcons = large; }
+bool IconSizeStyle::largeMenuIcons() { return g_largeMenuIcons; }
+
 int IconSizeStyle::pixelMetric(PixelMetric metric, const QStyleOption* option, const QWidget* widget) const {
+  if (g_largeMenuIcons && m_depth == 0 && metric == PM_SmallIconSize && qobject_cast<const QMenu*>(widget) != nullptr) {
+    ++m_depth;
+    const int pixels = QProxyStyle::pixelMetric(metric, option, widget);
+    --m_depth;
+    const int scaled = ui_sizes_detail::iconPercent == kDefaultUiSize ? pixels : iconSizeScaled(pixels);
+    return scaled * 3 / 2;
+  }
   if (m_depth > 0 || !iconSizeMetric(metric) || ui_sizes_detail::iconPercent == kDefaultUiSize) {
     return QProxyStyle::pixelMetric(metric, option, widget);
   }

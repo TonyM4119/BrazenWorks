@@ -6,6 +6,7 @@
 #include <initializer_list>
 #include <utility>
 
+#include <QApplication>
 #include <QCoreApplication>
 #include <QDockWidget>
 #include <QEvent>
@@ -661,12 +662,57 @@ int GlassCard::heightForContent(int contentHeight) const {
   return headerHeight() + m_contentMargins.top() + m_contentMargins.bottom() + contentHeight;
 }
 
-bool GlassCard::headerWanted() const { return !m_titleText.isEmpty() || m_collapsible || m_hasHeaderWidgets; }
+namespace {
+int g_headerMode = 0; // fork: Preferences › Layout › Card headers
+}
+
+int GlassCard::headerMode() { return g_headerMode; }
+
+void GlassCard::setHeaderMode(int mode) {
+  mode = std::clamp(mode, 0, 2);
+  if (mode == g_headerMode) {
+    return;
+  }
+  g_headerMode = mode;
+  for (QWidget* widget : QApplication::allWidgets()) {
+    if (auto* card = qobject_cast<GlassCard*>(widget)) {
+      card->updateHeader();
+    }
+  }
+}
+
+bool GlassCard::headerWanted() const {
+  const bool has = !m_titleText.isEmpty() || m_collapsible || m_hasHeaderWidgets;
+  return has && (g_headerMode != 2 || m_collapsed);
+}
+
+void GlassCard::showHeaderForHover(bool shown) {
+  if (shown) {
+    for (const QPointer<QWidget>& widget : std::as_const(m_hoverHidden)) {
+      if (widget != nullptr) {
+        widget->show();
+      }
+    }
+    m_hoverHidden.clear();
+    return;
+  }
+  for (QObject* child : m_header->children()) {
+    auto* widget = qobject_cast<QWidget*>(child);
+    if (widget != nullptr && !widget->isHidden()) {
+      widget->hide();
+      m_hoverHidden.append(widget);
+    }
+  }
+}
 
 void GlassCard::updateHeader() {
+  showHeaderForHover(true);
   m_header->setVisible(headerWanted());
   m_chevron->setVisible(m_collapsible);
   m_titleLabel->setVisible(!m_titleText.isEmpty());
+  if (g_headerMode == 1 && !m_collapsed && !underMouse()) {
+    showHeaderForHover(false);
+  }
   emit collapsedChanged(m_collapsed); // the header's height may have changed
 }
 
@@ -826,6 +872,16 @@ void GlassCard::changeEvent(QEvent* event) {
 
 bool GlassCard::event(QEvent* event) {
   switch (event->type()) {
+  case QEvent::Enter: // fork: header mode 1
+    if (g_headerMode == 1) {
+      showHeaderForHover(true);
+    }
+    break;
+  case QEvent::Leave:
+    if (g_headerMode == 1 && !m_collapsed) {
+      showHeaderForHover(false);
+    }
+    break;
   case QEvent::ParentChange:
     delete m_shadow;
     attachShadow();

@@ -4812,6 +4812,18 @@ void Ribbon::fitOverflow(QWidget* page, QList<GroupInfo>& infos, int total, int 
   }
 }
 
+void Ribbon::setGroupsShown(bool shown) {
+  if (m_pages == nullptr || m_pages->isHidden() == !shown) {
+    return;
+  }
+  m_pages->setVisible(shown);
+  updateGeometry();
+  adjustSize();
+  updateGroupMask();
+  emit groupCardsChanged();
+  qDebug().noquote() << QStringLiteral("Ribbon groups %1").arg(shown ? QStringLiteral("shown") : QStringLiteral("hidden"));
+}
+
 void Ribbon::setButtonLabels(bool labels) {
   if (labels == m_labels) {
     return;

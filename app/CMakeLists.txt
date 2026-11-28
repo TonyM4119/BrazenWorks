@@ -2157,6 +2157,7 @@ endif()
 # View menu's own actions; a card in the Floating layout, in the status bar
 # in the Docked layout.
 target_sources(mitcad PRIVATE view/NavigationBar.cpp view/NavigationBar.hpp MainWindowNavigationBar.cpp)
+target_sources(mitcad PRIVATE MainWindowLayout.cpp) # fork: Preferences › Layout applied
 
 # The message band and the session's message history (mitcad#1042,
 # docs/ui-conventions.md "The message band"): what the band shows of the

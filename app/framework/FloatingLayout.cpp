@@ -230,6 +230,13 @@ void FloatingLayout::addTopRow(QWidget* row, RowCards cards, const QList<QWidget
   requestLayout();
 }
 
+void FloatingLayout::setBandAtRight(bool right) {
+  if (right != m_bandAtRight) {
+    m_bandAtRight = right;
+    requestLayout();
+  }
+}
+
 void FloatingLayout::setFlushRow(QWidget* row) {
   if (!m_flushRows.contains(QPointer<QWidget>(row))) {
     m_flushRows.append(row);
@@ -615,8 +622,12 @@ void FloatingLayout::layoutCards() {
   // as messages come and fade), one line high and as wide as its text,
   // centred on the timeline.
   if (m_band != nullptr && m_band->isShown()) {
-    const int left = topBottom.isValid() ? topBottom.left() : view.left() + kMargin;
-    const int width = topBottom.isValid() ? topBottom.width() : view.width() - 2 * kMargin;
+    int left = topBottom.isValid() ? topBottom.left() : view.left() + kMargin;
+    int width = topBottom.isValid() ? topBottom.width() : view.width() - 2 * kMargin;
+    if (m_bandAtRight && width > kBandRightWidth) { // fork: Notices › Bottom right
+      left += width - kBandRightWidth;
+      width = kBandRightWidth;
+    }
     m_bandContent->setAvailableWidth(width - kBandMargins.left() - kBandMargins.right());
     const int row = std::max(topBottom.isValid() ? topBottom.height() : 0,
                              m_band->heightForContent(m_bandContent->fullHeight()));
@@ -904,11 +915,14 @@ void FloatingLayout::layoutCards() {
     const int height = card->heightForContent(hint);
     const int width = std::min(entry.sizing.width > 0 ? entry.sizing.width : card->sizeHint().width(),
                                std::max(1, view.width() - 2 * kMargin));
-    const int top = floor - height;
+    const int top = entry.sizing.atTop ? topLimit : floor - height;
     int freeLeft = view.left() + kMargin;
     int freeRight = view.right() + 1 - kMargin;
-    if (m_viewer->badgeWidth() > 0) { // the sketch's badge, at the bottom left
+    if (m_viewer->badgeWidth() > 0 && !entry.sizing.atTop) { // the sketch's badge, at the bottom left
       freeLeft = std::max(freeLeft, view.left() + m_viewer->badgeWidth() + kGap);
+    }
+    if (entry.sizing.atTop) { // fork: clear of the view navigator in the top right corner
+      freeRight = std::min(freeRight, view.right() + 1 - cubeRight - m_viewer->cubeAreaSize() - kGap);
     }
     for (const Entry& other : m_entries) {
       if (!visible(other) || other.anchor == Anchor::Bottom || other.anchor == Anchor::BottomCenter ||
@@ -916,7 +930,7 @@ void FloatingLayout::layoutCards() {
         continue;
       }
       const QRect slot = other.card->slot();
-      if (slot.bottom() < top - kGap || slot.top() > floor) {
+      if (slot.bottom() < top - kGap || slot.top() > top + height + kGap) {
         continue; // not in its row
       }
       if (other.anchor == Anchor::TopLeft) {
@@ -927,9 +941,13 @@ void FloatingLayout::layoutCards() {
     }
     // Centred in the free width; where that is narrower than the card, at
     // its left end.
-    const int x = freeLeft + std::max(0, (freeRight - freeLeft - width) / 2);
+    // Fork: or at its left or right end (Preferences › Layout).
+    const int room = std::max(0, freeRight - freeLeft - width);
+    const int x = freeLeft + (entry.sizing.align == 0 ? 0 : entry.sizing.align == 2 ? room : room / 2);
     card->setSlot(QRect(x, top, width, height));
-    floor = top - kGap;
+    if (!entry.sizing.atTop) {
+      floor = top - kGap;
+    }
   }
   // The centred cards (mitcad#2367): most of the room between the rows and
   // the bottom card, over the other cards.

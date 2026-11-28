@@ -2,6 +2,7 @@
 #include "ViewController.hpp"
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
+#include "LayoutPreferences.hpp" // Fork
 #include "GridSpacing.hpp"
 #include "DefaultView.hpp"
 #include "../platform/SpaceMouseDevice.hpp"
@@ -153,6 +154,10 @@
 
 namespace mitcad {
 namespace {
+
+// Fork: the brand's community links, read through a call so that the checks
+// on it are not constant conditions (MSVC C4127).
+bool upstreamCommunityLinks() { return brand::kUpstreamCommunityLinks; }
 
 const QString kGroup = QStringLiteral("view/");
 
@@ -342,6 +347,11 @@ const PreferencePage kPreferencePages[] = {
      "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
      "drawings small_circles circles boost navigation_bar",
      "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
+    // Fork: SolidCraft's Layout page.
+    {"layout", QT_TRANSLATE_NOOP("View", "Layout"),
+     "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
+     "sub-tab history browser bodies folders dialogs ok cancel toolbar tabs ribbon navigation_bar idle fade",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Where the parts of the window sit."), "toolbar-panel"},
     // Folders of font files for sketch text (mitcad#473).
     {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
@@ -401,7 +411,8 @@ const PreferencePage kPreferencePages[] = {
 bool pageFills(const char* id) {
   const QLatin1String page(id);
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
-         page == QLatin1String("navigation") || page == QLatin1String("cloud");
+         page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
+         page == QLatin1String("layout"); // fork: its own scroll area takes the page's height
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -647,6 +658,20 @@ QVector<QPair<QString, QString>> mouseRows(const NavigationSettings& settings) {
     return {{QObject::tr("Right drag"), QObject::tr("Orbit")},
             {QObject::tr("Middle drag, Shift + right drag"), QObject::tr("Pan")},
             {wheel, QObject::tr("Zoom")}};
+  case NavigationScheme::MiddleOrbitShiftPan:
+  case NavigationScheme::AltShiftButtons:
+  case NavigationScheme::AltLeftRightPan:
+  case NavigationScheme::AltLeftKeys: {
+    // Fork: the newer mappings' rows from their bindings.
+    QVector<QPair<QString, QString>> result;
+    for (const NavigationBinding& binding : navigationBindings(scheme)) {
+      if (navigationBindingAllowed(binding) && binding.action != NavigationAction::None &&
+          binding.input != NavigationInput::TrackpadScroll)
+        result.append({navigationInputText(binding), navigationActionText(binding.action)});
+    }
+    result.append({wheel, QObject::tr("Zoom")});
+    return result;
+  }
   case NavigationScheme::MiddlePan:
   case NavigationScheme::Custom:
     break;
@@ -3195,7 +3220,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // Windows and Linux, the Docked toolbar), beside Show the menu bar where
   // that is offered too (Preferences fits a 768 px high screen).
   QCheckBox* boostShown = nullptr;
-  if (brand::kUpstreamCommunityLinks && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
+  if (upstreamCommunityLinks() && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
     boostShown = new QCheckBox(tr("Show the Boost development button"));
     boostShown->setObjectName(QStringLiteral("boostVisible"));
     boostShown->setChecked(BoostSettings::loadVisible());
@@ -3227,7 +3252,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // × apart from Boost development; offered where the window has it, on
   // Show the Boost development button's row.
   QCheckBox* discordShown = nullptr;
-  if (brand::kUpstreamCommunityLinks && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
+  if (upstreamCommunityLinks() && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
     discordShown = new QCheckBox(tr("Show the Discord button"));
     discordShown->setObjectName(QStringLiteral("discordVisible"));
     discordShown->setChecked(DiscordSettings::loadVisible());
@@ -3699,6 +3724,75 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, quickAccess, applyQuickAccess);
   }
   groups.insert(QStringLiteral("display"), displayBox);
+
+  // Fork: Preferences › Layout (SolidCraft's Layout page): its own options
+  // (view/LayoutPreferences.hpp) and the Display page's rows about the
+  // window's layout, moved into its sections by their names.
+  QWidget* layoutBox = section(tr("Layout"));
+  auto* layoutColumn = new QVBoxLayout(layoutBox);
+  insetPreferencesGroup(layoutColumn, window == nullptr);
+  const QVector<QPair<QString, QString>> toolbarTabs{
+      {QStringLiteral("SOLID"), tr("Solid")},           {QStringLiteral("SURFACE"), tr("Surface")},
+      {QStringLiteral("ASSEMBLY"), tr("Assembly")},     {QStringLiteral("MESH"), tr("Mesh")},
+      {QStringLiteral("SHEET METAL"), tr("Sheet Metal")}, {QStringLiteral("PLASTIC"), tr("Plastic")},
+      {QStringLiteral("BUILD"), tr("Build")},           {QStringLiteral("MANAGE"), tr("Manage")}};
+  auto* layoutPage = new LayoutPreferences(toolbarTabs);
+  layoutColumn->addWidget(layoutPage);
+  {
+    using Section = LayoutPreferences::Section;
+    const QHash<QString, Section> moved{
+        {QStringLiteral("layout"), Section::Window},
+        {QStringLiteral("ribbonLabels"), Section::Window},
+        {QStringLiteral("menuBarVisible"), Section::Window},
+        {QStringLiteral("windowMenuBarVisible"), Section::Window},
+        {QStringLiteral("boostVisible"), Section::ToolbarTabs},
+        {QStringLiteral("discordVisible"), Section::ToolbarTabs},
+        {QStringLiteral("quickAccessVisible"), Section::ToolbarTabs},
+        {QStringLiteral("restoreDefaultLayout"), Section::ToolbarTabs},
+        {QStringLiteral("timelinePresentation"), Section::Panels},
+        {QStringLiteral("browserRowSpacing"), Section::Panels},
+        {QStringLiteral("browserBackground"), Section::Panels},
+        {QStringLiteral("browserRowsShare"), Section::Panels},
+        {QStringLiteral("browserBackgroundNote"), Section::Panels},
+        {QStringLiteral("ghostInactive"), Section::Panels},
+        {QStringLiteral("activePickPriority"), Section::Panels},
+        {QStringLiteral("navigationBar"), Section::NavigationBar}};
+    // The section of the first moved widget a row holds, in its label, its
+    // field or the layout of its field.
+    std::function<std::optional<Section>(QLayoutItem*)> sectionOf = [&](QLayoutItem* item) -> std::optional<Section> {
+      if (item == nullptr) return std::nullopt;
+      if (QWidget* widget = item->widget()) {
+        if (moved.contains(widget->objectName())) return moved.value(widget->objectName());
+        for (const QWidget* child : widget->findChildren<QWidget*>()) {
+          if (moved.contains(child->objectName())) return moved.value(child->objectName());
+        }
+      }
+      if (QLayout* inner = item->layout()) {
+        for (int i = 0; i < inner->count(); ++i) {
+          if (const auto found = sectionOf(inner->itemAt(i))) return found;
+        }
+      }
+      return std::nullopt;
+    };
+    for (int row = display->rowCount() - 1; row >= 0; --row) {
+      QLayoutItem* label = display->itemAt(row, QFormLayout::LabelRole);
+      QLayoutItem* field = display->itemAt(row, QFormLayout::FieldRole);
+      QLayoutItem* spanning = display->itemAt(row, QFormLayout::SpanningRole);
+      std::optional<Section> to = sectionOf(field);
+      if (!to) to = sectionOf(spanning);
+      if (!to) continue;
+      const QFormLayout::TakeRowResult taken = display->takeRow(row);
+      QWidget* labelWidget = taken.labelItem != nullptr ? taken.labelItem->widget() : nullptr;
+      layoutPage->addExisting(*to, labelWidget, taken.fieldItem);
+      Q_UNUSED(label);
+    }
+  }
+  if (window != nullptr) {
+    layoutPage->onChanged = [layoutPage] { layoutPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, layoutPage, [layoutPage] { layoutPage->commit(); });
+  }
+  groups.insert(QStringLiteral("layout"), layoutBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
@@ -4202,10 +4296,10 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     item->setData(Qt::UserRole, QLatin1String(entry.id));
     item->setIcon(monochromeIcon(themeIcon(QString::fromLatin1(entry.icon))));
     // The section's caption over its first page.
-    const QString section = QString::fromLatin1(entry.section);
-    if (section != lastSection) {
-      item->setData(kSectionRole, section);
-      lastSection = section;
+    const QString caption = QString::fromLatin1(entry.section);
+    if (caption != lastSection) {
+      item->setData(kSectionRole, caption);
+      lastSection = caption;
     }
     search->addPage(content, QCoreApplication::translate("View", entry.name), pageKeywords(entry));
   }
@@ -4274,8 +4368,13 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   }
   headerRow->addWidget(gear);
   headerRow->addWidget(title);
-  headerRow->addStretch(1);
-  search->setMinimumWidth(uiRoomSize(300));
+  headerRow->addStretch(2);
+  // Fork: between 160 and 300 px at the right. Its own Ignored width
+  // policy (as wide as the page list it once sat over) put it past the
+  // header's right end beside a stretch.
+  search->setSizePolicy(QSizePolicy::Preferred, search->sizePolicy().verticalPolicy());
+  search->setMinimumWidth(uiRoomSize(160));
+  search->setMaximumWidth(uiRoomSize(300));
   // SolidCraft's search: rounded, the magnifier at the left and the
   // shortcut at the right; a search opens the folded sections.
   search->addAction(monochromeIcon(themeIcon(QStringLiteral("search"))), QLineEdit::LeadingPosition);
@@ -4305,7 +4404,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   connect(search, &QLineEdit::textChanged, stack, [stack](const QString& text) {
     if (!text.isEmpty()) unfoldPreferenceSections(stack);
   });
-  headerRow->addWidget(search);
+  headerRow->addWidget(search, 1);
   // Ctrl+F (Cmd+F) takes the search, its text chosen.
   auto* find = new QShortcut(QKeySequence::Find, dialog.get());
   connect(find, &QShortcut::activated, search, [search] {
@@ -4447,6 +4546,9 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     if (fitted != shown->size()) {
       shown->resize(fitted);
     }
+    // Fork: one size for every page, as SolidCraft's Preferences: the
+    // largest page's, not resizable (the pages that need more scroll).
+    shown->setFixedSize(fitted);
     const QSize frame = fitted + margins;
     const QPoint from = shown->frameGeometry().topLeft();
     // The frame's furthest place right and down that still shows it whole.

@@ -87,6 +87,11 @@ public:
   ~GlassCard() override;
 
   void setTitle(const QString& title);
+  // Fork: Preferences › Layout › Card headers, for every card: 0 always,
+  // 1 their title and buttons only while the pointer is over the card,
+  // 2 hidden (a collapsed card keeps its header, to open it again).
+  static void setHeaderMode(int mode);
+  static int headerMode();
   QString title() const { return m_titleText; }
   void setCollapsible(bool collapsible);
   bool isCollapsible() const { return m_collapsible; }
@@ -281,6 +286,10 @@ private:
   QWidget* m_content = nullptr;
   QMargins m_contentMargins = QMargins(8, 4, 8, 8);
   bool m_hasHeaderWidgets = false;
+  // Fork: the header's widgets hidden while the pointer is away (header
+  // mode 1), shown again when it comes.
+  QList<QPointer<QWidget>> m_hoverHidden;
+  void showHeaderForHover(bool shown);
   bool m_bare = false;
   QRegion m_contentRegion;     // setContentRegion
   QSpacerItem* m_headerSpacer = nullptr; // bare: after the header's widgets

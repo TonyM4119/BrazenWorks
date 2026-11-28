@@ -323,6 +323,9 @@ public:
   // each group's labels as "Ribbon group SOLID/CREATE labels: Sketch,
   // Extrude, Revolve, Hole".
   void setButtonLabels(bool labels);
+  // Fork: Preferences › Layout › Ribbon: the panel of the tab's groups
+  // shown under the tabs, or only the tabs and the row.
+  void setGroupsShown(bool shown);
   bool buttonLabels() const { return m_labels; }
   // The shown page's group cards in sight: their names
   // ("ribbonGroup_SOLID/SHEET_METAL": spaces as underscores) and rectangles
