@@ -23,6 +23,10 @@
 #include <utility>
 #include <vector>
 
+#include <QFile>
+#include <QDateTime>
+#include <QStandardPaths>
+#include <QCryptographicHash>
 #include <QAction>
 #include <QApplication>
 #include <QDir>
@@ -724,10 +728,38 @@ void MainWindow::openExternalFile(const QString& path) {
   openPath(path);
 }
 
+namespace {
+
+// PureCAD: Preferences › Design › Reuse imports I've opened before: an
+// import opened as a design is kept as a design file in the cache folder,
+// by its file's path, size and time; opened again unchanged, the kept
+// design opens instead of a new import. Its Clear button forgets them
+// (the setting design/importCache).
+QString importCacheKey(const QString& file, const QString& structure) {
+  const QFileInfo info(file);
+  const QByteArray signature = QStringLiteral("%1|%2|%3|%4")
+                                   .arg(info.absoluteFilePath())
+                                   .arg(info.size())
+                                   .arg(info.lastModified().toMSecsSinceEpoch())
+                                   .arg(structure)
+                                   .toUtf8();
+  return QString::fromLatin1(QCryptographicHash::hash(signature, QCryptographicHash::Sha1).toHex());
+}
+
+QString importCacheFile(const QString& key) {
+  const QString folder = QStandardPaths::writableLocation(QStandardPaths::CacheLocation) + QStringLiteral("/imports");
+  QDir().mkpath(folder);
+  return folder + QLatin1Char('/') + key + QStringLiteral(".json");
+}
+
+} // namespace
+
 bool MainWindow::startImportedDocument(const QString& path, QString& error) {
   const QString name = QFileInfo(path).fileName();
   const QString file = QFileInfo(path).absoluteFilePath();
   const FileKind kind = fileKind(path);
+  const bool reuse = (kind == FileKind::Cad || kind == FileKind::Mesh) &&
+                     QSettings().value(QStringLiteral("design/reuseImports"), false).toBool();
   // A STEP assembly's choice, asked when the user opens it (mitcad#1274).
   QString structure;
   bool repeatedParts = false;
@@ -738,6 +770,30 @@ bool MainWindow::startImportedDocument(const QString& path, QString& error) {
       return false;
     }
     structure = *chosen;
+  }
+  // PureCAD: the kept design of this file, unchanged since.
+  const QString cacheKey = reuse ? importCacheKey(file, structure) : QString();
+  if (reuse) {
+    const QString kept = QSettings().value(QStringLiteral("design/importCache/") + cacheKey).toString();
+    QFile keptFile(kept);
+    if (!kept.isEmpty() && keptFile.open(QIODevice::ReadOnly)) {
+      const QByteArray json = keptFile.readAll();
+      const DocumentMaker again = [&](ModelJob& job) {
+        job.setStage(tr("Opening %1 as imported before").arg(name));
+        return load_document(rustStr(json));
+      };
+      m_openingImport = true;
+      const bool installed = installDocument(name, QString(), again, error);
+      m_openingImport = false;
+      if (installed) {
+        m_documentName = QFileInfo(path).completeBaseName();
+        updateWindowTitle();
+        qInfo().noquote() << QStringLiteral("Import reused: %1 from %2").arg(name, kept);
+        showHint(tr("%1 opened as imported before (Preferences › Design › Reuse imports).").arg(name));
+        return true;
+      }
+      error.clear(); // imported again below
+    }
   }
   QJsonObject result;
   QString sketch;
@@ -797,6 +853,16 @@ bool MainWindow::startImportedDocument(const QString& path, QString& error) {
   m_documentName = QFileInfo(path).completeBaseName();
   updateWindowTitle();
   m_autosave->saveSoon();
+  // PureCAD: kept for the next time it is opened (Reuse imports).
+  if (reuse && !modelBusy()) {
+    const rust::String json = idleDocument().to_json();
+    const QString keptPath = importCacheFile(cacheKey);
+    QFile kept(keptPath);
+    if (kept.open(QIODevice::WriteOnly | QIODevice::Truncate)) {
+      kept.write(json.data(), static_cast<qint64>(json.size()));
+      QSettings().setValue(QStringLiteral("design/importCache/") + cacheKey, keptPath);
+    }
+  }
   if (kind == FileKind::Drawing) {
     const QJsonObject model = queryObject({{QStringLiteral("query"), QStringLiteral("sketch")},
                                            {QStringLiteral("uid"), sketch}});
