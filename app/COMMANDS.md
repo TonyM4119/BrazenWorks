@@ -18031,6 +18031,7 @@ frontend's Projects card shares `projects/cardWidth` (mitcad#818,
 |---|---|
 | `view.projects` Projects | shows or hides the panel (View › Panels, checkable; the dock's close button too) |
 | `file.new_design` New Design... (Ctrl+N) | File menu and the indicator's menu: a design named in place in the panel's selected folder of the current project (its top when another project or none is selected), recorded (`new_design`) and opened (by the document-window rules below; replacing in the current window first saves its changes and releases its lock); without a current project (also one without versions) an untitled design, as `newDocument` (mitcad#175: New and New Design are one command) |
+| `file.new_choice` New... | File menu (PureCAD): What do you want to create? (`files/NewDocumentDialog.hpp`): picture cards for a Design (in the units chosen there, optionally kept for every new design), a Drawing of the open design (`createDrawing` of `C0`; off without a design), an Import into a new design (`file.import`) and a Project (`file.new_project`); double-click or Create New makes it; the card last made is chosen next time (`newDocument/last`). New Design keeps Ctrl+N and makes one at once |
 
 In the panel (toolbar, context menu, keys): **Open** (double-click, Enter;
 unsaved changes asked as with Open), **New Design** and **New Folder**

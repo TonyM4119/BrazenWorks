@@ -1599,6 +1599,8 @@ private:
   // selected folder of the current project, made as a version and opened;
   // without a current project an untitled design (newDocument, mitcad#175).
   void newDesign();
+  // PureCAD: File › New's What do you want to create? (file.new_choice).
+  void showNewDocumentChoice();
   // What the panel asks for (paths relative to the project at `root`).
   void createDesignInProject(const QString& root, const QString& path);
   void createFolderInProject(const QString& root, const QString& path);

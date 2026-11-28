@@ -1292,6 +1292,7 @@
     {
       "menu": "FILE",
       "entries": [
+        "file.new_choice",
         "file.new_design",
         "file.open",
         "file.open_from_project",
