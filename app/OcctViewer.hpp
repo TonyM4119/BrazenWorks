@@ -701,6 +701,7 @@ public:
   // PureCAD: Graphics › Quick measurement: the selection's line in the
   // view's lower right corner; empty hides it.
   void setQuickMeasurement(const QString& text);
+  void setHiddenEdgesOf(const std::set<std::string>& bodies); // PureCAD: Graphics › hidden edges of selected
   // The width that the sketch's badge takes at the bottom left, from the
   // view's left edge to the right edge of the badge and the pointer's place
   // above it (0: none; right of a card along the left edge when it keeps
@@ -2488,6 +2489,7 @@ private:
   QPointer<ViewPaintLayer> m_viewAngles; // PureCAD: paintViewAngles
   QPointer<ViewPaintLayer> m_quickLayer; // PureCAD: paintQuickMeasurement
   QString m_quickText;
+  std::set<std::string> m_hiddenEdgesShown; // PureCAD: setHiddenEdgesOf
   struct RulerAxis {
     gp_Dir direction;
     double min = 0.0; // mm along it the plane reaches

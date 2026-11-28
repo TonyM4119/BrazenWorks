@@ -7321,6 +7321,14 @@ void MainWindow::setSelection(const Selection& items) {
           m_selection, [this](const QJsonObject& request) { return queryObject(request); }, lengthUnit());
     }
     m_viewer->setQuickMeasurement(quick);
+    // PureCAD: Preferences › Graphics › Show hidden edges of selected bodies.
+    std::set<std::string> dashed;
+    if (QSettings().value(QStringLiteral("graphics/hiddenEdgesOfSelected"), false).toBool()) {
+      for (const SelectionItem& item : m_selection) {
+        if (item.kind == SelectKind::Body) dashed.insert(item.owner.toStdString());
+      }
+    }
+    m_viewer->setHiddenEdgesOf(dashed);
   }
   const qint64 viewMs = selectionClock.restart();
   m_sketch->refreshView();

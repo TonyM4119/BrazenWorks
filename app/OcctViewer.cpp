@@ -268,6 +268,7 @@ const Quantity_Color kCutPreviewColor = viewRole(ColorRole::PreviewRemove);
 bool g_tintNewSurface = true;
 bool g_removedMaterialRed = true;
 bool g_hatchByPart = true;
+bool g_keepDarkShapes = false; // PureCAD: Graphics › Keep the shape of dark parts
 Quantity_Color addPreviewColor() {
   return g_tintNewSurface ? kPreviewColor : Quantity_Color(0.72, 0.74, 0.77, Quantity_TOC_RGB);
 }
@@ -3303,14 +3304,21 @@ void OcctViewer::showBody(BodyEntry& entry) {
   const TopoDS_Shape edges = entry.edges ? entry.edges->drawn() : edgesOf(shape);
   // The dashed edges behind faces in the hidden-edge styles only; Wireframe
   // with Visible Edges Only has the edges in sight alone (mitcad#2155).
-  if (drawsHiddenEdges(m_visualStyle)) {
+  if (drawsHiddenEdges(m_visualStyle) || m_hiddenEdgesShown.count(entry.uid) > 0) { // PureCAD: or selected
     entry.hiddenEdges = new AIS_Shape(edges);
     drawWithoutMeshing(entry.hiddenEdges);
     setEdgeStyle(entry.hiddenEdges, kHiddenEdgeColor, 1.0, Aspect_TOL_DASH);
   }
   entry.visibleEdges = new AIS_Shape(edges);
   drawWithoutMeshing(entry.visibleEdges);
-  setEdgeStyle(entry.visibleEdges, paperFaces(m_visualStyle) ? wireColor(color) : kEdgeColor, 1.0);
+  // PureCAD: Preferences › Graphics › Keep the shape of dark parts: a dark
+  // body's edges light enough to show its outline against its own faces.
+  const bool darkBody = g_keepDarkShapes && !paperFaces(m_visualStyle) && color.lightnessF() < 0.3;
+  setEdgeStyle(entry.visibleEdges,
+               paperFaces(m_visualStyle) ? wireColor(color)
+               : darkBody                ? Quantity_Color(0.62, 0.65, 0.70, Quantity_TOC_RGB)
+                                         : kEdgeColor,
+               1.0);
   for (const auto& [object, layer] :
        {std::pair{entry.hiddenEdges, m_hiddenLayer}, std::pair{entry.visibleEdges, m_edgeLayer}}) {
     if (object.IsNull()) {
@@ -9451,6 +9459,23 @@ void OcctViewer::paintViewAngles(QPainter& painter) {
   painter.drawText(box, Qt::AlignCenter, text);
 }
 
+// PureCAD: Preferences › Graphics › Show hidden edges of selected bodies:
+// those bodies drawn again with their dashed edges behind faces.
+void OcctViewer::setHiddenEdgesOf(const std::set<std::string>& bodies) {
+  if (bodies == m_hiddenEdgesShown) return;
+  std::set<std::string> changed;
+  std::set_symmetric_difference(bodies.begin(), bodies.end(), m_hiddenEdgesShown.begin(), m_hiddenEdgesShown.end(),
+                                std::inserter(changed, changed.end()));
+  m_hiddenEdgesShown = bodies;
+  for (auto& [key, entry] : m_bodies) {
+    if (changed.count(entry.uid) > 0 && !entry.object.IsNull()) {
+      removeBody(entry);
+      showBody(entry);
+    }
+  }
+  sceneChanged();
+}
+
 void OcctViewer::setQuickMeasurement(const QString& text) {
   if (text == m_quickText) return;
   m_quickText = text;
@@ -11277,6 +11302,15 @@ void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
   g_tintNewSurface = settings.tintNewSurface;
   g_removedMaterialRed = settings.removedMaterialRed;
   g_hatchByPart = settings.hatchByPart;
+  if (g_keepDarkShapes != settings.keepDarkShapes) {
+    g_keepDarkShapes = settings.keepDarkShapes;
+    for (auto& [key, entry] : m_bodies) {
+      if (!entry.object.IsNull()) {
+        removeBody(entry);
+        showBody(entry);
+      }
+    }
+  }
   // PureCAD: View angles in the corner.
   if (settings.viewAngles && !m_viewAngles) {
     m_viewAngles = addPaintLayer(
