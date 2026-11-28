@@ -28,6 +28,7 @@
 #include <QPair>
 #include <QPushButton>
 #include <QSet>
+#include <QSettings>
 #include <QToolButton>
 #include <QWidget>
 #include <QtLogging>
@@ -1502,8 +1503,18 @@ void BrowserController::browserDoubleClicked(const BrowserNode& node) {
   case BrowserNode::Type::SheetRules:
     m_host.editFeature(node.uid);
     break;
-  case BrowserNode::Type::Body:
   case BrowserNode::Type::Component:
+    // PureCAD: Preferences › Design › Double-click a component to activate
+    // it (off by default: a double-click renames, as before).
+    if (QSettings().value(QStringLiteral("design/doubleClickActivates"), false).toBool()) {
+      activate(node);
+      break;
+    }
+    if (canChange()) {
+      m_browser->startRename(node);
+    }
+    break;
+  case BrowserNode::Type::Body:
     if (canChange()) {
       m_browser->startRename(node);
     }

@@ -9815,6 +9815,11 @@ bool MainWindow::installEmptyDocument(const QString& name, QString* error) {
   m_documentName = name;
   updateWindowTitle();
   qInfo().noquote() << QStringLiteral("New design in %1").arg(units);
+  // PureCAD: Preferences › Design › Hide the Origin folder in new designs:
+  // the origin starts hidden (its eye off; the Browser's Show brings it back).
+  if (QSettings().value(QStringLiteral("design/hideOriginFolder"), false).toBool()) {
+    runModelCommand({{QStringLiteral("cmd"), QStringLiteral("set_origin_visible")}, {QStringLiteral("visible"), false}});
+  }
   return true;
 }
 

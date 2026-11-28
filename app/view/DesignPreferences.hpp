@@ -45,7 +45,7 @@ struct DesignPrefs {
   bool originAxesAcross = false;
   bool originItemUnderPointer = true;
   bool updateLinks = true;
-  bool doubleClickActivates = true;
+  bool doubleClickActivates = false;  // a double-click renames, as before (BrowserController)
   bool insertListsOpenFirst = true;
   bool tabsNamedAfterFile = true;
   bool invertJointOrder = false;
