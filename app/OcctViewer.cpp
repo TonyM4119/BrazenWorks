@@ -8548,8 +8548,9 @@ void OcctViewer::bindGestures() {
     }
     return AIS_MouseGesture_NONE;
   };
-  const auto bindings = m_navigation.scheme == NavigationScheme::Custom ? m_navigation.customBindings
-                                                                        : navigationBindings(m_navigation.scheme);
+  // Fork: with Right drag orbits and the buttons' overrides
+  // (effectiveNavigationBindings).
+  const auto bindings = effectiveNavigationBindings(m_navigation);
   for (const auto& binding : bindings) {
     if (!navigationBindingAllowed(binding) || binding.action == NavigationAction::None ||
         binding.input == NavigationInput::TrackpadScroll) {

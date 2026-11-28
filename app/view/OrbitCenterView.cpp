@@ -84,6 +84,13 @@ gp_Pnt OcctViewer::orbitPivot(const std::optional<NCollection_Vec2<int>>& cursor
     qDebug().noquote() << QStringLiteral("Orbit about the fixed center at %1").arg(pointText(*m_orbitCenter));
     return *m_orbitCenter;
   }
+  // Fork: about the design's origin.
+  if (m_navigation.orbitCenter == OrbitCenter::Origin) {
+    const gp_Pnt origin(0.0, 0.0, 0.0);
+    m_lastOrbitPivot = origin;
+    qDebug().noquote() << QStringLiteral("Orbit about the origin");
+    return origin;
+  }
   if (m_navigation.orbitCenter == OrbitCenter::Cursor && cursor) {
     if (const std::optional<gp_Pnt> under = modelPointAt(*cursor)) {
       m_lastOrbitPivot = under;

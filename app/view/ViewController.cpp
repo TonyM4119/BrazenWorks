@@ -260,6 +260,15 @@ const SchemeEntry kSchemes[] = {
     {NavigationScheme::TrackpadShift, "trackpad-shift",
      QT_TRANSLATE_NOOP("View", "Trackpad (two-finger scroll pans, pinch zooms, Shift orbits)")},
     {NavigationScheme::Custom, "custom", QT_TRANSLATE_NOOP("View", "Custom")},
+    // Fork: the schemes of more CAD programs' mappings (kMouseMappings).
+    {NavigationScheme::MiddleOrbitShiftPan, "middle-orbit-shift-pan",
+     QT_TRANSLATE_NOOP("View", "Middle orbits, Shift + middle pans, Ctrl + middle zooms")},
+    {NavigationScheme::AltShiftButtons, "alt-shift-buttons",
+     QT_TRANSLATE_NOOP("View", "Alt + Shift + left orbits, + middle pans, + right zooms")},
+    {NavigationScheme::AltLeftRightPan, "alt-left-right-pan",
+     QT_TRANSLATE_NOOP("View", "Alt + left orbits, right pans, middle zooms")},
+    {NavigationScheme::AltLeftKeys, "alt-left-keys",
+     QT_TRANSLATE_NOOP("View", "Alt + left orbits, Alt + Shift + left pans, Alt + Ctrl + left zooms")},
 };
 
 const SchemeEntry& schemeEntry(NavigationScheme scheme) {
