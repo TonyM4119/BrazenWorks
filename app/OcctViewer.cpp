@@ -7921,6 +7921,7 @@ void OcctViewer::placeCubeArrows() {
   if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
     const int side = 2 * cubeOffset();
     m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - side, m_overlayInsets.top(), side, side);
+    m_axesNavigator->lower(); // under Home and the arrows placed below
   }
   // Around the cube's middle (cubeOffset from the corner), at the cube's
   // size (mitcad#2071).
@@ -11003,6 +11004,13 @@ void OcctViewer::applyViewNavigator() {
     m_axesNavigator->setGeometry(width() - m_overlayInsets.right() - side, m_overlayInsets.top(), side, side);
     m_axesNavigator->show();
     m_axesNavigator->raise();
+    // Home and the cube's arrows stay over it, so that their clicks reach them.
+    if (m_homeButton != nullptr) {
+      m_homeButton->raise();
+    }
+    for (const auto& [id, arrow] : m_cubeArrows) {
+      arrow->raise();
+    }
   } else {
     if (m_axesNavigator != nullptr) {
       m_axesNavigator->hide();
