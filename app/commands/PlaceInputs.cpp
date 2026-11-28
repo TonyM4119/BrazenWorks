@@ -1074,6 +1074,11 @@ std::function<std::optional<Manipulator>(const CommandState&, const CommandConte
     if (storedForm(state) != PlaceForm::Face) {
       return std::nullopt;
     }
+    // PureCAD: Preferences › Tools › Placement handles (on by default, as
+    // MitCad draws them): off, the distances are typed only.
+    if (!QSettings().value(QStringLiteral("tools/placementHandles"), true).toBool()) {
+      return std::nullopt;
+    }
     const auto sides = sidesOf(state);
     const auto point = facePoint(state, context);
     const double value = state.value(which == 0 ? kOffset1 : kOffset2);

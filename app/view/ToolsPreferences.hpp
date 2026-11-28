@@ -27,7 +27,7 @@ struct ToolsPrefs {
   bool extrudeReturnView = false;
   int newExtrudeDistance = 0;       // 0 Fixed, 1 The last used, 2 From the profile's size
   double fixedExtrudeDistance = 0.0; // mm; 0 starts at zero and waits for one, as before
-  bool placementHandles = false;
+  bool placementHandles = true;   // PureCAD: on, as MitCad draws them
   bool placedSnapPoints = true;
   bool rememberDialogValues = false;
   bool previousFilletDefault = false;
