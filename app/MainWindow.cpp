@@ -3531,7 +3531,23 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
     // the scene.
     beginCommandSketches(editUid, Selection(), def.name);
   }
-  auto* session = new CommandSession(def, *this, editUid, m_documentSession);
+  // PureCAD: Preferences › Design › Invert joint selection order: a new
+  // Joint asks for Origin B (the component that stays) first. The session
+  // keeps a reference: the reordered definition lives in the window.
+  const CommandDef* used = &def;
+  if (editUid.isEmpty() && (def.id == QLatin1String("assemble.joint") || def.id == QLatin1String("assemble.as_built_joint")) &&
+      QSettings().value(QStringLiteral("design/invertJointOrder"), false).toBool()) {
+    m_invertedJoint = std::make_unique<CommandDef>(def);
+    auto& inputs = m_invertedJoint->inputs;
+    const auto a = std::find_if(inputs.begin(), inputs.end(), [](const InputDef& i) { return i.id == QLatin1String("a"); });
+    const auto b = std::find_if(inputs.begin(), inputs.end(), [](const InputDef& i) { return i.id == QLatin1String("b"); });
+    if (a != inputs.end() && b != inputs.end() && a < b) {
+      std::rotate(a, b, b + 1); // b moved in front of a
+      used = m_invertedJoint.get();
+      qDebug().noquote() << QStringLiteral("Joint: Origin B picked first (Preferences)");
+    }
+  }
+  auto* session = new CommandSession(*used, *this, editUid, m_documentSession);
   if (!analysis.isEmpty()) {
     session->editAnalysis(analysis);
   }
