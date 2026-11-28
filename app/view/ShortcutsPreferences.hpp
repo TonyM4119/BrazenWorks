@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
 // Fork: Preferences › Shortcuts, as SolidCraft's: a filter with Done,

@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Fork: Preferences › Graphics › Graphics card: Windows' own choice of
 // graphics card for this program (Settings › System › Display › Graphics,
 // HKCU\Software\Microsoft\DirectX\UserGpuPreferences by the program's path),

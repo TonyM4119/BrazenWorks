@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Fork: the plane ruler (view/PlaneRuler.hpp): the numbered ticks' spacing
 // on the layout grid's major lines, and the labels' text.
 #include "UnitTests.hpp"

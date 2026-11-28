@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Fork: Preferences › Layout (view/LayoutSettings.hpp, SolidCraft's Layout
 // page) applied to the window: kept on top of other windows, the cards'
 // headers, where notices show, and the navigation bar's place, size,

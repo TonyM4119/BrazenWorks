@@ -1,4 +1,4 @@
-# SPDX-License-Identifier: MIT
+# SPDX-License-Identifier: AGPL-3.0-or-later
 # Fork: the plane ruler's tick spacing and labels: plain Qt Core. It calls
 # view/GridSpacing.cpp, which grid_spacing.cmake adds to the target.
 target_sources(test_app PRIVATE tests/plane_ruler.cpp view/PlaneRuler.cpp view/PlaneRuler.hpp)

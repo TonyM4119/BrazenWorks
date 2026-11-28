@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 #pragma once
 
 // Fork: the view's camera glides (Home, Fit, the view cube, Look At, the

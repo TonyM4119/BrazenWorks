@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: MIT
+// SPDX-License-Identifier: AGPL-3.0-or-later
 // Fork: Preferences › Display › Smoothness and Anti-aliasing
 // (view/ViewQualityPreference.hpp).
 #include "view/ViewQualityPreference.hpp"
