@@ -672,7 +672,7 @@ public:
     around->addWidget(m_orbitCenter);
     connect(m_orbitCenter, &QComboBox::currentIndexChanged, this, [this] {
       m_settings.orbitCenter = static_cast<OrbitCenter>(m_orbitCenter->currentData().toInt());
-      for (auto* card : findChildren<NavigationChoiceCard*>()) {
+      for (auto* card : findChildren<QAbstractButton*>()) {
         if (card->objectName() == QLatin1String(m_settings.orbitCenter == OrbitCenter::Origin ? "navigationOrbitOrigin"
                                                  : m_settings.orbitCenter == OrbitCenter::Cursor ? "navigationOrbitUnderCursor"
                                                                                                  : "navigationOrbitViewCenter")) {

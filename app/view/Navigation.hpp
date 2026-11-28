@@ -455,13 +455,13 @@ inline void loadNavigationDetails(const QSettings& store, NavigationSettings& se
   settings.reversePanVertical = store.value(prefix + QStringLiteral("reversePanVertical"), false).toBool();
   settings.reverseScrollOrbit = store.value(prefix + QStringLiteral("reverseScrollOrbit"), false).toBool();
   settings.mouseMapping = store.value(prefix + QStringLiteral("mouseMapping")).toString();
-  const auto flag = [&](const char* name, bool fallback) {
-    return store.value(prefix + QLatin1String(name), fallback).toBool();
+  const auto flag = [&](const char* name, bool otherwise) {
+    return store.value(prefix + QLatin1String(name), otherwise).toBool();
   };
-  const auto choice = [&](const char* name, int fallback, int last) {
+  const auto choice = [&](const char* name, int otherwise, int last) {
     bool ok = false;
-    const int value = store.value(prefix + QLatin1String(name), fallback).toInt(&ok);
-    return ok && value >= 0 && value <= last ? value : fallback;
+    const int value = store.value(prefix + QLatin1String(name), otherwise).toInt(&ok);
+    return ok && value >= 0 && value <= last ? value : otherwise;
   };
   settings.touchscreen = flag("touchscreen", false);
   settings.rightDragOrbits = flag("rightDragOrbits", true);
@@ -489,8 +489,8 @@ inline void loadNavigationDetails(const QSettings& store, NavigationSettings& se
   settings.viewNavigator = ViewNavigator(choice("viewNavigator", int(ViewNavigator::Cube), 1));
   {
     bool ok = false;
-    const double speed = store.value(prefix + QStringLiteral("animationSpeed"), 1.0).toDouble(&ok);
-    settings.animationSpeed = ok && std::isfinite(speed) ? std::clamp(speed, 0.25, 4.0) : 1.0;
+    const double animation = store.value(prefix + QStringLiteral("animationSpeed"), 1.0).toDouble(&ok);
+    settings.animationSpeed = ok && std::isfinite(animation) ? std::clamp(animation, 0.25, 4.0) : 1.0;
   }
   settings.homeFitSize = std::clamp(choice("homeFitSize", 100, 100), 50, 100);
   settings.fitAfterNavigatorChange = flag("fitAfterNavigatorChange", false);

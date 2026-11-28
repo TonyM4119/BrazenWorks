@@ -10873,7 +10873,7 @@ bool OcctViewer::touchNavigation(QTouchEvent* event) {
   // one finger orbits, two pan and pinch-zoom), keyed by the finger's id.
   for (const QEventPoint& point : event->points()) {
     const NCollection_Vec2<double> at(toDevicePixels(point.position()).x(), toDevicePixels(point.position()).y());
-    const auto id = Standard_Size(point.id());
+    const auto id = std::size_t(point.id());
     switch (point.state()) {
     case QEventPoint::State::Pressed:
       AddTouchPoint(id, at);
@@ -10890,7 +10890,7 @@ bool OcctViewer::touchNavigation(QTouchEvent* event) {
   }
   if (event->type() == QEvent::TouchCancel) {
     for (const QEventPoint& point : event->points()) {
-      RemoveTouchPoint(Standard_Size(point.id()));
+      RemoveTouchPoint(std::size_t(point.id()));
     }
   }
   if (event->type() == QEvent::TouchBegin) {
