@@ -13,6 +13,13 @@
 
 #include "ViewController.hpp"
 
+#include "AppearancePreferences.hpp"
+#include "DesignPreferences.hpp"
+#include "GraphicsSettings.hpp"
+#include "LayoutSettings.hpp"
+#include "SketchPreferences.hpp"
+#include "ToolsPreferences.hpp"
+
 #include <QDebug>
 #include <QMessageBox>
 #include <QPushButton>
@@ -29,7 +36,9 @@
 #include "../browser/JointHolderQuestion.hpp"
 #include "../drawings/DrawingPreferences.hpp"
 #include "../files/Print3d.hpp"
+#include "../files/RecentDesigns.hpp"
 #include "../framework/AppSettings.hpp"
+#include "../framework/CommandRegistry.hpp"
 #include "../framework/AppTheme.hpp"
 #include "../framework/ChromeStyle.hpp"
 #include "../framework/DebugLog.hpp"
@@ -131,10 +140,77 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
 #endif
   }
 
+  // Fork: the pages built as SolidCraft's keep settings of their own, and
+  // some show controls another page saves (Appearance the theme, background,
+  // size and fonts; Layout the window's layout, timeline and Browser rows;
+  // Graphics the camera, grid and smoothness; Design the units; Tools
+  // Extrude's start): each resets both.
+  const bool appearance = resets("appearance");
+  const bool layout = resets("layout");
+  const bool graphics = resets("graphics");
+  if (resets("general")) {
+    recent::setShowAtLaunch(true); // On startup: Home
+  }
+  if (appearance) {
+    AppearancePrefs{}.save();
+  }
+  if (layout) {
+    LayoutSettings settings;
+    settings.savedPresets = LayoutSettings::load().savedPresets; // the user's own presets stay
+    settings.save();
+    notifyLayoutSettings(settings);
+  }
+  if (graphics) {
+    const GraphicsSettings settings{};
+    settings.save();
+    notifyGraphicsSettings(settings);
+    if (m_settings.gridShown != fresh.gridShown) setGridShown(fresh.gridShown);
+    saveSmoothness(defaultSmoothness());
+    saveAntialiasing(4);
+  }
+  if (resets("design")) {
+    DesignPrefs{}.save();
+    GeneralSettings general = GeneralSettings::load();
+    const auto units = GeneralSettings{}.newDesignUnits;
+    if (general.newDesignUnits != units) {
+      general.newDesignUnits = units;
+      general.save();
+      if (newDesignUnitsChanged) newDesignUnitsChanged();
+    }
+  }
+  if (resets("tools")) {
+    ToolsPrefs{}.save();
+    saveExtrudeStart(NewFeatureOperation::Automatic);
+  }
+  if (resets("shortcuts")) {
+    // Every key back to the command's own: the saved ones go.
+    QSettings settings;
+    for (const QString& key : settings.allKeys()) {
+      if (key.startsWith(QLatin1String("shortcuts/")) || key.startsWith(QLatin1String("shortcuts."))) {
+        settings.remove(key);
+      }
+    }
+    settings.sync();
+    m_registry.reloadShortcuts();
+  }
+
   if (resets("navigation")) {
     m_settings.navigation = fresh.navigation;
   }
   const bool navigationBarWas = m_settings.navigationBar;
+  if (resets("display") || graphics) {
+    if (m_settings.anaglyph && m_settings.perspective && !fresh.perspective) {
+      m_settings.anaglyph = false;
+    }
+    m_settings.perspective = fresh.perspective;
+    m_settings.orthographicFaces = fresh.orthographicFaces;
+    m_settings.focalLength = fresh.focalLength;
+  }
+  if (resets("display") || appearance) {
+    m_settings.background = fresh.background;
+    m_settings.top = fresh.top;
+    m_settings.bottom = fresh.bottom;
+  }
   if (resets("display")) {
     if (m_settings.anaglyph && m_settings.perspective && !fresh.perspective) {
       // Orthographic ends Anaglyph 3D, as View › Camera does (mitcad#1449).
@@ -157,7 +233,7 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
     m_settings.sketchesThroughBodies = fresh.sketchesThroughBodies; // mitcad#1931
     m_settings.selectionThroughBodies = fresh.selectionThroughBodies; // mitcad#1956
   }
-  if (resets("navigation") || resets("display")) {
+  if (resets("navigation") || resets("display") || appearance || graphics) {
     m_settings.save();
     apply(); // the navigation, camera, lenses, cube, background, ghosts and picks
     if (m_render != nullptr) {
@@ -183,6 +259,8 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
         m_render->workerChanged();
       }
     }
+  }
+  if (resets("display") || appearance) {
     if (themePreference() != ThemeChoice::System) {
       setThemePreference(ThemeChoice::System);
       applyThemePreference(ThemeChoice::System);
@@ -192,7 +270,13 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
     saveTextSize(kDefaultUiSize);
     saveIconSize(kDefaultUiSize);
     saveFontFamily(QString());
+  }
+  if (resets("display") || layout) {
     clearLayoutPreference();
+    setTimelinePresentation(TimelinePresentation::Strip);
+    setBrowserRowSpacing(BrowserRowSpacing::Standard);
+  }
+  if (resets("display")) {
     QuickAccessSettings::saveVisible(true);
     BoostSettings::saveVisible(true);
     DiscordSettings::saveVisible(true);
@@ -231,7 +315,7 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
     VersionSettings().save();
   }
 
-  if (resets("updates")) {
+  if (resets("updates") || resets("general")) { // fork: Updates are on General
     UpdateSettings updates = UpdateSettings::load();
     const UpdateSettings defaults{};
     updates.automatic = defaults.automatic;
@@ -287,6 +371,7 @@ void ViewController::restorePreferenceDefaults(const QStringList& pages, bool al
     sketch::saveShowProfilesOnOpen(true);
     sketch::resetProjectFaceOnCreate();
     sketch::saveHideUsedSketches(true);
+    SketchPrefs{}.save(); // fork: Sketch's SolidCraft settings
   }
 
   if (resets("suppliers")) {

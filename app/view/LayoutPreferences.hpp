@@ -7,6 +7,7 @@
 // rows PureCAD's Display page had for these move here (addExisting).
 
 #include "LayoutSettings.hpp"
+#include "PreferenceKit.hpp"
 #include "../framework/CommandLayout.hpp"
 #include "../framework/UiSizes.hpp"
 
@@ -254,10 +255,14 @@ private:
                              : i == names.size() - 1
                                  ? QStringLiteral("border-left: none; border-top-right-radius: 5px; border-bottom-right-radius: 5px;")
                                  : QStringLiteral("border-left: none;");
+      // As the other pages' segments (view/PreferenceKit.hpp): the chosen one
+      // grey and bold, the one under the pointer lit.
       button->setStyleSheet(QStringLiteral("QPushButton { border: 1px solid %1; padding: 4px 12px; background: %2; %4 } "
+                                           "QPushButton:hover:!checked { background: %5; } "
                                            "QPushButton:checked { background: %3; font-weight: 600; }")
                                 .arg(pal.color(QPalette::Mid).name(), pal.color(QPalette::Base).name(),
-                                     pal.color(QPalette::Highlight).lighter(185).name(), radius));
+                                     pal.color(QPalette::Mid).lighter(135).name(), radius,
+                                     preferenceHoverTint(pal).name()));
       group->addButton(button, i);
       line->addWidget(button);
     }
@@ -324,9 +329,11 @@ private:
       card->setIcon(presetIcon(id == QLatin1String("classic")));
       card->setIconSize(QSize(uiRoomSize(110), uiRoomSize(64)));
       card->setAutoRaise(true);
-      card->setStyleSheet(QStringLiteral("QToolButton { border: 1px solid transparent; border-radius: 8px; padding: 4px; } "
-                                         "QToolButton:checked { border: 2px dashed %1; }")
-                              .arg(palette().color(QPalette::Highlight).name()));
+      card->setStyleSheet(QStringLiteral("QToolButton { border: 1px solid transparent; border-radius: 10px; padding: 4px; } "
+                                         "QToolButton:hover { background: %2; border-color: %3; } "
+                                         "QToolButton:checked { border: 2px solid %1; }")
+                              .arg(palette().color(QPalette::WindowText).name(), preferenceHoverTint(palette()).name(),
+                                   palette().color(QPalette::Mid).name()));
       connect(card, &QToolButton::clicked, this, [this, id] {
         m_settings.panelPreset = id;
         rebuildPresets();
@@ -383,7 +390,7 @@ private:
     p.setPen(QPen(palette().color(QPalette::Mid), 1.2, Qt::DashLine));
     p.setBrush(Qt::NoBrush);
     p.drawRoundedRect(r, 6, 6);
-    p.setPen(QPen(palette().color(QPalette::Highlight), 2.2));
+    p.setPen(QPen(palette().color(QPalette::WindowText), 2.0));
     p.drawLine(r.center() + QPointF(-9, 0), r.center() + QPointF(9, 0));
     p.drawLine(r.center() + QPointF(0, -9), r.center() + QPointF(0, 9));
     return QIcon(pixmap);
@@ -536,9 +543,11 @@ private:
       chip->setObjectName(QStringLiteral("layout_tab_") + id);
       chip->setCheckable(true);
       chip->setChecked(!m_settings.hiddenTabs.contains(id));
-      chip->setStyleSheet(QStringLiteral("QPushButton { border: 1px solid %1; border-radius: 6px; padding: 4px 12px; } "
-                                         "QPushButton:checked { border: 2px solid %2; font-weight: 600; }")
-                              .arg(palette().color(QPalette::Mid).name(), palette().color(QPalette::WindowText).name()));
+      chip->setStyleSheet(QStringLiteral("QPushButton { border: 1px solid %1; border-radius: 10px; padding: 3px 12px; "
+                                         "background: %3; } QPushButton:hover { background: %4; } "
+                                         "QPushButton:checked { border: 1px solid %2; font-weight: 600; }")
+                              .arg(palette().color(QPalette::Mid).name(), palette().color(QPalette::WindowText).name(),
+                                   palette().color(QPalette::Base).name(), preferenceHoverTint(palette()).name()));
       chip->setToolTip(tr("Shows or hides the %1 tab").arg(name));
       const QString tabId = id;
       connect(chip, &QPushButton::toggled, this, [this, tabId](bool on) {

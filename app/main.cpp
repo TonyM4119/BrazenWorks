@@ -878,6 +878,32 @@ int runApplication(int argc, char* argv[]) {
     } else if (startPage != "1" && testDriver.active()) {
       skip = QStringLiteral("a UI test script");
     }
+    // Fork: Reopen the designs that were open last time (Preferences ›
+    // General): a start without a file opens them again, the first in this
+    // window, the others beside it as File › Open would; one that is gone
+    // is left out.
+    if (skip.isEmpty() && mitcad::GeneralSettings::load().reopenLastDesigns) {
+      const QStringList last = QSettings().value(QStringLiteral("documents/lastOpenDesigns")).toStringList();
+      int reopened = 0;
+      for (const QString& path : last) {
+        if (!QFileInfo::exists(path)) {
+          qInfo().noquote() << QStringLiteral("Reopen last designs: %1 is gone").arg(path);
+          continue;
+        }
+        QString error;
+        const bool opened = reopened == 0 ? window.openFile(path, error)
+                                          : manager.openFile(&window, path, error) != nullptr;
+        if (opened) {
+          ++reopened;
+        } else if (!error.isEmpty()) {
+          qWarning().noquote() << QStringLiteral("Reopen last designs: %1 not opened: %2").arg(path, error);
+        }
+      }
+      if (reopened > 0) {
+        qInfo().noquote() << QStringLiteral("Reopen last designs: %1 of %2 opened").arg(reopened).arg(last.size());
+        skip = QStringLiteral("the last designs reopened");
+      }
+    }
     window.showStartPageAtLaunch(skip);
   }
   manager.present(&window);

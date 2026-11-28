@@ -39,6 +39,12 @@
 
 namespace mitcad {
 
+// Fork: SolidCraft's hover: what is under the pointer lights up in a soft
+// blue-grey (a lighter grey on dark).
+inline QColor preferenceHoverTint(const QPalette& pal) {
+  return pal.color(QPalette::Window).lightness() < 128 ? pal.color(QPalette::Base).lighter(135) : QColor(0xe4, 0xea, 0xf4);
+}
+
 // A card that shows a choice as a picture: `paint` draws it in the card's
 // upper part; the name (bold when chosen) and a caption under it. Chosen,
 // the card's border is the window text's colour, 2 px, and a round check
@@ -77,17 +83,19 @@ protected:
     const QColor ink = pal.color(QPalette::WindowText);
     const QRectF card = QRectF(rect()).adjusted(1.5, 1.5, -1.5, -1.5);
     QColor fill = ink;
-    fill.setAlphaF(isChecked() ? 0.07f : (underMouse() ? 0.05f : 0.025f));
+    fill.setAlphaF(isChecked() ? 0.07f : 0.025f);
+    const bool lit = underMouse() && isEnabled() && !isChecked(); // lights up, as SolidCraft's
+    if (lit) fill = pal.color(QPalette::Base);
     QColor edge = ink;
-    edge.setAlphaF(isChecked() ? 0.9f : 0.16f);
+    edge.setAlphaF(isChecked() ? 0.9f : (underMouse() ? 0.45f : 0.16f));
     p.setPen(QPen(edge, isChecked() ? 2.0 : 1.0));
     p.setBrush(fill);
     p.drawRoundedRect(card, 10, 10);
     // The picture's well, a shade darker, over the name.
     const double textHeight = m_caption.isEmpty() ? 26.0 : 40.0;
     const QRectF well = card.adjusted(6, 6, -6, -textHeight);
-    QColor wellFill = ink;
-    wellFill.setAlphaF(0.035f);
+    QColor wellFill = lit ? preferenceHoverTint(pal) : ink;
+    if (!lit) wellFill.setAlphaF(0.035f);
     p.setPen(Qt::NoPen);
     p.setBrush(wellFill);
     p.drawRoundedRect(well, 7, 7);
@@ -295,9 +303,11 @@ protected:
                                                   "border-bottom-right-radius: 6px;")
                                  : QStringLiteral("border-left: none;");
       button->setStyleSheet(QStringLiteral("QPushButton { border: 1px solid %1; padding: 5px 14px; background: %2; %4 } "
+                                           "QPushButton:hover:!checked { background: %5; } "
                                            "QPushButton:checked { background: %3; font-weight: 600; }")
                                 .arg(pal.color(QPalette::Mid).name(), pal.color(QPalette::Base).name(),
-                                     pal.color(QPalette::Mid).lighter(135).name(), radius));
+                                     pal.color(QPalette::Mid).lighter(135).name(), radius,
+                                     preferenceHoverTint(pal).name()));
       group->addButton(button, i);
       line->addWidget(button);
     }
@@ -386,10 +396,11 @@ protected:
       chip->setCheckable(true);
       chip->setChecked(i < values.size() && values.at(i));
       chip->setStyleSheet(QStringLiteral("QPushButton { border: 1px solid %1; border-radius: 12px; padding: 4px 12px; "
-                                         "background: %2; } QPushButton:checked { border: 1px solid %3; "
-                                         "background: %4; }")
+                                         "background: %2; } QPushButton:hover:!checked { background: %5; } "
+                                         "QPushButton:checked { border: 1px solid %3; background: %4; }")
                               .arg(pal.color(QPalette::Mid).name(), pal.color(QPalette::Base).name(),
-                                   pal.color(QPalette::WindowText).name(), pal.color(QPalette::Mid).lighter(140).name()));
+                                   pal.color(QPalette::WindowText).name(), pal.color(QPalette::Mid).lighter(140).name(),
+                                   preferenceHoverTint(pal).name()));
       connect(chip, &QPushButton::toggled, this, [this, apply, i](bool on) {
         apply(i, on);
         changed();

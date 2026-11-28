@@ -84,6 +84,10 @@ struct GeneralSettings {
   // last design quit MitCad. Off by default: the window stays on the Start
   // page with no design open (WindowManager::closeDesign).
   bool quitOnLastClose = false;
+  // Fork: the designs open when PureCAD last ended open again at the next
+  // start without a file (documents/reopenLastDesigns, off by default;
+  // WindowManager keeps them in documents/lastOpenDesigns).
+  bool reopenLastDesigns = false;
   // Save of a design that has no file yet (mitcad#2183; the setting
   // documents/newDesignSave): "ask" (the default: the question On this
   // computer or To a project when a remote project is known, else Save As

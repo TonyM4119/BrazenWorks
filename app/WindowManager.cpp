@@ -37,6 +37,19 @@ QString fileKey(const QString& path) {
 }
 } // namespace
 
+// Fork: the files of the designs open in `windows`, kept for Reopen the
+// designs that were open last time (GeneralSettings::reopenLastDesigns).
+static void rememberOpenDesigns(const QList<MainWindow*>& windows) {
+  QStringList paths;
+  for (MainWindow* window : windows) {
+    if (window == nullptr || !window->hasDesign()) continue;
+    const QString path = window->documentFilePath();
+    if (!path.isEmpty() && !paths.contains(path)) paths << path;
+  }
+  QSettings().setValue(QStringLiteral("documents/lastOpenDesigns"), paths);
+  qInfo().noquote() << QStringLiteral("Designs open at the end kept: %1").arg(paths.size());
+}
+
 WindowManager::WindowManager(bool nativeUi, QObject* parent) : QObject(parent), m_nativeUi(nativeUi) {
   Q_ASSERT(manager == nullptr);
   manager = this;
@@ -45,7 +58,10 @@ WindowManager::WindowManager(bool nativeUi, QObject* parent) : QObject(parent), 
   if (QCoreApplication::instance() != nullptr) {
     connect(QCoreApplication::instance(), &QCoreApplication::aboutToQuit, this, [this] {
       const shutdown::Step step(QStringLiteral("window manager: the active window's place kept"));
-      if (!m_quitting) saveActiveWindowPlace();
+      if (!m_quitting) {
+        saveActiveWindowPlace();
+        if (!windows().isEmpty()) rememberOpenDesigns(windows());
+      }
     });
   }
 }
@@ -356,6 +372,9 @@ void WindowManager::windowClosed(MainWindow* window) {
     // so that its floating docks are kept as shown.
     if (windows().isEmpty()) window->saveDockArrangement();
   }
+  // Fork: the last window closed by itself ends PureCAD: its design is the
+  // one to open again.
+  if (!m_quitting && windows().isEmpty() && window != nullptr) rememberOpenDesigns({window});
   emit windowRemoved(window);
   emit windowsChanged();
   if (window != nullptr) window->deleteLater();
@@ -379,7 +398,10 @@ void WindowManager::quit() {
   const QScopedValueRollback<bool> running(m_quitRunning, true);
   // The window worked in has the place kept for the next start
   // (mitcad#1710), not the one that happens to close last.
-  if (!m_quitting) saveActiveWindowPlace();
+  if (!m_quitting) {
+    saveActiveWindowPlace();
+    rememberOpenDesigns(windows()); // fork: before their questions close them
+  }
   m_quitting = true;
   QList<QPointer<MainWindow>> guarded;
   for (MainWindow* window : windows()) guarded.append(window);
