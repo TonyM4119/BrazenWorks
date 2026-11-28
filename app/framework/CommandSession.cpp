@@ -16,6 +16,7 @@
 #include <Bnd_Box.hxx>
 #include <TopLoc_Location.hxx>
 
+#include <QSettings>
 #include <QApplication>
 #include <QEvent>
 #include <QJsonArray>
@@ -5871,6 +5872,16 @@ void CommandSession::createCursorBox() {
     if (slot.def->type == InputDef::Type::Value && slot.def->cursorBox) {
       m_cursorKey = slot.key;
       break;
+    }
+  }
+  // PureCAD: Preferences › Tools › Tool at the cursor: every command's first
+  // value follows the cursor in a box to type it in.
+  if (m_cursorKey.isEmpty() && QSettings().value(QStringLiteral("tools/toolAtCursor"), false).toBool()) {
+    for (const Slot& slot : slotsOf(false)) {
+      if (slot.def->type == InputDef::Type::Value) {
+        m_cursorKey = slot.key;
+        break;
+      }
     }
   }
   if (m_cursorKey.isEmpty()) {
