@@ -7312,6 +7312,16 @@ void MainWindow::setSelection(const Selection& items) {
   m_idleCardMs = 0;
   m_idleMeasureMs = 0;
   updateIdleView();
+  // PureCAD: Preferences › Graphics › Quick measurement in the view's corner.
+  if (changed) {
+    QString quick;
+    if (m_mode != Mode::Sketch && !modelBusy() &&
+        QSettings().value(QStringLiteral("graphics/quickMeasurement"), false).toBool()) {
+      quick = quickMeasurement(
+          m_selection, [this](const QJsonObject& request) { return queryObject(request); }, lengthUnit());
+    }
+    m_viewer->setQuickMeasurement(quick);
+  }
   const qint64 viewMs = selectionClock.restart();
   m_sketch->refreshView();
   if (m_sketch3d != nullptr && m_sketch3d->isActive()) {

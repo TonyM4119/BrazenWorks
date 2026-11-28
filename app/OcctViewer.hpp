@@ -698,6 +698,9 @@ public:
   // A click on the cube's arrow `id` (up, down, left, right, cw, ccw).
   void pressCubeArrow(const QString& id);
   QMargins overlayInsets() const { return m_overlayInsets; }
+  // PureCAD: Graphics › Quick measurement: the selection's line in the
+  // view's lower right corner; empty hides it.
+  void setQuickMeasurement(const QString& text);
   // The width that the sketch's badge takes at the bottom left, from the
   // view's left edge to the right edge of the badge and the pointer's place
   // above it (0: none; right of a card along the left edge when it keeps
@@ -1908,6 +1911,8 @@ private:
   // Fork: the root origin planes' names (XY, XZ, YZ) written on each plane
   // drawn, lying in it, as Fusion's (a paint layer over the view).
   void paintPlaneNames(QPainter& painter);
+  void paintViewAngles(QPainter& painter); // PureCAD: Graphics › View angles
+  void paintQuickMeasurement(QPainter& painter);
   void remove(const occ::handle<AIS_Shape>& object);
   void activatePicking(const occ::handle<AIS_Shape>& object);
   void activateAllPicking();
@@ -2480,6 +2485,9 @@ private:
   occ::handle<PlaneRulerAxes> m_rulerAxes3d;
   QPointer<ViewPaintLayer> m_rulerLabels;
   QPointer<ViewPaintLayer> m_planeNames; // Fork: paintPlaneNames
+  QPointer<ViewPaintLayer> m_viewAngles; // PureCAD: paintViewAngles
+  QPointer<ViewPaintLayer> m_quickLayer; // PureCAD: paintQuickMeasurement
+  QString m_quickText;
   struct RulerAxis {
     gp_Dir direction;
     double min = 0.0; // mm along it the plane reaches

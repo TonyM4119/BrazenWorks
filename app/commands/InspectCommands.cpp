@@ -3082,6 +3082,52 @@ CommandDef minimumDistanceCommand() {
 
 } // namespace
 
+// PureCAD: Preferences › Graphics › Quick measurement: one line for the
+// selection without Measure open; one pick's length, area or volume, two
+// picks' distance. Empty for what it does not measure.
+QString quickMeasurement(const Selection& picked, const std::function<QJsonObject(const QJsonObject&)>& query,
+                         const QString& unit) {
+  if (picked.isEmpty() || picked.size() > 2) return QString();
+  for (const SelectionItem& item : picked) {
+    if (isSketchItem(item) || !measureRef(item).isObject()) return QString();
+  }
+  QJsonObject request{{QStringLiteral("query"), QStringLiteral("measure")}, {QStringLiteral("a"), measureRef(picked.at(0))}};
+  if (picked.size() == 2) request.insert(QStringLiteral("b"), measureRef(picked.at(1)));
+  QJsonObject answer;
+  try {
+    answer = query(request);
+  } catch (const std::exception&) {
+    return QString();
+  }
+  if (picked.size() == 2) {
+    const QJsonObject between = answer.value(QStringLiteral("between")).toObject();
+    QStringList parts;
+    if (between.value(QStringLiteral("distance")).isDouble()) {
+      parts << QObject::tr("Distance %1").arg(lengthInUnit(between.value(QStringLiteral("distance")).toDouble(), unit));
+    }
+    if (between.value(QStringLiteral("angle")).isDouble()) {
+      parts << QObject::tr("Angle %1°").arg(degrees(between.value(QStringLiteral("angle")).toDouble()));
+    }
+    return parts.join(QStringLiteral("   "));
+  }
+  const QJsonObject one = answer.value(QStringLiteral("a")).toObject();
+  QStringList parts;
+  if (one.contains(QStringLiteral("length"))) {
+    parts << QObject::tr("Length %1").arg(lengthInUnit(one.value(QStringLiteral("length")).toDouble(), unit));
+  }
+  const QJsonObject circle = one.value(QStringLiteral("circle")).toObject();
+  if (circle.contains(QStringLiteral("radius"))) {
+    parts << QObject::tr("Radius %1").arg(lengthInUnit(circle.value(QStringLiteral("radius")).toDouble(), unit));
+  }
+  if (one.contains(QStringLiteral("area"))) {
+    parts << QObject::tr("Area %1").arg(areaInUnit(one.value(QStringLiteral("area")).toDouble(), unit));
+  }
+  if (one.contains(QStringLiteral("volume"))) {
+    parts << QObject::tr("Volume %1").arg(volumeInUnit(one.value(QStringLiteral("volume")).toDouble(), unit));
+  }
+  return parts.join(QStringLiteral("   "));
+}
+
 void registerInspectCommands(CommandRegistry& registry, const CommandContext& context,
                              QWidget* window, std::function<Selection()> selection) {
   registry.add(measureCommand());

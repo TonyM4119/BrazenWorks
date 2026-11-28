@@ -9425,6 +9425,62 @@ void OcctViewer::updatePlaneRuler() {
   }
 }
 
+// PureCAD: Preferences › Graphics › View angles: the camera's turn about Z
+// and its height above the XY plane, in the view's lower left corner.
+void OcctViewer::paintViewAngles(QPainter& painter) {
+  if (m_view.IsNull() || m_view->Window().IsNull() || showsRenderedImage()) {
+    return;
+  }
+  const gp_Dir look = m_view->Camera()->Direction(); // from the eye to the target
+  const gp_Vec toEye = -gp_Vec(look);
+  double azimuth = std::atan2(toEye.Y(), toEye.X()) * 180.0 / 3.14159265358979323846;
+  if (azimuth < 0.0) azimuth += 360.0;
+  const double elevation = std::asin(std::clamp(toEye.Z(), -1.0, 1.0)) * 180.0 / 3.14159265358979323846;
+  const QString text = tr("Azimuth %1°   Elevation %2°").arg(azimuth, 0, 'f', 1).arg(elevation, 0, 'f', 1);
+  painter.setRenderHint(QPainter::Antialiasing);
+  QFont font = this->font();
+  font.setPointSizeF(std::max(7.0, font.pointSizeF() * 0.9));
+  painter.setFont(font);
+  const QFontMetricsF metrics(font);
+  const QRectF box(12.0, height() - m_overlayInsets.bottom() - 12.0 - (metrics.height() + 8.0),
+                   metrics.horizontalAdvance(text) + 16.0, metrics.height() + 8.0);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(m_backgroundDark ? QColor(20, 24, 30, 170) : QColor(255, 255, 255, 190));
+  painter.drawRoundedRect(box, 6.0, 6.0);
+  painter.setPen(m_backgroundDark ? QColor(230, 234, 240) : QColor(40, 48, 60));
+  painter.drawText(box, Qt::AlignCenter, text);
+}
+
+void OcctViewer::setQuickMeasurement(const QString& text) {
+  if (text == m_quickText) return;
+  m_quickText = text;
+  if (!m_quickLayer && !text.isEmpty()) {
+    m_quickLayer = addPaintLayer(
+        QStringLiteral("quick measurement"), [this](QPainter& painter) { paintQuickMeasurement(painter); }, this);
+  }
+  if (m_quickLayer) {
+    m_quickLayer->setShown(!text.isEmpty());
+    m_quickLayer->update();
+  }
+  if (!text.isEmpty()) qDebug().noquote() << QStringLiteral("Quick measurement: %1").arg(text);
+}
+
+void OcctViewer::paintQuickMeasurement(QPainter& painter) {
+  if (m_quickText.isEmpty() || showsRenderedImage()) return;
+  painter.setRenderHint(QPainter::Antialiasing);
+  QFont font = this->font();
+  painter.setFont(font);
+  const QFontMetricsF metrics(font);
+  const double w = metrics.horizontalAdvance(m_quickText) + 20.0;
+  const double h = metrics.height() + 10.0;
+  const QRectF box(width() - m_overlayInsets.right() - 12.0 - w, height() - m_overlayInsets.bottom() - 12.0 - h, w, h);
+  painter.setPen(Qt::NoPen);
+  painter.setBrush(m_backgroundDark ? QColor(20, 24, 30, 190) : QColor(255, 255, 255, 215));
+  painter.drawRoundedRect(box, 6.0, 6.0);
+  painter.setPen(m_backgroundDark ? QColor(230, 234, 240) : QColor(30, 38, 50));
+  painter.drawText(box, Qt::AlignCenter, m_quickText);
+}
+
 void OcctViewer::paintPlaneNames(QPainter& painter) {
   if (m_view->Window().IsNull() || showsRenderedImage()) {
     return;
@@ -11221,6 +11277,14 @@ void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
   g_tintNewSurface = settings.tintNewSurface;
   g_removedMaterialRed = settings.removedMaterialRed;
   g_hatchByPart = settings.hatchByPart;
+  // PureCAD: View angles in the corner.
+  if (settings.viewAngles && !m_viewAngles) {
+    m_viewAngles = addPaintLayer(
+        QStringLiteral("view angles"), [this](QPainter& painter) { paintViewAngles(painter); }, this);
+  }
+  if (m_viewAngles) {
+    m_viewAngles->setShown(settings.viewAngles);
+  }
   if (m_gridFollowsView != settings.gridFollowsView) { // PureCAD: Grid follows the view
     m_gridFollowsView = settings.gridFollowsView;
     updateGrid(true);
