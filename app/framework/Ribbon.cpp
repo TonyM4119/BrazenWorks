@@ -3655,7 +3655,15 @@ QWidget* Ribbon::createGroup(const QString& tab, const QString& group, GroupInfo
   const LayoutGroup* layoutGroup = m_layout.group(tab, group);
   const std::vector<LayoutEntry> noEntries;
   bool separator = false; // a separator before the next entry
-  const auto separate = [&separator, menu] {
+  // PureCAD: Preferences › Layout › Group Construct tools by entity type:
+  // off, the CONSTRUCT menu is one list (no sections for planes, axes and
+  // points).
+  const bool flat = group == QLatin1String("CONSTRUCT") &&
+                    !QSettings().value(QStringLiteral("layout/groupConstructByEntity"), true).toBool();
+  const auto separate = [&separator, menu, flat] {
+    if (flat) {
+      separator = false;
+    }
     if (separator && !menu->isEmpty()) {
       menu->addSeparator();
     }
