@@ -85,6 +85,11 @@ std::vector<ItemName> add_tree(const occ::handle<TDocStd_Document>& document, co
 // read_step). Unnamed bodies are called Body1, Body2, ...
 std::vector<Body> document_bodies(const occ::handle<TDocStd_Document>& document);
 
+// PureCAD: the bodies, those that fail BRepCheck healed (ShapeFix_Shape)
+// while PURECAD_HEAL_IMPORTS is 1 (Preferences › Design › Heal imported
+// parts that fail the check); as read otherwise. exchange.cpp.
+std::vector<Body> heal_if_asked(std::vector<Body> bodies);
+
 // The assembly structure of a document (see read_step_structured), or
 // nothing when its top shapes hold no assembly or place fewer than two
 // parts in all.

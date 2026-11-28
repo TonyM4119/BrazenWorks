@@ -34,6 +34,7 @@ void applyWindowsGpuPreference(int card); // fork: platform/windows/GpuPreferenc
 #include <utility>
 #include <vector>
 
+#include "view/DesignPreferences.hpp"
 #include "framework/Brand.hpp"
 #include "MainWindow.hpp"
 #include "WindowManager.hpp"
@@ -661,6 +662,8 @@ int runApplication(int argc, char* argv[]) {
   // first window too; after Windows 10's path, which reacts first to the
   // scheme it asks for.
   mitcad::startThemePreference();
+  // PureCAD: Preferences › Design › Heal imported parts, for the imports.
+  mitcad::DesignPrefs::applyImportHealing(mitcad::DesignPrefs::load().healImports);
   // Preferences › Display › Text size, Icon size and Font (mitcad#1556): the
   // application font and the code's icon sizes on top of Interface size,
   // before the first window takes its fonts and icons.

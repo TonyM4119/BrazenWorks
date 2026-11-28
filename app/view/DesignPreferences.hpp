@@ -101,7 +101,12 @@ struct DesignPrefs {
     flag("pasteAtOrigin", s.pasteAtOrigin);
     return s;
   }
+  // PureCAD: Heal imported parts: the geometry's import reads the switch
+  // from the environment (geometry/io exchange.cpp heal_if_asked).
+  static void applyImportHealing(bool on) { qputenv("PURECAD_HEAL_IMPORTS", on ? "1" : "0"); }
+
   void save() const {
+    applyImportHealing(healImports);
     QSettings store;
     const QString g = QStringLiteral("design/");
     const auto put = [&](const char* n, const QVariant& v) { store.setValue(g + QLatin1String(n), v); };
