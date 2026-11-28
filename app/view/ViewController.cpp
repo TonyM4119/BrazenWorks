@@ -528,6 +528,7 @@ public:
     line->addWidget(m_chevron);
     line->addWidget(name);
     line->addWidget(rule, 1);
+    m_rule = rule;
   }
 
   // The rows after this caption, up to the next one.
@@ -559,6 +560,30 @@ public:
   }
 
 protected:
+  // Lit up under the pointer, as SolidCraft's: a soft band over the row.
+  void enterEvent(QEnterEvent* event) override {
+    if (m_form != nullptr) {
+      m_hovered = true;
+      m_rule->setVisible(false);
+      update();
+    }
+    QWidget::enterEvent(event);
+  }
+  void leaveEvent(QEvent* event) override {
+    m_hovered = false;
+    m_rule->setVisible(true);
+    update();
+    QWidget::leaveEvent(event);
+  }
+  void paintEvent(QPaintEvent*) override {
+    if (!m_hovered) return;
+    QPainter painter(this);
+    painter.setRenderHint(QPainter::Antialiasing);
+    painter.setPen(Qt::NoPen);
+    painter.setBrush(preferenceHoverTint(palette()));
+    const QMargins margins = layout()->contentsMargins();
+    painter.drawRoundedRect(QRectF(rect().adjusted(-4, margins.top() - 4, 0, -margins.bottom() + 4)), 6, 6);
+  }
   void mouseReleaseEvent(QMouseEvent* event) override {
     if (event->button() != Qt::LeftButton || m_form == nullptr) return;
     m_folded = !m_folded;
@@ -576,6 +601,8 @@ protected:
 private:
   QFormLayout* m_form;
   QLabel* m_chevron = nullptr;
+  QFrame* m_rule = nullptr;
+  bool m_hovered = false;
   bool m_folded = false;
   QHash<int, bool> m_shown;
 };
@@ -702,7 +729,7 @@ public:
     const QColor deep = dark ? pal.color(QPalette::WindowText) : QColor(0x16, 0x24, 0x3a);
     if (selected || hovered) {
       QColor fill = dark ? QColor(255, 255, 255) : QColor(0x4a, 0x5a, 0x78);
-      fill.setAlpha(selected ? (dark ? 38 : 40) : (dark ? 16 : 16));
+      fill.setAlpha(selected ? (dark ? 38 : 40) : (dark ? 24 : 26));
       painter->setPen(Qt::NoPen);
       painter->setBrush(fill);
       painter->drawRoundedRect(QRectF(row).adjusted(2.0, 1.5, -2.0, -1.5), 8, 8);
@@ -761,30 +788,41 @@ public:
   }
 
 protected:
+  // As SolidCraft's: the whole caption row folds, and under the pointer it
+  // lights up as a soft band that takes the hairline's place.
+  static int captionBottom(const QGroupBox* box) { return QFontMetrics(box->font()).height() + 6; }
+  static void setHovered(QGroupBox* box, bool hovered) {
+    if (box->property("purecadHover").toBool() == hovered) return;
+    box->setProperty("purecadHover", hovered);
+    box->setCursor(hovered ? Qt::PointingHandCursor : Qt::ArrowCursor);
+    box->style()->unpolish(box);
+    box->style()->polish(box);
+    box->update();
+  }
   bool eventFilter(QObject* watched, QEvent* event) override {
     auto* box = static_cast<QGroupBox*>(watched);
     if (event->type() == QEvent::MouseButtonRelease) {
       auto* mouse = static_cast<QMouseEvent*>(event);
-      const int captionBottom = QFontMetrics(box->font()).height() + 4;
-      const int captionRight = QFontMetrics(box->font()).horizontalAdvance(box->title()) + 16;
-      if (mouse->button() == Qt::LeftButton && mouse->position().y() <= captionBottom &&
-          mouse->position().x() <= captionRight) {
+      if (mouse->button() == Qt::LeftButton && mouse->position().y() <= captionBottom(box)) {
         setFolded(box, !box->property(kSectionFoldedProperty).toBool());
         return true;
       }
     } else if (event->type() == QEvent::MouseMove) {
       auto* mouse = static_cast<QMouseEvent*>(event);
-      const bool onCaption = mouse->position().y() <= QFontMetrics(box->font()).height() + 4 &&
-                             mouse->position().x() <= QFontMetrics(box->font()).horizontalAdvance(box->title()) + 16;
-      box->setCursor(onCaption ? Qt::PointingHandCursor : Qt::ArrowCursor);
+      setHovered(box, mouse->position().y() <= captionBottom(box));
+    } else if (event->type() == QEvent::Leave) {
+      setHovered(box, false);
+    } else if (event->type() == QEvent::Paint && box->property("purecadHover").toBool()) {
+      QPainter painter(box);
+      painter.setRenderHint(QPainter::Antialiasing);
+      painter.setPen(Qt::NoPen);
+      painter.setBrush(preferenceHoverTint(box->palette()));
+      painter.drawRoundedRect(QRectF(0, -2, box->width(), captionBottom(box) + 2), 6, 6);
     }
     return false;
   }
 };
 
-// Fork: a page's settings box shown as SolidCraft's page: no frame and no
-// title of its own (the page's title stands over it), and the boxes inside
-// it as sections, a caption in small capitals over a hairline.
 // Fork: SolidCraft's two tones of Preferences, the frame's grey and the
 // page panel's lighter one (the dialog's header, sidebar and foot; its page).
 QColor preferencesFrameTone(const QPalette& pal) {
@@ -796,6 +834,9 @@ QColor preferencesPaneTone(const QPalette& pal) {
   return window.lightness() < 128 ? window.lighter(118) : QColor(0xf5, 0xf6, 0xf8);
 }
 
+// Fork: a page's settings box shown as SolidCraft's page: no frame and no
+// title of its own (the page's title stands over it), and the boxes inside
+// it as sections, a caption in small capitals over a hairline.
 void stylePreferencesPage(QWidget* page) {
   const QPalette pal = page->palette();
   const QString line = themeColor(ColorRole::Line, pal).name(QColor::HexArgb);
@@ -831,7 +872,9 @@ void stylePreferencesPage(QWidget* page) {
     inner->setStyleSheet(QStringLiteral("QGroupBox { border: none; border-top: 1px solid %1; margin-top: 0.7em; "
                                         "padding-top: 14px; margin-bottom: 6px; } QGroupBox::title { "
                                         "subcontrol-origin: margin; subcontrol-position: top left; left: 0px; "
-                                        "padding: 0 10px 0 0; color: %2; background: %3; }")
+                                        "padding: 0 10px 0 6px; color: %2; background: %3; } "
+                                        "QGroupBox[purecadHover=\"true\"] { border-top-color: transparent; } "
+                                        "QGroupBox[purecadHover=\"true\"]::title { background: transparent; }")
                              .arg(line, text, surface));
     inner->setCursor(Qt::ArrowCursor);
     inner->setMouseTracking(true);
@@ -5048,7 +5091,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
                                themeColor(ColorRole::TextSecondary, dialog->palette()).name(QColor::HexArgb),
                                dialog->palette().color(QPalette::Window).lightness() < 128 ? QStringLiteral("chevron-down-light")
                                                                                           : QStringLiteral("chevron-down"),
-                               paneTone.darker(104).name()));
+                               preferenceHoverTint(dialog->palette()).name()));
   outerLayout->addWidget(card);
   auto* layout = new QVBoxLayout(card);
   layout->setContentsMargins(0, 0, 0, 0);

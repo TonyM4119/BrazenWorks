@@ -197,10 +197,11 @@ private:
       const bool active = profile == m_profiles.active;
       chip->setToolTip(tr("Load the settings saved as %1").arg(profile));
       chip->setStyleSheet(QStringLiteral("QPushButton { border: 1px solid %1; border-radius: 10px; padding: 2px 12px; "
-                                         "background: %2; font-weight: %3; }")
+                                         "background: %2; font-weight: %3; } QPushButton:hover { background: %4; }")
                               .arg(active ? pal.color(QPalette::WindowText).name() : pal.color(QPalette::Mid).name(),
                                    active ? pal.color(QPalette::Mid).lighter(140).name() : pal.color(QPalette::Base).name(),
-                                   active ? QStringLiteral("600") : QStringLiteral("400")));
+                                   active ? QStringLiteral("600") : QStringLiteral("400"),
+                                   preferenceHoverTint(pal).name()));
       chip->setContextMenuPolicy(Qt::CustomContextMenu);
       connect(chip, &QPushButton::clicked, this, [this, profile] {
         if (loadProfile) loadProfile(profile);
