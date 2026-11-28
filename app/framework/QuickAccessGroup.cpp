@@ -514,7 +514,16 @@ void QuickAccessGroup::rebuild() {
     if (action == nullptr || m_rowCommands.contains(id)) {
       continue; // the row's own buttons are followed below
     }
-    auto* button = new QuickButton(action, m_iconSize, [this, id] { return tooltipOf(id); });
+    // PureCAD: the + (New Design's place) asks what to create, as File ›
+    // New and Ctrl+N do.
+    QString tipId = id;
+    if (id == QLatin1String("file.new_design")) {
+      if (QAction* choice = m_registry.action(QStringLiteral("file.new_choice"))) {
+        action = choice;
+        tipId = QStringLiteral("file.new_choice");
+      }
+    }
+    auto* button = new QuickButton(action, m_iconSize, [this, tipId] { return tooltipOf(tipId); });
     button->setObjectName(QStringLiteral("quickAccess_") + id);
     m_row->insertWidget(index++, button);
     if (m_topBar) {
