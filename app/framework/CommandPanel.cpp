@@ -25,6 +25,7 @@
 #include <QFrame>
 #include <QHeaderView>
 #include <QHBoxLayout>
+#include <QMainWindow>
 #include <QIcon>
 #include <QImage>
 #include <QKeyEvent>
@@ -55,6 +56,7 @@
 #include <QVBoxLayout>
 #include <QtLogging>
 
+#include "../view/LayoutSettings.hpp"
 #include "BusyMark.hpp"
 #include "ChromeStyle.hpp"
 #include "CommandMessage.hpp"
@@ -1244,8 +1246,19 @@ CommandPanel::CommandPanel(const CommandDef& def, const CommandState& state, boo
     }
   });
   m_buttonBox = buttonRow;
-  layout->addWidget(buttonRow);
+  // Fork: Preferences › Layout › Dialogs: OK and Cancel at the bottom, or
+  // at the top above the rows; and also in the view's corner.
+  const LayoutSettings dialogLayout = LayoutSettings::load();
+  if (dialogLayout.okCancelTop) {
+    layout->insertWidget(0, buttonRow);
+  } else {
+    layout->addWidget(buttonRow);
+  }
   layout->addStretch();
+  if (dialogLayout.okCancelInCorner) {
+    installEventFilter(this);
+    QTimer::singleShot(0, this, [this] { makeCornerButtons(); });
+  }
 
   applyControlStyles();
   refresh(state);
@@ -1300,7 +1313,55 @@ void CommandPanel::changeEvent(QEvent* event) {
   }
 }
 
+void CommandPanel::makeCornerButtons() {
+  QWidget* host = window();
+  auto* main = qobject_cast<QMainWindow*>(host);
+  QWidget* area = main != nullptr && main->centralWidget() != nullptr ? main->centralWidget() : nullptr;
+  if (area == nullptr || m_cornerButtons != nullptr || m_ok == nullptr) {
+    return;
+  }
+  auto* card = new GlassCard(area);
+  card->setObjectName(QStringLiteral("commandCornerButtons"));
+  auto* content = new QWidget;
+  auto* row = new QHBoxLayout(content);
+  row->setContentsMargins(0, 0, 0, 0);
+  row->setSpacing(6);
+  auto* ok = new QPushButton(m_ok->text());
+  ok->setObjectName(QStringLiteral("commandCornerOk"));
+  ok->setDefault(true);
+  ok->setFocusPolicy(Qt::NoFocus);
+  connect(ok, &QPushButton::clicked, m_ok, &QPushButton::click);
+  row->addWidget(ok);
+  if (!m_def.closeOnly) {
+    auto* cancel = new QPushButton(m_def.repeats ? tr("Close") : tr("Cancel"));
+    cancel->setObjectName(QStringLiteral("commandCornerCancel"));
+    cancel->setFocusPolicy(Qt::NoFocus);
+    connect(cancel, &QPushButton::clicked, this, &CommandPanel::rejected);
+    row->addWidget(cancel);
+  }
+  card->setContent(content, QMargins(8, 6, 8, 6));
+  m_cornerButtons = card;
+  area->installEventFilter(this);
+  placeCornerButtons();
+  qDebug().noquote() << QStringLiteral("Panel %1 OK and Cancel also in the view's corner").arg(m_def.name);
+}
+
+void CommandPanel::placeCornerButtons() {
+  if (m_cornerButtons == nullptr) {
+    return;
+  }
+  QWidget* area = m_cornerButtons->parentWidget();
+  m_cornerButtons->adjustSize();
+  const QSize size = m_cornerButtons->sizeHint();
+  // Above the timeline's row at the bottom right.
+  m_cornerButtons->setGeometry(area->width() - size.width() - 16, area->height() - size.height() - 64, size.width(),
+                               size.height());
+  m_cornerButtons->setVisible(isVisible());
+  m_cornerButtons->raise();
+}
+
 CommandPanel::~CommandPanel() {
+  delete m_cornerButtons; // fork: not a child of the panel
   // The lists' hover watches go first: a list that goes from under the
   // pointer as the widgets are deleted would report its pick left through
   // the presenter's actions, which are gone by then (mitcad#2064).
@@ -3357,6 +3418,13 @@ QStringList CommandPanel::layoutLines() const {
 }
 
 bool CommandPanel::eventFilter(QObject* watched, QEvent* event) {
+  // Fork: the corner's OK and Cancel follow the view's size and the
+  // panel's showing.
+  if (m_cornerButtons != nullptr &&
+      (watched == m_cornerButtons->parentWidget() || watched == this) &&
+      (event->type() == QEvent::Resize || event->type() == QEvent::Show || event->type() == QEvent::Hide)) {
+    QTimer::singleShot(0, this, [this] { placeCornerButtons(); });
+  }
   switch (event->type()) {
   case QEvent::Move:
   case QEvent::Resize:

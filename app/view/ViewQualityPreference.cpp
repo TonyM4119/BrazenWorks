@@ -20,7 +20,17 @@ int offeredSamples(int samples) {
 } // namespace
 
 QString smoothnessId(Smoothness choice) {
-  return choice == Smoothness::Standard ? QStringLiteral("standard") : QStringLiteral("smooth");
+  switch (choice) {
+  case Smoothness::Standard:
+    return QStringLiteral("standard");
+  case Smoothness::Coarse:
+    return QStringLiteral("coarse");
+  case Smoothness::Ultra:
+    return QStringLiteral("ultra");
+  case Smoothness::Smooth:
+    break;
+  }
+  return QStringLiteral("smooth");
 }
 
 std::optional<Smoothness> smoothnessFromId(const QString& id) {
@@ -29,6 +39,12 @@ std::optional<Smoothness> smoothnessFromId(const QString& id) {
   }
   if (id == QLatin1String("standard")) {
     return Smoothness::Standard;
+  }
+  if (id == QLatin1String("coarse")) {
+    return Smoothness::Coarse;
+  }
+  if (id == QLatin1String("ultra")) {
+    return Smoothness::Ultra;
   }
   return std::nullopt;
 }

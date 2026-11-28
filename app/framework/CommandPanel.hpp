@@ -11,6 +11,7 @@
 #include <QPoint>
 #include <QString>
 #include <QStringList>
+#include <QPointer>
 #include <QWidget>
 
 #include "CommandPresenter.hpp"
@@ -281,6 +282,11 @@ private:
   QWidget* m_buttonBox = nullptr; // OK and Cancel (and the busy mark) until takeButtons
   // Beside OK and Cancel while a preview computes (mitcad#1907).
   BusyMark* m_busy = nullptr;
+  // Fork: Preferences › Layout › Dialogs › Also in the view's corner: OK
+  // and Cancel again at the view's bottom right while the panel shows.
+  QPointer<QWidget> m_cornerButtons;
+  void makeCornerButtons();
+  void placeCornerButtons();
   std::vector<std::unique_ptr<Row>> m_rows;
   QHash<QString, Row*> m_byKey;
   QHash<QString, QPair<QString, QString>> m_notes; // key: error, hint

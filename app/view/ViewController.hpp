@@ -306,6 +306,7 @@ private:
   DocumentHost& m_host;
   std::function<void()> m_lookAt;
   QWidget* m_window;
+  QString m_rendererName; // fork: the view's OpenGL renderer (Preferences › Graphics)
   QPointer<QWidget> m_settingsWindow; // macOS: the Settings window, when open
   QPointer<QWidget> m_gestureRing;    // fork: the gesture ring while a right drag shows it
   ViewSettings m_settings;

@@ -453,6 +453,7 @@ endif()
 target_sources(mitcad PRIVATE platform/WindowsTheme.hpp)
 if(WIN32)
   target_sources(mitcad PRIVATE platform/windows/WindowsTheme.cpp)
+  target_sources(mitcad PRIVATE platform/windows/GpuPreference.cpp) # fork: Preferences › Graphics › Graphics card
 endif()
 
 # Which bodies a feature's preview draws and where: hidden ones stay

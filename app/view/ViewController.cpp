@@ -2,6 +2,12 @@
 #include "ViewController.hpp"
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
+#include "AppearancePreferences.hpp"
+#include "DesignPreferences.hpp"
+#include "GraphicsPreferences.hpp"
+#include "ShortcutsPreferences.hpp"
+#include "ToolsPreferences.hpp"
+#include "SketchPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
 #include "GridSpacing.hpp"
 #include "DefaultView.hpp"
@@ -347,11 +353,22 @@ const PreferencePage kPreferencePages[] = {
      "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
      "drawings small_circles circles boost navigation_bar",
      "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
+    // Fork: SolidCraft's Appearance page.
+    {"appearance", QT_TRANSLATE_NOOP("View", "Appearance"),
+     "appearance theme light dark follow system background color gradient picture logo accent scale "
+     "interface_size text font color_vision colour blind protan deutan tritan",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Colors, text and accessibility."), "appearance"},
     // Fork: SolidCraft's Layout page.
     {"layout", QT_TRANSLATE_NOOP("View", "Layout"),
      "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
      "sub-tab history browser bodies folders dialogs ok cancel toolbar tabs ribbon navigation_bar idle fade",
      "LOOK", QT_TRANSLATE_NOOP("View", "Where the parts of the window sit."), "toolbar-panel"},
+    // Fork: SolidCraft's Graphics page.
+    {"graphics", QT_TRANSLATE_NOOP("View", "Graphics"),
+     "graphics preset performance quality curved surfaces smoothness tessellation anti-aliasing antialiasing "
+     "supersampling shadow perspective ambient occlusion visual style field_of_view frame_rate fps vertex "
+     "measurement joint hatch section gpu graphics_card api opengl safe restart",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Trade speed for smoothness."), "visual-style"},
     // Folders of font files for sketch text (mitcad#473).
     {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
@@ -359,6 +376,11 @@ const PreferencePage kPreferencePages[] = {
     {"textures", QT_TRANSLATE_NOOP("View", "Textures"),
      "texture folders maps materials appearance images internet online",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of textures for appearances."), "image-reference"},
+    // Fork: SolidCraft's Design page (shown under WORK).
+    {"design", QT_TRANSLATE_NOOP("View", "Design"),
+     "design units precision decimals parameters kernel check body drawings projection template sheet calibration "
+     "orientation z_up y_up import heal export file_name folders origin planes linked assemblies joint trackball paste",
+     "WORK", QT_TRANSLATE_NOOP("View", "What new designs start with."), "component"},
     // The first dimension scales the sketch (mitcad#860).
     // Click adds to the selection in sketches (mitcad#1403).
     // Esc leaves an unchanged sketch (mitcad#1623).
@@ -368,7 +390,12 @@ const PreferencePage kPreferencePages[] = {
      "sketch dimension first scale proportion drawn size click select selection add ctrl multiple "
      "esc escape leave exit finish unchanged profile profiles shade shading project edges face "
      "hide hidden show shown visible visibility used extrude feature eye",
-     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, dimensions and selecting in sketches."), "sketch"},
+     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, snapping and selecting."), "sketch"},
+    // Fork: SolidCraft's Tools page.
+    {"tools", QT_TRANSLATE_NOOP("View", "Tools"),
+     "tools hole extrude target operation arrow isometric distance placed features handles snap command dialogs "
+     "remember fillet assembly move joint ghost axis step measure pointer cursor direct interaction",
+     "WORK", QT_TRANSLATE_NOOP("View", "How modeling tools behave."), "settings"},
     // Joints whose picks lie under another component than the active one
     // (mitcad#1856).
     {"assembly", QT_TRANSLATE_NOOP("View", "Assembly"),
@@ -385,6 +412,10 @@ const PreferencePage kPreferencePages[] = {
      "mouse orbit pan zoom scheme shortcuts bindings custom trackpad 3d_mouse space speed arrow key step "
      "orbit_center cursor constrained reverse smooth transitions scroll",
      "INPUT", QT_TRANSLATE_NOOP("View", "Mouse, trackpad and 3D mouse."), "named-view"},
+    // Fork: SolidCraft's Shortcuts page.
+    {"shortcuts", QT_TRANSLATE_NOOP("View", "Shortcuts"),
+     "shortcuts keyboard keys hotkeys bindings commands export import modifier reselect sketches",
+     "INPUT", QT_TRANSLATE_NOOP("View", "Keys for each command."), "keyboard"},
     // The folders for designs, which AI assistants save to and open from
     // (mitcad#402).
     {"agents", QT_TRANSLATE_NOOP("View", "AI Assistants"),
@@ -412,7 +443,10 @@ bool pageFills(const char* id) {
   const QLatin1String page(id);
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
-         page == QLatin1String("layout"); // fork: its own scroll area takes the page's height
+         page == QLatin1String("layout") || page == QLatin1String("graphics") ||
+         page == QLatin1String("sketch") || page == QLatin1String("appearance") ||
+         page == QLatin1String("design") || page == QLatin1String("tools") ||
+         page == QLatin1String("shortcuts"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -849,6 +883,8 @@ ViewController::ViewController(OcctViewer& viewer, CommandRegistry& registry, Do
                                std::function<void()> lookAt, QWidget* window)
     : QObject(window), m_viewer(viewer), m_registry(registry), m_host(host),
       m_lookAt(std::move(lookAt)), m_window(window), m_settings(ViewSettings::load()) {
+  // Fork: the view's renderer, for Preferences › Graphics › This computer.
+  connect(&m_viewer, &OcctViewer::glInitialized, this, [this](const QString& renderer) { m_rendererName = renderer; });
   // Offered when the render worker is installed next to the application
   // (a package without it has no rendered view).
   if (!render::RenderClient::workerPath().isEmpty()) {
@@ -2361,7 +2397,49 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   } else {
     connect(dialog.get(), &QDialog::accepted, hideUsed, applyHideUsed);
   }
-  groups.insert(QStringLiteral("sketch"), sketchBox);
+  // Fork: Preferences › Sketch as SolidCraft's (view/SketchPreferences.hpp):
+  // the rows above move into its sections with their own saving.
+  QWidget* sketchPageBox = section(tr("Sketch"));
+  auto* sketchPageColumn = new QVBoxLayout(sketchPageBox);
+  insetPreferencesGroup(sketchPageColumn, window == nullptr);
+  auto* sketchPage = new SketchPreferences(m_settings.snapToGrid);
+  sketchPageColumn->addWidget(sketchPage);
+  {
+    const struct {
+      const char* name;
+      const char* place;
+      const char* text;
+      const char* tip;
+    } adopted[] = {
+        {"scaleToFirstDimension", "scale", QT_TR_NOOP("The first dimension scales the drawing"),
+         QT_TR_NOOP("A sketch's first length dimension scales the whole sketch so that it holds")},
+        {"projectFaceOnCreate", "project", QT_TR_NOOP("Project face edges into new sketches"), ""},
+        {"clickAddsToSelection", "click", QT_TR_NOOP("A click adds to the selection in sketches"),
+         QT_TR_NOOP("Each click adds to the selection without Shift")},
+        {"escLeavesUnchangedSketch", "esc", QT_TR_NOOP("Esc leaves an unchanged sketch"),
+         QT_TR_NOOP("Esc in a sketch you have not changed ends it")},
+        {"showProfilesOnOpen", "profiles", QT_TR_NOOP("Show profiles when a sketch opens"),
+         QT_TR_NOOP("The sketch's closed profiles are shaded when it opens")},
+        {"hideUsedSketches", "hideUsed", QT_TR_NOOP("Hide a sketch when a feature uses it"),
+         QT_TR_NOOP("A shown sketch hides when a feature such as Extrude first uses it")},
+    };
+    for (const auto& row : adopted) {
+      if (auto* box = sketchBox->findChild<QCheckBox*>(QLatin1String(row.name))) {
+        sketchPage->adopt(QLatin1String(row.place), box, tr(row.text), *row.tip ? tr(row.tip) : QString());
+      }
+    }
+  }
+  sketchPage->applySnapToGrid = [this](bool on) {
+    if (on != m_settings.snapToGrid) setSnapToGrid(on);
+  };
+  if (window != nullptr) {
+    sketchPage->onChanged = [sketchPage] { sketchPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, sketchPage, [sketchPage] { sketchPage->commit(); });
+  }
+  sketchBox->hide(); // its rows moved; it keeps its saving's connections
+  sketchBox->setParent(sketchPageBox);
+  groups.insert(QStringLiteral("sketch"), sketchPageBox);
   // Suppliers (mitcad#950): the region of the product links and the shops
   // the Supplier filters start with. Saved when the dialog is accepted, at
   // once in the Settings window.
@@ -3793,6 +3871,198 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, layoutPage, [layoutPage] { layoutPage->commit(); });
   }
   groups.insert(QStringLiteral("layout"), layoutBox);
+
+  // Fork: Preferences › Graphics (SolidCraft's Graphics page,
+  // view/GraphicsPreferences.hpp). It takes over the Display page's
+  // Smoothness and Anti-aliasing row (hidden there; Graphics commits after
+  // Display, so its choice is the one saved).
+  QWidget* graphicsBox = section(tr("Graphics"));
+  auto* graphicsColumn = new QVBoxLayout(graphicsBox);
+  insetPreferencesGroup(graphicsColumn, window == nullptr);
+  GraphicsPreferences::ViewState graphicsView;
+  graphicsView.grid = m_settings.gridShown;
+  graphicsView.perspective = m_settings.perspective;
+  graphicsView.focalLength = m_settings.focalLength;
+  QList<QAction*> graphicsStyles;
+  for (QAction* style : visualStyleActions()) {
+    if (style == nullptr) continue;
+    graphicsStyles << style;
+    graphicsView.styles << style->text().remove(QLatin1Char('&'));
+    if (style->isChecked()) graphicsView.style = int(graphicsView.styles.size()) - 1;
+  }
+  graphicsView.gpu = m_rendererName;
+  graphicsView.renderer = m_rendererName.isEmpty() ? tr("OpenGL") : tr("OpenGL · GPU renderer");
+  auto* graphicsPage = new GraphicsPreferences(graphicsView);
+  graphicsColumn->addWidget(graphicsPage);
+  graphicsPage->applyView = [this, graphicsStyles](const GraphicsPreferences::ViewState& chosen) {
+    if (chosen.grid != m_settings.gridShown) setGridShown(chosen.grid);
+    if (chosen.perspective != m_settings.perspective) {
+      setProjection(chosen.perspective ? CameraProjection::Perspective : CameraProjection::Orthographic);
+    }
+    if (chosen.focalLength != m_settings.focalLength) {
+      m_settings.focalLength = std::clamp(chosen.focalLength, ViewSettings::kMinFocalLength,
+                                          ViewSettings::kMaxFocalLength);
+      m_settings.save();
+      applyFocalLengths(m_settings.focalLength, m_settings.anaglyphFocalLength);
+    }
+    if (QAction* style = graphicsStyles.value(chosen.style); style != nullptr && !style->isChecked()) {
+      style->trigger();
+    }
+  };
+  graphicsPage->restartRequested = [this] {
+    if (restartRequested) restartRequested();
+  };
+  if (QWidget* smooth = displayBox->findChild<QWidget*>(QStringLiteral("preferencesSmoothness"))) {
+    for (int row = 0; row < display->rowCount(); ++row) {
+      QLayoutItem* field = display->itemAt(row, QFormLayout::FieldRole);
+      if (field != nullptr && field->layout() != nullptr && field->layout()->indexOf(smooth) >= 0) {
+        display->setRowVisible(row, false);
+      }
+    }
+  }
+  if (window != nullptr) {
+    graphicsPage->onChanged = [graphicsPage] { graphicsPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, graphicsPage, [graphicsPage] { graphicsPage->commit(); });
+  }
+  groups.insert(QStringLiteral("graphics"), graphicsBox);
+
+  // Fork: Preferences › Appearance (SolidCraft's, view/AppearancePreferences.hpp).
+  // Its theme, background, interface size and font set the Display page's
+  // controls, which keep their saving; their rows there are hidden.
+  QWidget* appearanceBox = section(tr("Appearance"));
+  auto* appearanceColumn = new QVBoxLayout(appearanceBox);
+  insetPreferencesGroup(appearanceColumn, window == nullptr);
+  AppearancePreferences::Shown appearanceShown;
+  appearanceShown.theme = themePreference() == ThemeChoice::Light ? 1 : themePreference() == ThemeChoice::Dark ? 2 : 0;
+  appearanceShown.background = int(m_settings.background);
+  appearanceShown.color = m_settings.top;
+  appearanceShown.scale = savedInterfaceSize();
+  appearanceShown.systemFont = savedFontFamily().isEmpty();
+  appearanceShown.family = savedFontFamily();
+  auto* appearancePage = new AppearancePreferences(appearanceShown);
+  appearanceColumn->addWidget(appearancePage);
+  appearancePage->apply = [themeChoice, background, top, bottom, interfaceSize, systemFont,
+                           fontFamily](const AppearancePreferences::Shown& chosen) {
+    const ThemeChoice theme = chosen.theme == 1 ? ThemeChoice::Light : chosen.theme == 2 ? ThemeChoice::Dark
+                                                                                       : ThemeChoice::System;
+    themeChoice->setCurrentIndex(std::max(0, themeChoice->findData(themeChoiceName(theme))));
+    if (chosen.background == int(ViewSettings::Background::Custom)) {
+      *top = chosen.color;
+      *bottom = chosen.color;
+    }
+    background->setCurrentIndex(chosen.background);
+    interfaceSize->setCurrentIndex(std::max(0, interfaceSize->findData(chosen.scale)));
+    systemFont->setChecked(chosen.systemFont);
+    if (!chosen.systemFont && !chosen.family.isEmpty()) fontFamily->setCurrentFont(QFont(chosen.family));
+  };
+  {
+    const auto hideRowOf = [display](QWidget* widget) {
+      for (int row = 0; row < display->rowCount(); ++row) {
+        QLayoutItem* field = display->itemAt(row, QFormLayout::FieldRole);
+        if (field == nullptr) continue;
+        if (field->widget() == widget || (field->layout() != nullptr && field->layout()->indexOf(widget) >= 0)) {
+          display->setRowVisible(row, false);
+        }
+      }
+    };
+    hideRowOf(themeChoice);
+    hideRowOf(topButton);
+    hideRowOf(fontFamily);
+    background->hide(); // its row keeps the selection's color and width
+  }
+  if (window != nullptr) {
+    appearancePage->onChanged = [appearancePage] { appearancePage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, appearancePage, [appearancePage] { appearancePage->commit(); });
+  }
+  groups.insert(QStringLiteral("appearance"), appearanceBox);
+
+  // Fork: Preferences › Design (SolidCraft's, view/DesignPreferences.hpp).
+  // Units of new designs sets the General page's control (its row hidden
+  // there), which keeps its saving.
+  QWidget* designBox = section(tr("Design"));
+  auto* designColumn = new QVBoxLayout(designBox);
+  insetPreferencesGroup(designColumn, window == nullptr);
+  auto* designPage = new DesignPreferences(newDesignUnits->currentText());
+  designColumn->addWidget(designPage);
+  designPage->applyUnits = [newDesignUnits](const QString& units) { newDesignUnits->setCurrentText(units); };
+  generalForm->setRowVisible(newDesignUnits, false);
+  if (window != nullptr) {
+    designPage->onChanged = [designPage] { designPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, designPage, [designPage] { designPage->commit(); });
+  }
+  groups.insert(QStringLiteral("design"), designBox);
+
+  // Fork: Preferences › Tools (SolidCraft's, view/ToolsPreferences.hpp).
+  // Choose the operation automatically sets the General page's Extrude
+  // starts with (its row hidden there), which keeps its saving.
+  QWidget* toolsBox = section(tr("Tools"));
+  auto* toolsColumn = new QVBoxLayout(toolsBox);
+  insetPreferencesGroup(toolsColumn, window == nullptr);
+  auto* toolsPage = new ToolsPreferences([](const QString& icon) { return themeIcon(icon); },
+                                         extrudeStart->currentIndex() == 0);
+  toolsColumn->addWidget(toolsPage);
+  toolsPage->applyAutoOperation = [extrudeStart](bool automatic) { extrudeStart->setCurrentIndex(automatic ? 0 : 1); };
+  generalForm->setRowVisible(extrudeStart, false);
+  if (window != nullptr) {
+    toolsPage->onChanged = [toolsPage] { toolsPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, toolsPage, [toolsPage] { toolsPage->commit(); });
+  }
+  groups.insert(QStringLiteral("tools"), toolsBox);
+
+  // Fork: Preferences › Shortcuts (SolidCraft's, view/ShortcutsPreferences.hpp):
+  // every command by its group (the id's first part: SOLID, SKETCH, VIEW,
+  // ...), its key the registry's in all its contexts.
+  QWidget* shortcutsBox = section(tr("Shortcuts"));
+  auto* shortcutsColumn = new QVBoxLayout(shortcutsBox);
+  insetPreferencesGroup(shortcutsColumn, window == nullptr);
+  QVector<ShortcutsPreferences::Row> shortcutRows;
+  {
+    QStringList groupOrder;
+    QHash<QString, QVector<ShortcutsPreferences::Row>> byGroup;
+    for (const auto& def : m_registry.commands()) {
+      if (def->name.isEmpty()) continue;
+      const QString group = def->id.section(QLatin1Char('.'), 0, 0).toUpper().replace(QLatin1Char('_'), QLatin1Char(' '));
+      if (!groupOrder.contains(group)) groupOrder << group;
+      ShortcutsPreferences::Row row;
+      row.id = def->id;
+      row.name = QString(def->name).remove(QLatin1Char('&'));
+      row.group = group;
+      row.key = m_registry.shortcut(def->id);
+      row.defaultKey = m_registry.defaultShortcut(def->id);
+      byGroup[group].append(row);
+    }
+    for (const QString& group : std::as_const(groupOrder)) shortcutRows += byGroup.value(group);
+  }
+  auto* shortcutsPage = new ShortcutsPreferences(shortcutRows);
+  shortcutsColumn->addWidget(shortcutsPage);
+  const auto allContexts = [this](const QString& id, const QKeySequence& key) {
+    ContextShortcuts keys = m_registry.shortcuts(id);
+    if (keys.isEmpty()) keys.insert(AllShortcutContexts, key);
+    for (QKeySequence& each : keys) each = key;
+    return keys;
+  };
+  shortcutsPage->conflict = [this, allContexts](const QString& id, const QKeySequence& key) {
+    for (const ShortcutConflict& found : m_registry.shortcutConflicts({{id, allContexts(id, key)}})) {
+      if (found.first.id == id) return found.second.name;
+      if (found.second.id == id) return found.first.name;
+    }
+    return QString();
+  };
+  shortcutsPage->apply = [this, allContexts](const QHash<QString, QKeySequence>& changedKeys) {
+    QHash<QString, ContextShortcuts> proposal;
+    for (auto it = changedKeys.cbegin(); it != changedKeys.cend(); ++it) proposal.insert(it.key(), allContexts(it.key(), it.value()));
+    m_registry.setShortcuts(proposal);
+  };
+  if (window != nullptr) {
+    shortcutsPage->onChanged = [shortcutsPage] { shortcutsPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, shortcutsPage, [shortcutsPage] { shortcutsPage->commit(); });
+  }
+  groups.insert(QStringLiteral("shortcuts"), shortcutsBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
