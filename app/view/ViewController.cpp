@@ -4517,6 +4517,21 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     systemFont->setChecked(chosen.systemFont);
     if (!chosen.systemFont && !chosen.family.isEmpty()) fontFamily->setCurrentFont(QFont(chosen.family));
   };
+  // PureCAD: Appearance › Color vision: the selection in a color the chosen
+  // kind of color blindness tells apart from bodies and sketches (Okabe-Ito
+  // blue for protan and deutan, vermilion for tritan); Off, the default
+  // color again. Display's selection color keeps the saving.
+  if (QWidget* vision = appearancePage->findChild<QWidget*>(QStringLiteral("appearance_colorVision"))) {
+    if (auto* group = vision->findChild<QButtonGroup*>()) {
+      connect(group, &QButtonGroup::idClicked, selectionColorButton,
+              [chosenSelectionColor, showSelectionColor](int mode) {
+                *chosenSelectionColor = mode == 1 || mode == 2 ? QColor(0x00, 0x72, 0xb2)
+                                        : mode == 3             ? QColor(0xd5, 0x5e, 0x00)
+                                                                : defaultSelectionColor();
+                showSelectionColor();
+              });
+    }
+  }
   {
     const auto hideRowOf = [display](QWidget* widget) {
       for (int row = 0; row < display->rowCount(); ++row) {
