@@ -1418,6 +1418,7 @@ bool ParameterField::nativeStepWheel(int angle, Qt::KeyboardModifiers modifiers)
 }
 
 void ParameterField::stepValue(double by, const QString& how) {
+  if (!valueSteppingOn()) return; // PureCAD: Design › Step values
   stepText(m_edit->text(), m_options, by, how, m_edit, [this](const QString& after) {
     // As typed: textEdited (the panel's value and its preview, a sketch
     // tool's value), and the field's own undo; no suggestions for the unit.

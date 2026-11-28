@@ -1,5 +1,6 @@
 // SPDX-License-Identifier: MIT
 #include "CommandSession.hpp"
+#include "ValueStep.hpp"
 
 #include <algorithm>
 #include <cmath>
@@ -2495,6 +2496,7 @@ void CommandSession::stepValueBox(bool back) {
 }
 
 void CommandSession::stepBoxValue(double by, const QString& how) {
+  if (!valueSteppingOn()) return; // PureCAD: Design › Step values
   if (!m_valueBox) {
     return;
   }

@@ -20,7 +20,7 @@ struct DesignPrefs {
   int lengthDecimals = 2;
   int angleDecimals = 1;
   int parameterRows = 50;
-  bool stepValues = false;
+  bool stepValues = true;           // values step as they always did (ValueStep.hpp)
   bool valuesBesideHandles = true;
   int kernelCheck = 1;              // 0 After every step, 1 Once per feature, 2 Off
   bool thirdAngle = false;          // projection of new drawings (metric default: first angle)

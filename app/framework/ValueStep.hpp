@@ -63,6 +63,10 @@ QString valueStepHint(bool macKeys);
 // in degrees). The text itself when the limit stops the step; nothing when
 // the text is not a plain value of the kind (an expression, a parameter's
 // name, a unit of another kind, a text field).
+// PureCAD: Preferences › Design › Step values with arrows and wheel
+// ("design/stepValues", on by default, as values always stepped).
+bool valueSteppingOn();
+
 std::optional<QString> steppedValue(const QString& text, ParameterKind kind, double step,
                                     const ValueStepLimit& limit = {}, double bareUnit = 1.0);
 
