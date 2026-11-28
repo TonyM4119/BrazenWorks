@@ -8582,6 +8582,11 @@ void MainWindow::leaveSketchMode() {
   // opened (mitcad#1592: that one's top view came back). A 2D sketch puts
   // back the view it was opened from.
   const bool spatial = m_sketch3d != nullptr && m_sketch3d->isActive();
+  // PureCAD: Preferences › Sketch › When the sketch ends: 0 back to the
+  // view before it (as before), 1 the view as it is, 2 back unless the view
+  // was turned off the sketch's plane.
+  const int sketchEnds = QSettings().value(QStringLiteral("sketchPrefs/whenSketchEnds"), 0).toInt();
+  const bool turnedOff = sketchEnds == 2 && std::abs(m_viewer->viewDirection().Dot(m_sketch->model().frame.normal())) < 0.999;
   m_sketch->leave();
   if (m_sketch3d != nullptr) {
     m_sketch3d->leave(); // a 3D sketch's context (mitcad#1524)
@@ -8591,7 +8596,7 @@ void MainWindow::leaveSketchMode() {
   }
   m_sketchOccurrence.clear();
   m_mode = Mode::Idle;
-  if (spatial) {
+  if (spatial || sketchEnds == 1 || turnedOff) {
     m_viewer->keepCamera();
   } else {
     m_viewer->restoreCamera();
