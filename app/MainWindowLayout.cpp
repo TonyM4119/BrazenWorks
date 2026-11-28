@@ -130,8 +130,14 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
     sizing.atTop = layout.navigationPosition < 3;
     sizing.shown = m_navigationCard->isShown();
     m_floating->setCardAnchor(m_navigationCard, FloatingLayout::Anchor::BottomCenter, sizing);
-    auto* idle = m_navigationCard->findChild<NavigationIdle*>(QStringLiteral("navigationIdle"),
-                                                                 Qt::FindDirectChildrenOnly);
+    // (No Q_OBJECT here, so not found by findChild<NavigationIdle*>: by its
+    // name among the card's own children.)
+    NavigationIdle* idle = nullptr;
+    for (QObject* child : m_navigationCard->children()) {
+      if (child->objectName() == QLatin1String("navigationIdle")) {
+        idle = static_cast<NavigationIdle*>(child);
+      }
+    }
     if (idle == nullptr) {
       idle = new NavigationIdle(m_navigationCard);
     }

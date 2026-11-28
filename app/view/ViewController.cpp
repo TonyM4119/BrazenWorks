@@ -155,6 +155,10 @@
 namespace mitcad {
 namespace {
 
+// Fork: the brand's community links, read through a call so that the checks
+// on it are not constant conditions (MSVC C4127).
+bool upstreamCommunityLinks() { return brand::kUpstreamCommunityLinks; }
+
 const QString kGroup = QStringLiteral("view/");
 
 struct StyleEntry {
@@ -3215,7 +3219,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // Windows and Linux, the Docked toolbar), beside Show the menu bar where
   // that is offered too (Preferences fits a 768 px high screen).
   QCheckBox* boostShown = nullptr;
-  if (brand::kUpstreamCommunityLinks && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
+  if (upstreamCommunityLinks() && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
     boostShown = new QCheckBox(tr("Show the Boost development button"));
     boostShown->setObjectName(QStringLiteral("boostVisible"));
     boostShown->setChecked(BoostSettings::loadVisible());
@@ -3247,7 +3251,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   // × apart from Boost development; offered where the window has it, on
   // Show the Boost development button's row.
   QCheckBox* discordShown = nullptr;
-  if (brand::kUpstreamCommunityLinks && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
+  if (upstreamCommunityLinks() && (chromeStyle() == ChromeStyle::Docked || floatingTopCards())) {  // Fork
     discordShown = new QCheckBox(tr("Show the Discord button"));
     discordShown->setObjectName(QStringLiteral("discordVisible"));
     discordShown->setChecked(DiscordSettings::loadVisible());
@@ -4291,10 +4295,10 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     item->setData(Qt::UserRole, QLatin1String(entry.id));
     item->setIcon(monochromeIcon(themeIcon(QString::fromLatin1(entry.icon))));
     // The section's caption over its first page.
-    const QString section = QString::fromLatin1(entry.section);
-    if (section != lastSection) {
-      item->setData(kSectionRole, section);
-      lastSection = section;
+    const QString caption = QString::fromLatin1(entry.section);
+    if (caption != lastSection) {
+      item->setData(kSectionRole, caption);
+      lastSection = caption;
     }
     search->addPage(content, QCoreApplication::translate("View", entry.name), pageKeywords(entry));
   }
