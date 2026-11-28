@@ -229,6 +229,8 @@ protected:
       column->addWidget(note);
       // Room for the caption to wrap in a few lines, not one word a line.
       box->setFixedWidth(uiRoomSize(250));
+    } else {
+      box->setMinimumWidth(box->sizeHint().width());
     }
     return box;
   }

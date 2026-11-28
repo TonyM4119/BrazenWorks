@@ -2,6 +2,7 @@
 #include "ViewController.hpp"
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
+#include "AppearancePreferences.hpp"
 #include "GraphicsPreferences.hpp"
 #include "SketchPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
@@ -349,6 +350,11 @@ const PreferencePage kPreferencePages[] = {
      "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
      "drawings small_circles circles boost navigation_bar",
      "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
+    // Fork: SolidCraft's Appearance page.
+    {"appearance", QT_TRANSLATE_NOOP("View", "Appearance"),
+     "appearance theme light dark follow system background color gradient picture logo accent scale "
+     "interface_size text font color_vision colour blind protan deutan tritan",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Colors, text and accessibility."), "appearance"},
     // Fork: SolidCraft's Layout page.
     {"layout", QT_TRANSLATE_NOOP("View", "Layout"),
      "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
@@ -421,7 +427,7 @@ bool pageFills(const char* id) {
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
          page == QLatin1String("layout") || page == QLatin1String("graphics") ||
-         page == QLatin1String("sketch"); // fork: own scroll areas
+         page == QLatin1String("sketch") || page == QLatin1String("appearance"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -3901,6 +3907,57 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, graphicsPage, [graphicsPage] { graphicsPage->commit(); });
   }
   groups.insert(QStringLiteral("graphics"), graphicsBox);
+
+  // Fork: Preferences › Appearance (SolidCraft's, view/AppearancePreferences.hpp).
+  // Its theme, background, interface size and font set the Display page's
+  // controls, which keep their saving; their rows there are hidden.
+  QWidget* appearanceBox = section(tr("Appearance"));
+  auto* appearanceColumn = new QVBoxLayout(appearanceBox);
+  insetPreferencesGroup(appearanceColumn, window == nullptr);
+  AppearancePreferences::Shown appearanceShown;
+  appearanceShown.theme = themePreference() == ThemeChoice::Light ? 1 : themePreference() == ThemeChoice::Dark ? 2 : 0;
+  appearanceShown.background = int(m_settings.background);
+  appearanceShown.color = m_settings.top;
+  appearanceShown.scale = savedInterfaceSize();
+  appearanceShown.systemFont = savedFontFamily().isEmpty();
+  appearanceShown.family = savedFontFamily();
+  auto* appearancePage = new AppearancePreferences(appearanceShown);
+  appearanceColumn->addWidget(appearancePage);
+  appearancePage->apply = [themeChoice, background, top, bottom, interfaceSize, systemFont,
+                           fontFamily](const AppearancePreferences::Shown& chosen) {
+    const ThemeChoice theme = chosen.theme == 1 ? ThemeChoice::Light : chosen.theme == 2 ? ThemeChoice::Dark
+                                                                                       : ThemeChoice::System;
+    themeChoice->setCurrentIndex(std::max(0, themeChoice->findData(themeChoiceName(theme))));
+    if (chosen.background == int(ViewSettings::Background::Custom)) {
+      *top = chosen.color;
+      *bottom = chosen.color;
+    }
+    background->setCurrentIndex(chosen.background);
+    interfaceSize->setCurrentIndex(std::max(0, interfaceSize->findData(chosen.scale)));
+    systemFont->setChecked(chosen.systemFont);
+    if (!chosen.systemFont && !chosen.family.isEmpty()) fontFamily->setCurrentFont(QFont(chosen.family));
+  };
+  {
+    const auto hideRowOf = [display](QWidget* widget) {
+      for (int row = 0; row < display->rowCount(); ++row) {
+        QLayoutItem* field = display->itemAt(row, QFormLayout::FieldRole);
+        if (field == nullptr) continue;
+        if (field->widget() == widget || (field->layout() != nullptr && field->layout()->indexOf(widget) >= 0)) {
+          display->setRowVisible(row, false);
+        }
+      }
+    };
+    hideRowOf(themeChoice);
+    hideRowOf(topButton);
+    hideRowOf(fontFamily);
+    background->hide(); // its row keeps the selection's color and width
+  }
+  if (window != nullptr) {
+    appearancePage->onChanged = [appearancePage] { appearancePage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, appearancePage, [appearancePage] { appearancePage->commit(); });
+  }
+  groups.insert(QStringLiteral("appearance"), appearanceBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
