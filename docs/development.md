@@ -2799,7 +2799,8 @@ packages were restored from the binary cache both times, as before.
   no compiler-specific constructs, no Windows path assumptions; builds and
   runs on Windows, Linux and macOS.
 - Every source file starts with an SPDX line (`// SPDX-License-Identifier:
-  MIT` or `# ...`), checked by `tools/check-spdx.sh`.
+  AGPL-3.0-or-later` in a new file, `MIT` kept in one from MitCad, or
+  `# ...`), checked by `tools/check-spdx.sh`.
 - Narrow strings (`std::string`, `char*`, paths) are UTF-8 on every
   platform. On Windows a new executable gets the UTF-8 code page with
   `mitcad_utf8_code_page(<target>)` (`cmake/Utf8CodePage.cmake`), so that
@@ -3044,7 +3045,15 @@ rebuild); a patch header that has a `Test:` paragraph again is reported.
 
 ## Licence policy
 
-- MitCad's code is MIT with an SPDX identifier in every file.
+- PureCAD as a whole is AGPL-3.0-or-later (`LICENSE`). Code that came
+  from MitCad is MIT and keeps its `SPDX-License-Identifier: MIT` line and
+  MitCad's notice (`LICENSE-MITCAD`); new files of PureCAD's own carry
+  `SPDX-License-Identifier: AGPL-3.0-or-later`. Every file has an SPDX
+  identifier.
+- AGPL-compatible components only in what PureCAD links or loads as part
+  of itself: no closed-source libraries or plugins inside the program
+  (a driver the user installed and PureCAD talks to, such as 3DxWare's
+  `siappdll.dll`, is the user's, not shipped).
 - Third-party components are used under their most permissive offered
   licence (an MIT/Apache crate as MIT, Qt as LGPL-3.0).
 - Not allowed: GPL-2.0-only, non-commercial or otherwise restricted

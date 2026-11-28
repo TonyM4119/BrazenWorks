@@ -28,10 +28,13 @@ void showAboutDialog(QWidget* parent) {
       QStringLiteral("<p>%1</p>")
           .arg(QObject::tr("A parametric desktop CAD application with a history-based modeling workflow.")) +
       QStringLiteral("<p>%1</p>")
-          // Fork: the upstream's copyright notice, which the MIT licence keeps; the
-          // name is an argument, so BrandTranslator does not swap it.
-          .arg(QObject::tr("Licensed under the MIT license. Copyright (c) 2026 %1 contributors.")
-                   .arg(QString::fromUtf8(brand::kUpstreamName))) +
+          // Fork: PureCAD's licence (AGPL-3.0-or-later), then the upstream's
+          // copyright notice, which the MIT licence keeps; the names are
+          // arguments, so BrandTranslator does not swap them.
+          .arg(QObject::tr("%1 is licensed under the GNU Affero General Public License, version 3 or later "
+                           "(<a href=\"https://www.gnu.org/licenses/agpl-3.0.html\">gnu.org/licenses/agpl-3.0.html</a>). "
+                           "It is based on %2, Copyright (c) 2026 %2 contributors, under the MIT license.")
+                   .arg(name, QString::fromUtf8(brand::kUpstreamName))) +
       QStringLiteral("<p>%1</p><ul>").arg(QObject::tr("Built with:")) +
       QStringLiteral("<li>%1</li>")
           .arg(QObject::tr("Open CASCADE Technology %1 (LGPL-2.1 with the Open CASCADE exception)")

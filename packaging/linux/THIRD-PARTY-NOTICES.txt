@@ -1,4 +1,6 @@
-MitCad is released under the MIT licence (see LICENSE). The Linux AppImage
+PureCAD is released under the GNU AGPL, version 3 or later (see LICENSE).
+It is based on MitCad, released under the MIT licence (see LICENSE-MITCAD).
+The Linux AppImage
 also contains the following third-party components. The files named here
 are in usr/share/doc of the AppImage (unpack it with --appimage-extract).
 

@@ -62,6 +62,7 @@ install(FILES "${PROJECT_SOURCE_DIR}/packaging/linux/mitcad-mime.xml"
 # font's licence and the licence text of every vcpkg port.
 set(mitcad_doc_dir ${CMAKE_INSTALL_DATADIR}/doc/mitcad)
 install(FILES "${PROJECT_SOURCE_DIR}/LICENSE"
+              "${PROJECT_SOURCE_DIR}/LICENSE-MITCAD"
               "${PROJECT_SOURCE_DIR}/packaging/linux/THIRD-PARTY-NOTICES.txt"
   DESTINATION ${mitcad_doc_dir})
 install(FILES "${PROJECT_SOURCE_DIR}/third_party/fonts/droid-sans/LICENSE.txt"
