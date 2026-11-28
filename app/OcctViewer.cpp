@@ -569,6 +569,25 @@ protected:
     }
     return std::nullopt;
   }
+ public:
+  // Repaints only when the camera has turned: a repaint over the GL view
+  // makes the view draw again, so repainting every frame never stops.
+  void followCamera() {
+    const occ::handle<Graphic3d_Camera> camera = m_camera();
+    if (camera.IsNull()) return;
+    const gp_Dir d = camera->Direction();
+    const gp_Dir u = camera->Up();
+    const std::array<double, 6> now{d.X(), d.Y(), d.Z(), u.X(), u.Y(), u.Z()};
+    bool same = true;
+    for (std::size_t i = 0; i < now.size(); ++i) {
+      if (std::abs(now[i] - m_seen[i]) > 1e-6) same = false;
+    }
+    if (same) return;
+    m_seen = now;
+    update();
+  }
+
+ protected:
   void mouseMoveEvent(QMouseEvent* event) override {
     if (m_forwarding) {
       forward(event);
@@ -624,6 +643,7 @@ private:
   Turn m_turn;
   bool m_hover = false;
   bool m_forwarding = false;
+  std::array<double, 6> m_seen{};
   std::optional<std::pair<int, bool>> m_hoverEnd;
 };
 
@@ -7952,8 +7972,15 @@ void OcctViewer::placeHomeButton() {
   // At the cube's upper left, at the cube's size (mitcad#2071); fork: with
   // the Axes navigator, left of its whole area, clear of its axes.
   // (The Axes navigator's compact axes leave its corner free too.)
-  m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
-                     m_overlayInsets.top() + cubeScaled(9));
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    // Fork: at the compact Axes navigator's upper left.
+    const int side = cubeScaled(92);
+    m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - side / 2 - m_homeButton->width() / 2,
+                       m_overlayInsets.top() + cubeOffset() - side / 2 - m_homeButton->height() / 3);
+  } else {
+    m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
+                       m_overlayInsets.top() + cubeScaled(9));
+  }
   m_homeButton->raise();
   const QPoint at = mapTo(window(), m_homeButton->geometry().center());
   qDebug().noquote() << QStringLiteral("View home at %1,%2").arg(at.x()).arg(at.y());
@@ -10547,9 +10574,9 @@ void OcctViewer::readViewEglFrame(const occ::handle<OpenGl_Context>& gl) {
 #endif
 
 void OcctViewer::paintGL() {
-  // Fork: the Axes navigator follows the camera every frame.
+  // Fork: the Axes navigator follows the camera when it turns.
   if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
-    m_axesNavigator->update();
+    static_cast<AxesNavigator*>(m_axesNavigator)->followCamera();
   }
 #ifdef MITCAD_OCCT_EGL
   if (m_viewEgl != nullptr && m_viewEgl->context != nullptr) {
