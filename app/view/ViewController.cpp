@@ -4368,8 +4368,13 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   }
   headerRow->addWidget(gear);
   headerRow->addWidget(title);
-  headerRow->addStretch(1);
-  search->setMinimumWidth(uiRoomSize(160)); // fork: shrinks in a narrow window rather than leaving it
+  headerRow->addStretch(2);
+  // Fork: between 160 and 300 px at the right. Its own Ignored width
+  // policy (as wide as the page list it once sat over) put it past the
+  // header's right end beside a stretch.
+  search->setSizePolicy(QSizePolicy::Preferred, search->sizePolicy().verticalPolicy());
+  search->setMinimumWidth(uiRoomSize(160));
+  search->setMaximumWidth(uiRoomSize(300));
   // SolidCraft's search: rounded, the magnifier at the left and the
   // shortcut at the right; a search opens the folded sections.
   search->addAction(monochromeIcon(themeIcon(QStringLiteral("search"))), QLineEdit::LeadingPosition);
@@ -4399,7 +4404,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   connect(search, &QLineEdit::textChanged, stack, [stack](const QString& text) {
     if (!text.isEmpty()) unfoldPreferenceSections(stack);
   });
-  headerRow->addWidget(search);
+  headerRow->addWidget(search, 1);
   // Ctrl+F (Cmd+F) takes the search, its text chosen.
   auto* find = new QShortcut(QKeySequence::Find, dialog.get());
   connect(find, &QShortcut::activated, search, [search] {
@@ -4541,6 +4546,9 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     if (fitted != shown->size()) {
       shown->resize(fitted);
     }
+    // Fork: one size for every page, as SolidCraft's Preferences: the
+    // largest page's, not resizable (the pages that need more scroll).
+    shown->setFixedSize(fitted);
     const QSize frame = fitted + margins;
     const QPoint from = shown->frameGeometry().topLeft();
     // The frame's furthest place right and down that still shows it whole.

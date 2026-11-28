@@ -10,6 +10,7 @@
 #include "../framework/CommandLayout.hpp"
 #include "../framework/UiSizes.hpp"
 
+#include <algorithm>
 #include <functional>
 #include <utility>
 
@@ -26,6 +27,7 @@
 #include <QPainter>
 #include <QPushButton>
 #include <QScrollArea>
+#include <QStyle>
 #include <QToolButton>
 #include <QVBoxLayout>
 #include <QWidget>
@@ -168,6 +170,16 @@ public:
     } else if (QLayout* layout = field->layout()) {
       label != nullptr ? form->addRow(label, layout) : form->addRow(layout);
     }
+  }
+
+  // The whole content's width (no sideways scrolling) and up to 640 px of
+  // its height: what Preferences opens at for this page.
+  QSize sizeHint() const override {
+    const auto* scroll = findChild<QScrollArea*>(QStringLiteral("layoutScroll"));
+    if (scroll == nullptr || scroll->widget() == nullptr) return QWidget::sizeHint();
+    const QSize content = scroll->widget()->sizeHint();
+    const int bar = style()->pixelMetric(QStyle::PM_ScrollBarExtent);
+    return QSize(content.width() + bar + 4, std::min(content.height(), uiRoomSize(640)));
   }
 
   const LayoutSettings& chosen() const { return m_settings; }
