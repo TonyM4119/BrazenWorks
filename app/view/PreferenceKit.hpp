@@ -225,9 +225,10 @@ protected:
     if (!caption.isEmpty()) {
       auto* note = new QLabel(caption);
       note->setWordWrap(true);
-      note->setMaximumWidth(uiRoomSize(240));
       note->setForegroundRole(QPalette::PlaceholderText);
       column->addWidget(note);
+      // Room for the caption to wrap in a few lines, not one word a line.
+      box->setFixedWidth(uiRoomSize(250));
     }
     return box;
   }
@@ -275,6 +276,10 @@ protected:
       auto* button = new QPushButton(names.at(i));
       button->setCheckable(true);
       button->setChecked(i == value);
+      // As wide as its name in bold, which it shows when chosen.
+      QFont bold = button->font();
+      bold.setBold(true);
+      button->setMinimumWidth(QFontMetrics(bold).horizontalAdvance(names.at(i)) + uiRoomSize(32));
       if (stretch) button->setSizePolicy(QSizePolicy::Expanding, QSizePolicy::Fixed);
       const QString radius = i == 0 ? QStringLiteral("border-top-left-radius: 6px; border-bottom-left-radius: 6px;")
                              : i == names.size() - 1

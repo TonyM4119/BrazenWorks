@@ -3,6 +3,7 @@
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
 #include "GraphicsPreferences.hpp"
+#include "SketchPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
 #include "GridSpacing.hpp"
 #include "DefaultView.hpp"
@@ -375,7 +376,7 @@ const PreferencePage kPreferencePages[] = {
      "sketch dimension first scale proportion drawn size click select selection add ctrl multiple "
      "esc escape leave exit finish unchanged profile profiles shade shading project edges face "
      "hide hidden show shown visible visibility used extrude feature eye",
-     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, dimensions and selecting in sketches."), "sketch"},
+     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, snapping and selecting."), "sketch"},
     // Joints whose picks lie under another component than the active one
     // (mitcad#1856).
     {"assembly", QT_TRANSLATE_NOOP("View", "Assembly"),
@@ -419,7 +420,8 @@ bool pageFills(const char* id) {
   const QLatin1String page(id);
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
-         page == QLatin1String("layout") || page == QLatin1String("graphics"); // fork: own scroll areas
+         page == QLatin1String("layout") || page == QLatin1String("graphics") ||
+         page == QLatin1String("sketch"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -2370,7 +2372,49 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   } else {
     connect(dialog.get(), &QDialog::accepted, hideUsed, applyHideUsed);
   }
-  groups.insert(QStringLiteral("sketch"), sketchBox);
+  // Fork: Preferences › Sketch as SolidCraft's (view/SketchPreferences.hpp):
+  // the rows above move into its sections with their own saving.
+  QWidget* sketchPageBox = section(tr("Sketch"));
+  auto* sketchPageColumn = new QVBoxLayout(sketchPageBox);
+  insetPreferencesGroup(sketchPageColumn, window == nullptr);
+  auto* sketchPage = new SketchPreferences(m_settings.snapToGrid);
+  sketchPageColumn->addWidget(sketchPage);
+  {
+    const struct {
+      const char* name;
+      const char* place;
+      const char* text;
+      const char* tip;
+    } adopted[] = {
+        {"scaleToFirstDimension", "scale", QT_TR_NOOP("The first dimension scales the drawing"),
+         QT_TR_NOOP("A sketch's first length dimension scales the whole sketch so that it holds")},
+        {"projectFaceOnCreate", "project", QT_TR_NOOP("Project face edges into new sketches"), ""},
+        {"clickAddsToSelection", "click", QT_TR_NOOP("A click adds to the selection in sketches"),
+         QT_TR_NOOP("Each click adds to the selection without Shift")},
+        {"escLeavesUnchangedSketch", "esc", QT_TR_NOOP("Esc leaves an unchanged sketch"),
+         QT_TR_NOOP("Esc in a sketch you have not changed ends it")},
+        {"showProfilesOnOpen", "profiles", QT_TR_NOOP("Show profiles when a sketch opens"),
+         QT_TR_NOOP("The sketch's closed profiles are shaded when it opens")},
+        {"hideUsedSketches", "hideUsed", QT_TR_NOOP("Hide a sketch when a feature uses it"),
+         QT_TR_NOOP("A shown sketch hides when a feature such as Extrude first uses it")},
+    };
+    for (const auto& row : adopted) {
+      if (auto* box = sketchBox->findChild<QCheckBox*>(QLatin1String(row.name))) {
+        sketchPage->adopt(QLatin1String(row.place), box, tr(row.text), *row.tip ? tr(row.tip) : QString());
+      }
+    }
+  }
+  sketchPage->applySnapToGrid = [this](bool on) {
+    if (on != m_settings.snapToGrid) setSnapToGrid(on);
+  };
+  if (window != nullptr) {
+    sketchPage->onChanged = [sketchPage] { sketchPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, sketchPage, [sketchPage] { sketchPage->commit(); });
+  }
+  sketchBox->hide(); // its rows moved; it keeps its saving's connections
+  sketchBox->setParent(sketchPageBox);
+  groups.insert(QStringLiteral("sketch"), sketchPageBox);
   // Suppliers (mitcad#950): the region of the product links and the shops
   // the Supplier filters start with. Saved when the dialog is accepted, at
   // once in the Settings window.
