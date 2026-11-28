@@ -95,6 +95,9 @@ public:
   void rebuild();
   // Shows the SKETCH tab and switches to it, or hides it.
   void setSketchMode(bool sketching);
+  // PureCAD: Preferences › Layout › Keep the Sketch tab shown: the SKETCH
+  // tab stays between sketches (its tools off until one is open).
+  void setKeepSketchTab(bool keep);
   // While a drawing is open (mitcad#1008): its DRAWING tab alone (CUT
   // SHEET for a cut sheet, mitcad#853), the model's tabs hidden, so that
   // the toolbar is one row; closed, they come back with the tab the
@@ -652,6 +655,8 @@ private:
   QStackedWidget* m_pages = nullptr;
   QWidget* m_sketchPage = nullptr;
   int m_pageBeforeSketch = 0; // the page Finish Sketch goes back to
+  bool m_sketching = false;   // PureCAD: a sketch open (the tab may be kept without one)
+  bool m_keepSketchTab = false;
   int m_pageBeforeDrawing = 0; // the page Close Drawing goes back to
   mutable QStringList m_loggedLayout; // the places logged last
   QHash<QString, Extras> m_extras;   // by the extra's key

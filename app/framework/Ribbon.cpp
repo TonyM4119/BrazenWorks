@@ -5255,7 +5255,7 @@ void Ribbon::applyWorkspaceTabs() {
   // A tab with its own row (setTabRow) shows it in place of the tabs.
   updateTabRow();
   const QString shown = workspace();
-  const bool sketching = tabOfPage(kSketchPage) >= 0;
+  const bool sketching = m_sketching;
   if (auto* selector = static_cast<WorkspaceButton*>(m_workspaceButton)) {
     selector->setWorkspace(workspaceTitle(shown), workspaceIcon(shown));
     // Locked while sketching (a sketch is the model's, mitcad#1990).
@@ -5295,7 +5295,7 @@ void Ribbon::followCurrentTab() {
 }
 
 void Ribbon::setWorkspace(const QString& workspace) {
-  if (!m_workspaces || tabOfPage(kSketchPage) >= 0) {
+  if (!m_workspaces || m_sketching) {
     return;
   }
   qDebug().noquote() << QStringLiteral("Ribbon workspace chosen: %1").arg(workspace);
@@ -5760,9 +5760,55 @@ void Ribbon::paintEvent(QPaintEvent* event) {
   painter.fillRect(QRect(0, height() - 1, width(), 1), cardBorderColor(palette()));
 }
 
-void Ribbon::setSketchMode(bool sketching) {
+void Ribbon::setKeepSketchTab(bool keep) {
+  if (m_keepSketchTab == keep) return;
+  m_keepSketchTab = keep;
+  if (m_sketching) return; // the sketch's own tab, as it is
   const int shown = tabOfPage(kSketchPage);
+  if (keep && shown < 0) {
+    // PureCAD: the SKETCH tab kept between sketches, at the row's end and not
+    // switched to; its tools are off until a sketch is open.
+    const QScopedValueRollback<bool> applying(m_applyingWorkspace, true);
+    const int index = m_tabs->addTab(displayName(kSketch));
+    m_tabs->setTabData(index, kSketchPage);
+    m_tabs->setTabTextColor(index, accentColor(palette()));
+    m_tabs->setTabToolTip(index, tr("Sketch: the sketch tools, on while a sketch is open"));
+  } else if (!keep && shown >= 0) {
+    const QScopedValueRollback<bool> applying(m_applyingWorkspace, true);
+    removeTabShowing(shown, m_tabs->tabData(m_tabs->currentIndex()).toInt() == kSketchPage
+                                ? m_pageBeforeSketch
+                                : m_tabs->tabData(m_tabs->currentIndex()).toInt());
+  }
+  applyWorkspaceTabs();
+}
+
+void Ribbon::setSketchMode(bool sketching) {
+  int shown = tabOfPage(kSketchPage);
+  if (sketching && !m_sketching && shown >= 0) {
+    // The kept tab (setKeepSketchTab) becomes the sketch's.
+    m_sketching = true;
+    m_pageBeforeSketch = m_tabs->tabData(m_tabs->currentIndex()).toInt();
+    if (m_pageBeforeSketch == kStartPage || m_pageBeforeSketch == kSketchPage) {
+      m_pageBeforeSketch =
+          m_workspaces ? m_workspacePage.value(m_workspace, firstPageOfWorkspace(m_workspace)) : kSolidPage;
+    }
+    m_tabs->setCurrentIndex(shown);
+    applyWorkspaceTabs();
+    emit sketchModeChanged(true);
+    return;
+  }
+  if (!sketching && m_sketching && m_keepSketchTab && shown >= 0) {
+    // Back to the tab it started from; the tab stays.
+    m_sketching = false;
+    const int back = tabOfPage(m_pageBeforeSketch);
+    if (back >= 0) m_tabs->setCurrentIndex(back);
+    followCurrentTab();
+    applyWorkspaceTabs();
+    emit sketchModeChanged(false);
+    return;
+  }
   if (sketching && shown < 0) {
+    m_sketching = true;
     // Back to the tab the sketch started from afterwards (SOLID or BUILD).
     m_pageBeforeSketch = m_tabs->tabData(m_tabs->currentIndex()).toInt();
     // Not to the Start tab (mitcad#1258): a sketch is the model's (the
@@ -5780,6 +5826,7 @@ void Ribbon::setSketchMode(bool sketching) {
     applyWorkspaceTabs();
     emit sketchModeChanged(true);
   } else if (!sketching && shown >= 0) {
+    m_sketching = false;
     {
       // The tab Qt picks while SKETCH goes is not shown, not even for a
       // moment (removeTabShowing): the one it started from is.

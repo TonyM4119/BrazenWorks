@@ -121,9 +121,10 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
   }
   // Window › Menus: List or Large icons (menus made from now on).
   IconSizeStyle::setLargeMenuIcons(layout.largeMenuIcons);
-  // Window › Ribbon.
+  // Window › Ribbon; Toolbar tabs › Keep the Sketch tab shown.
   if (m_ribbon != nullptr) {
     m_ribbon->setGroupsShown(layout.ribbon);
+    m_ribbon->setKeepSketchTab(layout.keepSketchTab);
   }
   // Window › Ribbon › Only when hovered: View › Toolbar Panel hidden, shown
   // at the view's top edge (MainWindowToolbarPanel.cpp).
