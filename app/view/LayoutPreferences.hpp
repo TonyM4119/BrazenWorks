@@ -38,7 +38,7 @@ class LayoutSchematic : public QWidget {
 public:
   explicit LayoutSchematic(QWidget* parent = nullptr) : QWidget(parent) {
     setObjectName(QStringLiteral("layoutSchematic"));
-    setFixedSize(uiRoomSize(300), uiRoomSize(200));
+    setFixedSize(uiRoomSize(210), uiRoomSize(140));
   }
   void setSettings(const LayoutSettings& settings) {
     m_settings = settings;
@@ -280,9 +280,17 @@ private:
     });
     top->addWidget(reset);
     column->addLayout(top);
+    // The presets' cards, and at the right the picture of the window as
+    // the page's choices lay it out.
+    auto* presetsRow = new QHBoxLayout;
     m_presets = new QHBoxLayout;
     m_presets->setSpacing(14);
-    column->addLayout(m_presets);
+    presetsRow->addLayout(m_presets);
+    presetsRow->addStretch(1);
+    m_schematic = new LayoutSchematic;
+    m_schematic->setSettings(m_settings);
+    presetsRow->addWidget(m_schematic, 0, Qt::AlignTop);
+    column->addLayout(presetsRow);
     rebuildPresets();
   }
   void rebuildPresets() {
@@ -418,9 +426,6 @@ private:
     check(g, r++, 0, tr("Keep on top of other windows"), "keepOnTop", &LayoutSettings::keepOnTop,
           tr("PureCAD's window stays above other programs' windows"));
     row->addLayout(left, 1);
-    m_schematic = new LayoutSchematic;
-    m_schematic->setSettings(m_settings);
-    row->addWidget(m_schematic, 0, Qt::AlignTop);
     column->addLayout(row);
   }
 

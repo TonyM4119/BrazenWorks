@@ -411,7 +411,8 @@ const PreferencePage kPreferencePages[] = {
 bool pageFills(const char* id) {
   const QLatin1String page(id);
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
-         page == QLatin1String("navigation") || page == QLatin1String("cloud");
+         page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
+         page == QLatin1String("layout"); // fork: its own scroll area takes the page's height
 }
 
 // A page's keywords as the command search and Preferences' search take
