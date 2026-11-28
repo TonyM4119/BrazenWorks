@@ -1432,7 +1432,7 @@ StartPage::StartPage(OcctViewer* viewer, Host host) : QWidget(viewer), m_viewer(
   // SolidCraft's rows: the File commands, a rule, Save, Save As, Export
   // and Design properties (dimmed while they cannot run), a rule, then
   // Preferences, Keyboard shortcuts, Crash reports and About.
-  command(tr("New"), QStringLiteral("file.new_design"));
+  command(tr("New"), QStringLiteral("file.new_choice")); // PureCAD: What do you want to create?
   command(tr("Open"), QStringLiteral("file.open"));
   command(tr("Recover"), QStringLiteral("file.recover"));
   side->addWidget(new StartSideRule);
