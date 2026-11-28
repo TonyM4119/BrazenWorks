@@ -3572,6 +3572,18 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
     }
     if (!start.values.isEmpty()) session->setRepeatSettings(start);
   }
+  // PureCAD: Preferences › Tools › Use the previous Solid Fillet radius default.
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.fillet") &&
+      QSettings().value(QStringLiteral("tools/previousFilletDefault"), false).toBool()) {
+    if (const auto found = m_repeatSettings.constFind(def.id); found != m_repeatSettings.cend()) {
+      const QString last = found.value().values.value(QStringLiteral("radius"));
+      if (!last.isEmpty()) {
+        PanelSettings start;
+        start.values.insert(QStringLiteral("radius"), last);
+        session->setRepeatSettings(start);
+      }
+    }
+  }
   m_repeatCommand.clear();
 #ifdef MITCAD_MACOS_NATIVE_UI
   if (m_nativeWindow) {

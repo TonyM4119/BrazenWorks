@@ -13,6 +13,7 @@
 #include <QMouseEvent>
 #include <QPainter>
 #include <QPainterPath>
+#include <QSettings>
 #include <QStringList>
 #include <QToolTip>
 #include <QtLogging>
@@ -665,7 +666,19 @@ ManipulatorOverlay::DragValue ManipulatorOverlay::valueAt(const Handle& handle, 
     const double step = niceHandleStep(3.0 * pixelSize(m.origin));
     return {step > 0.0 ? std::round(raw / step) * step : raw, raw};
   }
-  const double degree = kPi / 180.0;
+  double degree = kPi / 180.0;
+  // PureCAD: Preferences › Tools › Near-axis and Far-axis steps. With the
+  // pointer inside the ring the coarse step, outside it the fine one; whole
+  // degrees as before until the preference has been saved.
+  const QSettings store;
+  if (store.contains(QStringLiteral("tools/nearAxisStep"))) {
+    const QPointF c = m_viewer.toWidgetF(m.origin);
+    const QPointF rim = m_viewer.toWidgetF(m.origin.Translated(gp_Vec(m.reference) * ringRadius(m))) - c;
+    const bool near = std::hypot(position.x() - c.x(), position.y() - c.y()) <= std::hypot(rim.x(), rim.y());
+    const double chosen = near ? store.value(QStringLiteral("tools/nearAxisStep"), 10.0).toDouble()
+                               : store.value(QStringLiteral("tools/farAxisStep"), 0.1).toDouble();
+    if (chosen > 0.0) degree = chosen * kPi / 180.0;
+  }
   return {std::round(raw / degree) * degree, raw};
 }
 
