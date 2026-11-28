@@ -77,6 +77,7 @@
 
 class OpenGl_Context;
 class QNativeGestureEvent;
+class QTouchEvent;
 class QOpenGLContext;
 class QPainter;
 class QSurface;
@@ -1611,7 +1612,13 @@ private:
   // The keys that decide a press on the view (mitcad#1571): those of the
   // press that put the first button down, while a button is held; the keys
   // held now otherwise.
-  Qt::KeyboardModifiers pressKeys(Qt::KeyboardModifiers live) const { return m_buttonKeys.value_or(live); }
+  // Fork: unless A drag keeps the navigation it started with is off.
+  Qt::KeyboardModifiers pressKeys(Qt::KeyboardModifiers live) const {
+    return m_navigation.dragKeepsNavigation ? m_buttonKeys.value_or(live) : live;
+  }
+  // Fork: a touch screen's fingers (Touchscreen navigation): OCCT's touch
+  // navigation, one finger orbiting, two panning and zooming.
+  bool touchNavigation(QTouchEvent* event);
   // Whether a press, a drag, a held F4 or a scroll's drag is under way:
   // what a window losing the activation ends (mitcad#1573).
   bool pointerInteractionHeld() const;
@@ -2314,6 +2321,9 @@ private:
   QPointF m_panRemainder;
   bool m_pointerMoving = false; // in UpdateMousePosition: a drag zoom's step
   bool m_f4Press = false;
+  // Fork: a side button's drag under way (1 back, 2 forward): the view takes
+  // it as a drag of the middle button with flags of its own.
+  int m_sidePress = 0;
   // An orbit goes on past the edge of the screen, on the screen it began.
   OrbitWrap m_orbitWrap;
   QPointer<QScreen> m_orbitScreen;

@@ -78,6 +78,7 @@
 #include <QKeySequence>
 #include <QMouseEvent>
 #include <QNativeGestureEvent>
+#include <QTouchEvent>
 #include <QOpenGLContext>
 #include <QOpenGLFunctions>
 #include <QPainter>
@@ -311,6 +312,10 @@ constexpr Aspect_VKeyFlags kCtrlShift = Aspect_VKeyFlags_CTRL | Aspect_VKeyFlags
 // drag does.
 constexpr Aspect_VKeyFlags kScrollPan = Aspect_VKeyFlags_META | Aspect_VKeyFlags_SHIFT;
 constexpr Aspect_VKeyFlags kScrollOrbit = Aspect_VKeyFlags_META | Aspect_VKeyFlags_CTRL;
+// Fork: a side button's drag (Side button drag): the middle button's with
+// flags no key gives.
+constexpr Aspect_VKeyFlags kSideBackDrag = Aspect_VKeyFlags_META | Aspect_VKeyFlags_ALT | Aspect_VKeyFlags_SHIFT;
+constexpr Aspect_VKeyFlags kSideForwardDrag = Aspect_VKeyFlags_META | Aspect_VKeyFlags_ALT | Aspect_VKeyFlags_CTRL;
 // A scroll that pauses this long ends its drag (ms).
 constexpr int kScrollEndMilliseconds = 150;
 // The zoom steps (what a wheel notch of 15 gives, about 15 %) of a pixel of
@@ -8529,7 +8534,10 @@ void OcctViewer::bindGestures() {
   auto& gestures = ChangeMouseGestureMap();
   gestures.Clear();
   // A window selection with or without the keys that add to a selection.
-  gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
+  // Fork: Left drag Nothing: a plain left drag selects no window.
+  if (m_navigation.leftDrag != DragOverride::Nothing) {
+    gestures.Bind(Aspect_VKeyMouse_LeftButton, AIS_MouseGesture_SelectRectangle);
+  }
   gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_CTRL,
                 AIS_MouseGesture_SelectRectangle);
   gestures.Bind(Aspect_VKeyMouse_LeftButton | Aspect_VKeyFlags_SHIFT,
@@ -8562,6 +8570,13 @@ void OcctViewer::bindGestures() {
     const auto flags = binding.f4 ? kF4Drag : toVKeyFlags(binding.modifiers);
     gestures.Bind(button | flags, gesture(binding.action));
   }
+  // Fork: the side buttons' drags.
+  if (const NavigationAction back = sideButtonAction(m_navigation.backDrag); back != NavigationAction::None) {
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton | kSideBackDrag, gesture(back));
+  }
+  if (const NavigationAction forward = sideButtonAction(m_navigation.forwardDrag); forward != NavigationAction::None) {
+    gestures.Bind(Aspect_VKeyMouse_MiddleButton | kSideForwardDrag, gesture(forward));
+  }
   if (m_navigation.scheme == NavigationScheme::Trackpad ||
       m_navigation.scheme == NavigationScheme::TrackpadShift ||
       m_navigation.scheme == NavigationScheme::Custom) {
@@ -8586,7 +8601,9 @@ void OcctViewer::setNavigation(const NavigationSettings& settings) {
   m_panRemainder = {};
   bindGestures();
   SetOrbitAcceleration(float(m_navigation.orbitSpeed));
-  SetLockOrbitZUp(settings.constrainedOrbit);
+  // Fork: the turntable turns about the vertical axis unless that is off.
+  SetLockOrbitZUp(settings.constrainedOrbit && settings.turnAroundVertical);
+  setAttribute(Qt::WA_AcceptTouchEvents, settings.touchscreen);
   emit navigationChanged(); // the 3D mouse follows (mitcad#951)
 }
 
@@ -10604,12 +10621,20 @@ std::optional<gp_Pnt2d> OcctViewer::sketchPlanePoint(const QPointF& position) co
 // While a sketch tool is active, the left button belongs to it, not to
 // OCCT, except on the orientation cube.
 Aspect_VKeyMouse OcctViewer::viewButtons(Qt::MouseButtons buttons) const {
-  return toVKeyMouse(m_sketchInput && !m_cubePress ? (buttons & ~Qt::LeftButton) : buttons);
+  Aspect_VKeyMouse shown = toVKeyMouse(m_sketchInput && !m_cubePress ? (buttons & ~Qt::LeftButton) : buttons);
+  // Fork: a side button's drag is the middle button's.
+  if (m_sidePress != 0 && (buttons & (m_sidePress == 1 ? Qt::BackButton : Qt::ForwardButton))) {
+    shown |= Aspect_VKeyMouse_MiddleButton;
+  }
+  return shown;
 }
 
 // Cube and F4 drags use separate synthetic flags, so custom F4 actions
 // cannot replace the cube's orbit gesture.
 Aspect_VKeyFlags OcctViewer::viewFlags(Qt::KeyboardModifiers modifiers) const {
+  if (m_sidePress != 0) {
+    return m_sidePress == 1 ? kSideBackDrag : kSideForwardDrag;
+  }
   return m_f4Press ? kF4Drag : m_cubePress ? kCubeDrag : toVKeyFlags(modifiers);
 }
 
@@ -10667,6 +10692,7 @@ void OcctViewer::updateCursor(bool log) {
 }
 
 void OcctViewer::cancelPointerInteraction() {
+  m_sidePress = 0;
   disarmPickList(); // a press cut off opens no pick list (mitcad#1703)
   endScrollDrag();
   ResetViewInput();
@@ -10737,6 +10763,42 @@ void OcctViewer::buttonsReleased() {
   }
 }
 
+bool OcctViewer::touchNavigation(QTouchEvent* event) {
+  if (m_view.IsNull()) {
+    return false;
+  }
+  // Each finger a touch point of OCCT's own navigation (AIS_ViewController:
+  // one finger orbits, two pan and pinch-zoom), keyed by the finger's id.
+  for (const QEventPoint& point : event->points()) {
+    const NCollection_Vec2<double> at(toDevicePixels(point.position()).x(), toDevicePixels(point.position()).y());
+    const auto id = Standard_Size(point.id());
+    switch (point.state()) {
+    case QEventPoint::State::Pressed:
+      AddTouchPoint(id, at);
+      break;
+    case QEventPoint::State::Updated:
+      UpdateTouchPoint(id, at);
+      break;
+    case QEventPoint::State::Released:
+      RemoveTouchPoint(id);
+      break;
+    default:
+      break;
+    }
+  }
+  if (event->type() == QEvent::TouchCancel) {
+    for (const QEventPoint& point : event->points()) {
+      RemoveTouchPoint(Standard_Size(point.id()));
+    }
+  }
+  if (event->type() == QEvent::TouchBegin) {
+    qDebug().noquote() << QStringLiteral("Touch navigation: %1 finger(s)").arg(event->points().size());
+  }
+  requestFrame();
+  event->accept();
+  return true;
+}
+
 bool OcctViewer::event(QEvent* event) {
   if (headlessUiTest()) {
     // Reparenting and layout changes can show this widget without calling
@@ -10749,6 +10811,13 @@ bool OcctViewer::event(QEvent* event) {
   if (event->type() == QEvent::NativeGesture) {
     nativeGesture(static_cast<QNativeGestureEvent*>(event));
     return true;
+  }
+  // Fork: Touchscreen navigation.
+  if (m_navigation.touchscreen && (event->type() == QEvent::TouchBegin || event->type() == QEvent::TouchUpdate ||
+                                   event->type() == QEvent::TouchEnd || event->type() == QEvent::TouchCancel)) {
+    if (touchNavigation(static_cast<QTouchEvent*>(event))) {
+      return true;
+    }
   }
   if (event->type() == QEvent::ShortcutOverride && m_spaceMouseWheel.duringMotion(spaceMouseNow())) {
     // Every key pressed in the view comes here first, a shortcut's too: a
@@ -10848,6 +10917,25 @@ void OcctViewer::mousePressEvent(QMouseEvent* event) {
     return;
   }
   m_pointerModifiers = event->modifiers();
+  // Fork: Middle double-click goes Home or fits.
+  if (event->type() == QEvent::MouseButtonDblClick && event->button() == Qt::MiddleButton &&
+      m_navigation.middleDoubleClick != MiddleDoubleClick::Nothing) {
+    qDebug().noquote() << QStringLiteral("Middle double-click: %1")
+                              .arg(m_navigation.middleDoubleClick == MiddleDoubleClick::Home ? QStringLiteral("Home")
+                                                                                             : QStringLiteral("Fit"));
+    if (m_navigation.middleDoubleClick == MiddleDoubleClick::Home) {
+      goHome();
+    } else {
+      fitAll();
+    }
+    return;
+  }
+  // Fork: a side button whose drag does something drags as the middle one.
+  if (event->button() == Qt::BackButton || event->button() == Qt::ForwardButton) {
+    const bool back = event->button() == Qt::BackButton;
+    const NavigationAction side = sideButtonAction(back ? m_navigation.backDrag : m_navigation.forwardDrag);
+    m_sidePress = side == NavigationAction::None ? 0 : (back ? 1 : 2);
+  }
   disarmPickList(); // another button too: a held left press lists nothing
   if (event->buttons() == event->button()) {
     resetOrbitWrap(); // the first button: a new drag
@@ -11006,6 +11094,15 @@ void OcctViewer::endOccurrenceDrag(const QPointF& position, bool cancelled) {
 
 void OcctViewer::mouseReleaseEvent(QMouseEvent* event) {
   QOpenGLWidget::mouseReleaseEvent(event);
+  // Fork: a side button's drag ends with its release, however the release
+  // goes on.
+  struct SideRelease {
+    OcctViewer* viewer;
+    bool side;
+    ~SideRelease() {
+      if (side) viewer->m_sidePress = 0;
+    }
+  } sideRelease{this, event->button() == Qt::BackButton || event->button() == Qt::ForwardButton};
   if (ignoresClickWithoutGraphics(event, "release")) {
     return;
   }
@@ -11224,8 +11321,8 @@ void OcctViewer::mouseMoveEvent(QMouseEvent* event) {
 // edge as before. With two screens side by side the shared edge jumps too:
 // the cursor stays on the screen the orbit is on (mitcad#2188).
 void OcctViewer::wrapOrbitCursor(const QMouseEvent* event) {
-  if (myMouseActiveGesture != AIS_MouseGesture_RotateOrbit || event->source() != Qt::MouseEventNotSynthesized ||
-      !m_orbitWrap.canJump()) {
+  if (!m_navigation.wrapCursor || myMouseActiveGesture != AIS_MouseGesture_RotateOrbit ||
+      event->source() != Qt::MouseEventNotSynthesized || !m_orbitWrap.canJump()) {
     return;
   }
   const QPointF from = event->globalPosition();

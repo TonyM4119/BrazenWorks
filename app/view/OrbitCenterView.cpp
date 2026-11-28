@@ -6,6 +6,7 @@
 // orbit starts (Cursor). A marker shows the fixed center while it is set,
 // and a Cursor orbit's point while it turns; drawn over the bodies and
 // never picked.
+#include <QGuiApplication>
 #include <cmath>
 
 #include <QtLogging>
@@ -69,6 +70,29 @@ gp_Pnt OcctViewer::GravityPoint(const occ::handle<AIS_InteractiveContext>& conte
   if (input.OrbitRotation.ToRotate && !input.OrbitRotation.ToStart && m_lastOrbitPivot) {
     return *m_lastOrbitPivot;
   }
+  // Fork: as an orbit starts, a held free-orbit key lets a turntable orbit
+  // turn freely, and a rolled view stands upright first (Orbiting stands a
+  // rolled view upright).
+  if (input.OrbitRotation.ToStart && !m_cubePress) {
+    const Qt::KeyboardModifiers freeKey = heldKeyModifier(m_navigation.freeOrbitKey);
+    const bool free = freeKey != Qt::NoModifier && QGuiApplication::queryKeyboardModifiers().testFlag(
+                                                       static_cast<Qt::KeyboardModifier>(int(freeKey)));
+    const bool turntable = m_navigation.constrainedOrbit && !free;
+    SetLockOrbitZUp(turntable && m_navigation.turnAroundVertical);
+    if (turntable && m_navigation.uprightAfterRoll) {
+      const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
+      const gp_Vec direction(camera->Direction());
+      const gp_Vec z(0.0, 0.0, 1.0);
+      const gp_Vec upright = z - direction * z.Dot(direction);
+      if (upright.Magnitude() > 1e-6 && camera->Up().Angle(gp_Dir(upright)) > 1e-3) {
+        camera->SetUp(gp_Dir(upright));
+        qDebug().noquote() << QStringLiteral("Orbit: the rolled view stood upright");
+      }
+    }
+    if (free) {
+      qDebug().noquote() << QStringLiteral("Orbit: free, its key held");
+    }
+  }
   // The cube's drag starts on the cube: no model point under it.
   std::optional<NCollection_Vec2<int>> cursor;
   if (!m_cubePress) {
@@ -89,19 +113,28 @@ gp_Pnt OcctViewer::orbitPivot(const std::optional<NCollection_Vec2<int>>& cursor
     const gp_Pnt origin(0.0, 0.0, 0.0);
     m_lastOrbitPivot = origin;
     qDebug().noquote() << QStringLiteral("Orbit about the origin");
+    if (m_navigation.markOrbitPoint) {
+      showOrbitMarker(origin);
+    }
     return origin;
   }
   if (m_navigation.orbitCenter == OrbitCenter::Cursor && cursor) {
     if (const std::optional<gp_Pnt> under = modelPointAt(*cursor)) {
       m_lastOrbitPivot = under;
       qDebug().noquote() << QStringLiteral("Orbit about the point under the cursor at %1").arg(pointText(*under));
-      showOrbitMarker(under);
+      if (m_navigation.markOrbitPoint) {
+        showOrbitMarker(under);
+      }
       return *under;
     }
   }
   // The middle of what is shown: OCCT's own (the shown objects' box).
   const gp_Pnt middle = AIS_ViewController::GravityPoint(m_context, m_view);
   m_lastOrbitPivot = middle;
+  // Fork: Mark the orbit point, the view's middle too.
+  if (m_navigation.markOrbitPoint && m_navigation.orbitCenter == OrbitCenter::Model) {
+    showOrbitMarker(middle);
+  }
   if (m_navigation.orbitCenter == OrbitCenter::Cursor) {
     qDebug().noquote() << QStringLiteral("Orbit about the model's middle at %1: nothing under the cursor")
                               .arg(pointText(middle));
