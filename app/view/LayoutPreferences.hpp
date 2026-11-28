@@ -7,6 +7,7 @@
 // rows PureCAD's Display page had for these move here (addExisting).
 
 #include "LayoutSettings.hpp"
+#include "../framework/CommandLayout.hpp"
 #include "../framework/UiSizes.hpp"
 
 #include <functional>
@@ -142,6 +143,9 @@ public:
     scroll->viewport()->setAutoFillBackground(false);
     outer->addWidget(scroll);
 
+    // The tabs' chips show and hide the tabs as the tab bar's own menu does
+    // (CommandLayoutStore's hidden tabs, mitcad#1975).
+    m_settings.hiddenTabs = CommandLayoutStore::instance().userLayer().hiddenTabs;
     buildPanelLayout();
     buildWindow();
     buildDesignTabs();
@@ -169,6 +173,16 @@ public:
   const LayoutSettings& chosen() const { return m_settings; }
   // Saves the settings and tells who follows them (Apply and OK).
   void commit() {
+    LayoutUserLayer layer = CommandLayoutStore::instance().userLayer();
+    QStringList before = layer.hiddenTabs;
+    QStringList after = m_settings.hiddenTabs;
+    before.sort();
+    after.sort();
+    if (before != after) {
+      layer.hiddenTabs = m_settings.hiddenTabs;
+      CommandLayoutStore::instance().setUserLayer(layer);
+      qDebug().noquote() << QStringLiteral("Preferences: toolbar tabs hidden: %1").arg(after.join(QStringLiteral(", ")));
+    }
     m_settings.save();
     notifyLayoutSettings(m_settings);
     qDebug().noquote() << QStringLiteral("Preferences: layout saved");

@@ -90,6 +90,12 @@ public:
     // layout (mitcad#1932: the Browser's card with the Rows background
     // follows its rows); 0 or less, or null: `width`.
     std::function<int(int viewWidth)> widthFor = nullptr;
+    // Fork: a bottom centre card's place (Preferences › Layout ›
+    // Navigation bar › Position): 0 at the left of the free width, 1 in its
+    // middle, 2 at its right; at the top of the view below the rows rather
+    // than at its bottom.
+    int align = 1;
+    bool atTop = false;
   };
 
   static constexpr int kMargin = 12;
@@ -136,6 +142,10 @@ public:
   // than one row can be a bar (the toolbar panel under the title row, as in
   // Fusion); a bar right after a bar starts at its bottom, without a gap.
   void setFlushRow(QWidget* row);
+  // Fork: Preferences › Layout › Notices: the message band at the bottom
+  // right, at most kBandRightWidth wide, rather than across the bottom.
+  static constexpr int kBandRightWidth = 460;
+  void setBandAtRight(bool right);
   // A top row hidden by the user (mitcad#2426: View › Toolbar Panel hides
   // the toolbar panel's row): not shown whatever its parts are, the rows,
   // the cards and the view's free area below it moving up. With `overlay`
@@ -280,6 +290,7 @@ private:
   bool m_bandQuiet = false;    // Fork: hints held back (showOnlyCards)
   MessageBand* m_bandContent = nullptr;
   QRect m_bandRow; // the row it keeps, from the last layout
+  bool m_bandAtRight = false; // fork: setBandAtRight
   QString m_loggedBand;
 };
 

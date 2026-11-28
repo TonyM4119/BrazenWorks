@@ -1070,6 +1070,7 @@ MainWindow::MainWindow(bool demo, QWidget* parent, bool nativeUi)
   // Look At, Fit, Visual Style and the grid's toggles at the bottom of the
   // view (mitcad#1086, MainWindowNavigationBar.cpp).
   createNavigationBar();
+  followLayoutSettings(); // fork: Preferences › Layout
   // The version over the view's lower right (mitcad#1209).
   m_versionWatermark = new VersionWatermark(m_viewer);
   m_search = new CommandSearch(*m_registry, this);
@@ -4063,7 +4064,10 @@ void MainWindow::openCommandSearch() {
     return;
   }
 #endif
-  m_search->popup(m_viewer->mapToGlobal(m_viewer->rect().center()));
+  // Fork: in the view's middle, or (Preferences › Layout) below its top.
+  const QRect view = m_viewer->rect();
+  const QPoint at = m_searchCentered ? view.center() : QPoint(view.center().x(), view.top() + view.height() / 5);
+  m_search->popup(m_viewer->mapToGlobal(at));
 }
 
 void MainWindow::editShortcuts(const QString& id) {

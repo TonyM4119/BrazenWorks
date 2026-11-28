@@ -118,6 +118,7 @@ class RemoteController;
 class LiveController;
 class ModeBanner;
 class NavigationBar;
+struct LayoutSettings;
 class Ribbon;
 class SelectionFilterPanel;
 class SelectionCreatePanel;
@@ -2157,6 +2158,11 @@ private:
   // cards then).
   void createNavigationBar();
   void updateNavigationBar();
+  // Fork: Preferences › Layout applied to the window (MainWindowLayout.cpp),
+  // now and whenever its settings are saved.
+  void applyLayoutSettings(const LayoutSettings& layout);
+  void followLayoutSettings();
+  bool m_searchCentered = true; // Layout › Open Search commands centered
   NavigationBar* m_navigationBar = nullptr;
   GlassCard* m_navigationCard = nullptr;
   // MitCad's version over the view's lower right (mitcad#1209); it keeps

@@ -28,7 +28,7 @@ struct LayoutSettings {
   bool legacySurfaceToolbar = false;
   bool largeMenuIcons = false;          // Menus: List or Large icons
   bool groupConstructByEntity = true;   // Construct's menu in Planes, Axes, Points
-  bool noticesCentered = false;         // Notices: Bottom right or Bottom center
+  bool noticesCentered = true;          // Notices: Bottom right or Bottom center (centred as before)
   bool statusBar = false;
   bool operationsInView = true;         // a running operation's progress over the view
   bool waitForFiles = false;            // a file opens before the window takes input
@@ -83,7 +83,7 @@ struct LayoutSettings {
   bool highlightActiveCommands = true;
   bool onlyRibbonTabs = false;
   bool panelMenusOnHover = false;
-  bool searchCentered = false;
+  bool searchCentered = true;           // in the view's middle as before, else below its top
   // NAVIGATION BAR
   int navigationIdle = 1;               // 0 Always visible, 1 Fade, 2 Hide until hovered
   int navigationPosition = 4;           // 0..2 top left, centre, right; 3..5 bottom

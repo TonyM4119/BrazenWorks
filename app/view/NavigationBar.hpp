@@ -73,6 +73,9 @@ public:
   // The widget whose place and visibility the log reports: the card that
   // holds the bar in the Floating layout (null: the bar itself).
   void setHolder(QWidget* holder);
+  // Fork: Preferences › Layout › Navigation bar: smaller buttons, and the
+  // commands' names beside their icons.
+  void setLook(bool compact, bool labels);
 
   // The commands pinned to the bar (mitcad#1589), saved at once and logged
   // (above). An id is the command's or an alias's; sketch.parameters is
@@ -127,6 +130,8 @@ private:
   CommandRegistry& m_registry;
   Presentation m_presentation;
   QWidget* m_holder = nullptr;
+  bool m_compact = false; // fork: setLook
+  bool m_labels = false;
   QList<QToolButton*> m_buttons; // in the bar's order
   QToolButton* m_style = nullptr;
   QMenu* m_styleMenu = nullptr;
