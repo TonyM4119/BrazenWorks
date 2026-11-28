@@ -11,11 +11,18 @@
 #include <QStatusBar>
 #include <QPointer>
 #include <QTimer>
+#include <QToolButton>
 
+#include "framework/AppTheme.hpp"
+#include "framework/CommandRegistry.hpp"
 #include "framework/FloatingLayout.hpp"
 #include "framework/IconSizeStyle.hpp"
 #include "framework/Ribbon.hpp"
 #include "framework/GlassCard.hpp"
+#include "browser/BrowserController.hpp"
+#include "browser/BrowserPanel.hpp"
+#include "browser/TimelineWidget.hpp"
+#include "view/LayoutPreferences.hpp"
 #include "view/LayoutSettings.hpp"
 #include "view/NavigationBar.hpp"
 
@@ -68,6 +75,18 @@ private:
   int m_mode = 0;
 };
 
+// A card's idle look (above), made the first time. No Q_OBJECT here, so not
+// found by findChild<NavigationIdle*>: by its name among the card's own
+// children.
+NavigationIdle* idleOf(GlassCard* card) {
+  for (QObject* child : card->children()) {
+    if (child->objectName() == QLatin1String("navigationIdle")) {
+      return static_cast<NavigationIdle*>(child);
+    }
+  }
+  return new NavigationIdle(card);
+}
+
 } // namespace
 
 void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
@@ -106,6 +125,18 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
   if (m_ribbon != nullptr) {
     m_ribbon->setGroupsShown(layout.ribbon);
   }
+  // Window › Ribbon › Only when hovered: View › Toolbar Panel hidden, shown
+  // at the view's top edge (MainWindowToolbarPanel.cpp).
+  if (layout.ribbonOnHover != m_toolbarPanelHidden) {
+    setToolbarPanelHiddenEverywhere(layout.ribbonOnHover);
+  }
+  // Window › Other panels: the Browser's and the History's cards hidden
+  // until the pointer is over them, as the navigation bar's can be.
+  for (QWidget* panel : {findChild<QWidget*>(QStringLiteral("browserDock")), static_cast<QWidget*>(m_timelineCard.data())}) {
+    if (auto* card = qobject_cast<GlassCard*>(panel)) {
+      idleOf(card)->setMode(layout.otherPanelsOnHover ? 2 : 0);
+    }
+  }
   // Window › Status bar: the Floating layout's status line at the bottom of
   // the window (the Docked layout always has one: it holds the navigation
   // bar).
@@ -123,6 +154,9 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
   // Navigation bar › Position, When idle, Size, Buttons.
   if (m_navigationBar != nullptr) {
     m_navigationBar->setLook(layout.navigationCompact, layout.navigationLabels);
+    // Navigation bar › Items.
+    m_navigationBar->setItems(layout.navigationItems.isEmpty() ? LayoutPreferences::defaultNavigationItems()
+                                                               : layout.navigationItems);
   }
   if (m_navigationCard != nullptr && m_floating != nullptr) {
     FloatingLayout::Sizing sizing;
@@ -130,21 +164,32 @@ void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
     sizing.atTop = layout.navigationPosition < 3;
     sizing.shown = m_navigationCard->isShown();
     m_floating->setCardAnchor(m_navigationCard, FloatingLayout::Anchor::BottomCenter, sizing);
-    // (No Q_OBJECT here, so not found by findChild<NavigationIdle*>: by its
-    // name among the card's own children.)
-    NavigationIdle* idle = nullptr;
-    for (QObject* child : m_navigationCard->children()) {
-      if (child->objectName() == QLatin1String("navigationIdle")) {
-        idle = static_cast<NavigationIdle*>(child);
-      }
-    }
-    if (idle == nullptr) {
-      idle = new NavigationIdle(m_navigationCard);
-    }
-    idle->setMode(layout.navigationIdle);
+    idleOf(m_navigationCard)->setMode(layout.navigationIdle);
     m_floating->requestLayout();
   }
   m_searchCentered = layout.searchCentered;
+  // Panels › Browser tree: the Browser's card or dock.
+  if (auto* browser = findChild<QWidget*>(QStringLiteral("browserDock"))) {
+    if (auto* card = qobject_cast<GlassCard*>(browser)) {
+      card->setSuppressed(!layout.browserTree);
+    } else {
+      browser->setVisible(layout.browserTree);
+    }
+  }
+  // Panels › History: the Play button.
+  if (m_controller != nullptr && m_controller->timeline() != nullptr) {
+    m_controller->timeline()->setPlayButtonShown(layout.playHistoryButton);
+    // Fold the History bar into groups: turned on, the groups there fold.
+    if (layout.foldHistoryGroups && !timelineFoldsGroups()) {
+      for (const TimelineWidget::ShownGroup& group : m_controller->timeline()->shownGroups()) {
+        m_controller->timeline()->setGroupCollapsed(group.name, true);
+      }
+    }
+    timelineFoldsGroups() = layout.foldHistoryGroups;
+  }
+  // Panels › Browser: how rows start, for the rows made from now on.
+  browserOpenDefaults().componentsOpen = layout.componentsStartOpen;
+  browserOpenDefaults().rowsClosed = layout.rowsStartClosed;
   qDebug().noquote() << QStringLiteral("Layout applied: on top %1, card headers %2, notices %3, navigation bar %4 idle %5%6%7")
                             .arg(layout.keepOnTop ? QStringLiteral("yes") : QStringLiteral("no"))
                             .arg(layout.cardHeaders)
@@ -169,6 +214,35 @@ void MainWindow::followLayoutSettings() {
       self->applyLayoutSettings(layout);
     }
   });
+}
+
+void MainWindow::markActiveCommand(const QString& id) {
+  // The buttons tinted before go back to their own look.
+  const QList<QToolButton*> buttons = findChildren<QToolButton*>();
+  for (QToolButton* button : buttons) {
+    if (button->property("purecadActiveCommand").toBool()) {
+      button->setStyleSheet(button->property("purecadOwnStyle").toString());
+      button->setProperty("purecadActiveCommand", false);
+    }
+  }
+  if (id.isEmpty() || !LayoutSettings::load().highlightActiveCommands) {
+    return;
+  }
+  const QAction* action = m_registry->action(id);
+  if (action == nullptr) {
+    return;
+  }
+  QColor tint = accentColor(palette());
+  tint.setAlpha(60);
+  for (QToolButton* button : buttons) {
+    if (button->defaultAction() == action && button->isVisible()) {
+      button->setProperty("purecadOwnStyle", button->styleSheet());
+      button->setProperty("purecadActiveCommand", true);
+      button->setStyleSheet(button->styleSheet() +
+                            QStringLiteral(" QToolButton { background: %1; border-radius: 6px; }")
+                                .arg(tint.name(QColor::HexArgb)));
+    }
+  }
 }
 
 } // namespace mitcad

@@ -38,7 +38,7 @@ struct LayoutSettings {
   bool pauseDrawingWhileDragged = false;
   bool windowButtons = true;            // minimize, maximize and close in the title bar
   bool ribbon = true;                   // the toolbar's panel of groups
-  bool ribbonOnHover = true;            // ... only when hovered or focused (Compact)
+  bool ribbonOnHover = false;           // ... only when hovered (View › Toolbar Panel hidden, its own setting)
   bool otherPanelsOnHover = false;      // ... and the other panels too
   bool topBarAtEdge = false;            // Top bar: Always or At top edge
   int cardHeaders = 0;                  // 0 Always, 1 On hover, 2 Hidden
@@ -67,7 +67,7 @@ struct LayoutSettings {
   bool originAndBodiesOnTop = false;
   bool historyByComponent = true;
   bool featureMenusWholeSelection = true;
-  bool componentsStartOpen = false;
+  bool componentsStartOpen = true;   // as the Browser always started (PureCAD)
   bool rowsStartClosed = false;
   bool eyeBesideArrow = false;
   bool featuresUnderBodies = false;
@@ -119,7 +119,9 @@ struct LayoutSettings {
     s.pauseDrawingWhileDragged = flag("pauseDrawingWhileDragged", s.pauseDrawingWhileDragged);
     s.windowButtons = flag("windowButtons", s.windowButtons);
     s.ribbon = flag("ribbon", s.ribbon);
-    s.ribbonOnHover = flag("ribbonOnHover", s.ribbonOnHover);
+    // PureCAD: the toolbar panel hidden, shown at the view's top edge, is
+    // View › Toolbar Panel's own setting (Ctrl+F1 changes it too).
+    s.ribbonOnHover = store.value(QStringLiteral("view/toolbarPanelHidden"), false).toBool();
     s.otherPanelsOnHover = flag("otherPanelsOnHover", s.otherPanelsOnHover);
     s.topBarAtEdge = flag("topBarAtEdge", s.topBarAtEdge);
     s.cardHeaders = number("cardHeaders", s.cardHeaders, 0, 2);
@@ -189,7 +191,6 @@ struct LayoutSettings {
     put("pauseDrawingWhileDragged", pauseDrawingWhileDragged);
     put("windowButtons", windowButtons);
     put("ribbon", ribbon);
-    put("ribbonOnHover", ribbonOnHover);
     put("otherPanelsOnHover", otherPanelsOnHover);
     put("topBarAtEdge", topBarAtEdge);
     put("cardHeaders", cardHeaders);

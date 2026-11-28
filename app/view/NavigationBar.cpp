@@ -6,6 +6,7 @@
 #include <QContextMenuEvent>
 #include <QCursor>
 #include <QEvent>
+#include <QFrame>
 #include <QHBoxLayout>
 #include <QMenu>
 #include <QMouseEvent>
@@ -629,6 +630,61 @@ void NavigationBar::logNow() {
     m_loggedStates = line;
     qDebug().noquote() << line;
   }
+}
+
+void NavigationBar::setItems(const QStringList& items) {
+  auto* row = static_cast<QHBoxLayout*>(layout());
+  for (QToolButton* button : std::as_const(m_fixedButtons)) row->removeWidget(button);
+  for (QWidget* line : std::as_const(m_itemLines)) {
+    row->removeWidget(line);
+    delete line;
+  }
+  m_itemLines.clear();
+  QList<QToolButton*> fixed = m_fixedButtons;
+  QList<QToolButton*> shown;
+  int at = 0;
+  for (const QString& id : items) {
+    if (id == QLatin1String("|")) {
+      auto* line = new QFrame(this);
+      line->setObjectName(QStringLiteral("navigationBarLine"));
+      line->setFrameShape(QFrame::VLine);
+      line->setFixedWidth(1);
+      line->setForegroundRole(QPalette::Mid);
+      row->insertWidget(at++, line);
+      m_itemLines << line;
+      continue;
+    }
+    QToolButton* button = nullptr;
+    for (QToolButton* candidate : std::as_const(fixed)) {
+      if (candidate->objectName() == QStringLiteral("navigationBar_") + id) button = candidate;
+    }
+    if (button == nullptr) {
+      button = addCommand(id); // at the row's end, moved below
+      if (button == nullptr) continue;
+      row->removeWidget(button);
+      m_buttons.removeAll(button);
+      fixed << button;
+    }
+    if (shown.contains(button)) continue;
+    row->insertWidget(at++, button);
+    button->show();
+    shown << button;
+  }
+  for (QToolButton* button : std::as_const(fixed)) {
+    if (!shown.contains(button)) {
+      row->insertWidget(at++, button);
+      button->hide();
+    }
+  }
+  // The bar's order for its log and pins: the items shown, then the rest.
+  QList<QToolButton*> pinned = m_buttons;
+  for (QToolButton* button : std::as_const(m_fixedButtons)) pinned.removeAll(button);
+  m_fixedButtons = shown;
+  for (QToolButton* button : std::as_const(fixed)) {
+    if (!shown.contains(button)) m_fixedButtons << button;
+  }
+  m_buttons = m_fixedButtons + pinned;
+  requestLog();
 }
 
 } // namespace mitcad

@@ -3480,6 +3480,7 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
     return;
   }
   m_messages->commandStarted(); // an edit too (mitcad#1042)
+  markActiveCommand(def.id); // PureCAD: Highlight active commands
   // A panel works in the 3D view: back from a drawing (mitcad#707).
   leaveDrawing();
   // The sketch a feature command leaves (mitcad#1227), shown once its card
@@ -3848,6 +3849,7 @@ bool MainWindow::chooseInCommand(const QString& command, const QString& input, c
 
 void MainWindow::onCommandFinished(bool committed) {
   clearNativeCommandContinuation();
+  markActiveCommand(QString()); // PureCAD
 #ifdef MITCAD_MACOS_NATIVE_UI
   if (m_nativeWindow) {
     m_nativeWindow->setInspectorView(nullptr);

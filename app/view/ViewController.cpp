@@ -4381,6 +4381,51 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
       Q_UNUSED(label);
     }
   }
+  // Fork: Layout options that are another control's setting follow that
+  // control both ways, and it keeps its saving: Show History in the Browser
+  // is the Timeline's History list, Eye beside the fold arrow the Browser
+  // eye's Classic place, Sketches in History the General page's used
+  // sketches under their features.
+  {
+    const auto mirrorBox = [](QCheckBox* box, std::function<bool()> other, std::function<void(bool)> setOther) {
+      if (box == nullptr) return;
+      box->setChecked(other());
+      QObject::connect(box, &QCheckBox::toggled, box, [setOther](bool on) { setOther(on); });
+    };
+    QCheckBox* history = layoutPage->findChild<QCheckBox*>(QStringLiteral("layout_historyInBrowser"));
+    const int listIndex = timelineChoice->findData(timelinePresentationId(TimelinePresentation::HistoryList));
+    mirrorBox(history, [timelineChoice, listIndex] { return timelineChoice->currentIndex() == listIndex; },
+              [timelineChoice, listIndex](bool on) {
+                const int strip = timelineChoice->findData(timelinePresentationId(TimelinePresentation::Strip));
+                timelineChoice->setCurrentIndex(on ? listIndex : strip);
+              });
+    if (history != nullptr) {
+      connect(timelineChoice, &QComboBox::currentIndexChanged, history,
+              [history, listIndex](int index) { history->setChecked(index == listIndex); });
+    }
+    QCheckBox* eye = layoutPage->findChild<QCheckBox*>(QStringLiteral("layout_eyeBesideArrow"));
+    const int classic = browserEyePlaceChoice->findData(browserControlPlaceId(BrowserControlPlace::Classic));
+    const int right = browserEyePlaceChoice->findData(browserControlPlaceId(BrowserControlPlace::Right));
+    mirrorBox(eye, [browserEyePlaceChoice, classic] { return browserEyePlaceChoice->currentIndex() == classic; },
+              [browserEyePlaceChoice, classic, right](bool on) {
+                browserEyePlaceChoice->setCurrentIndex(on ? classic : right);
+              });
+    if (eye != nullptr) {
+      connect(browserEyePlaceChoice, &QComboBox::currentIndexChanged, eye,
+              [eye, classic](int index) { eye->setChecked(index == classic); });
+    }
+    if (QWidget* sketches = layoutPage->findChild<QWidget*>(QStringLiteral("layout_sketchesUnderFeature"))) {
+      if (auto* group = sketches->findChild<QButtonGroup*>()) {
+        if (QAbstractButton* button = group->button(consumeSketches->isChecked() ? 1 : 0)) button->setChecked(true);
+        connect(group, &QButtonGroup::idClicked, consumeSketches, [consumeSketches](int id) {
+          consumeSketches->setChecked(id == 1);
+        });
+        connect(consumeSketches, &QCheckBox::toggled, group, [group](bool on) {
+          if (QAbstractButton* button = group->button(on ? 1 : 0)) button->setChecked(true);
+        });
+      }
+    }
+  }
   if (window != nullptr) {
     layoutPage->onChanged = [layoutPage] { layoutPage->commit(); };
   } else {
