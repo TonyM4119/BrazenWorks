@@ -409,6 +409,11 @@ endif()
 # Narrow strings as UTF-8 on Windows too: the paths the application hands
 # the bridge and the geometry as std::string (cmake/Utf8CodePage.cmake).
 mitcad_utf8_code_page(mitcad)
+# Fork: Preferences (view/ViewController.cpp) outgrew MSVC's default
+# section count in one object file (C1128).
+if(MSVC)
+  set_source_files_properties(view/ViewController.cpp PROPERTIES COMPILE_OPTIONS /bigobj)
+endif()
 
 # Sketch selection filters: three states per category, body edges in sight
 # or behind faces, Shift's wider clicks, Project's sources (mitcad#217).

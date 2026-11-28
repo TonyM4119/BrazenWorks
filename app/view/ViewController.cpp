@@ -5214,9 +5214,9 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   {
     const QString active = QSettings().value(QStringLiteral("general/profile")).toString();
     profileName->setText(!active.isEmpty() && QFileInfo::exists(preferenceProfileFile(active)) ? active : tr("None"));
-    auto* card = new QHBoxLayout(profile);
-    card->setContentsMargins(12, 8, 10, 8);
-    card->setSpacing(10);
+    auto* cardRow = new QHBoxLayout(profile);
+    cardRow->setContentsMargins(12, 8, 10, 8);
+    cardRow->setSpacing(10);
     auto* person = new QLabel;
     person->setPixmap(monochromeIcon(themeIcon(QStringLiteral("profile-person"))).pixmap(uiIconSize(16), uiIconSize(16)));
     auto* words = new QVBoxLayout;
@@ -5234,10 +5234,10 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     words->addWidget(profileName);
     auto* chevron = new QLabel(QStringLiteral("\u2304"));
     for (QLabel* part : {person, caps, profileName, chevron}) part->setAttribute(Qt::WA_TransparentForMouseEvents);
-    card->addWidget(person);
-    card->addLayout(words, 1);
-    card->addWidget(chevron);
-    profile->setMinimumHeight(card->sizeHint().height());
+    cardRow->addWidget(person);
+    cardRow->addLayout(words, 1);
+    cardRow->addWidget(chevron);
+    profile->setMinimumHeight(cardRow->sizeHint().height());
   }
   profile->setStyleSheet(QStringLiteral("QPushButton#preferencesProfile { text-align: left; border: 1px solid %1; "
                                         "border-radius: 10px; padding: 0; background: %2; } "
@@ -5369,21 +5369,21 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   apply->setEnabled(false);
   {
     const auto enableApply = [apply] { apply->setEnabled(true); };
-    for (QAbstractButton* control : stack->findChildren<QAbstractButton*>()) {
-      connect(control, &QAbstractButton::clicked, apply, enableApply);
+    for (QAbstractButton* widget : stack->findChildren<QAbstractButton*>()) {
+      connect(widget, &QAbstractButton::clicked, apply, enableApply);
     }
-    for (QComboBox* control : stack->findChildren<QComboBox*>()) {
-      connect(control, &QComboBox::activated, apply, enableApply);
+    for (QComboBox* widget : stack->findChildren<QComboBox*>()) {
+      connect(widget, &QComboBox::activated, apply, enableApply);
     }
-    for (QAbstractSlider* control : stack->findChildren<QAbstractSlider*>()) {
-      connect(control, &QAbstractSlider::sliderMoved, apply, enableApply);
-      connect(control, &QAbstractSlider::actionTriggered, apply, enableApply);
+    for (QAbstractSlider* widget : stack->findChildren<QAbstractSlider*>()) {
+      connect(widget, &QAbstractSlider::sliderMoved, apply, enableApply);
+      connect(widget, &QAbstractSlider::actionTriggered, apply, enableApply);
     }
-    for (QLineEdit* control : stack->findChildren<QLineEdit*>()) {
-      connect(control, &QLineEdit::textEdited, apply, enableApply);
+    for (QLineEdit* widget : stack->findChildren<QLineEdit*>()) {
+      connect(widget, &QLineEdit::textEdited, apply, enableApply);
     }
-    for (QKeySequenceEdit* control : stack->findChildren<QKeySequenceEdit*>()) {
-      connect(control, &QKeySequenceEdit::editingFinished, apply, enableApply);
+    for (QKeySequenceEdit* widget : stack->findChildren<QKeySequenceEdit*>()) {
+      connect(widget, &QKeySequenceEdit::editingFinished, apply, enableApply);
     }
   }
   auto* ok = new QPushButton(tr("OK"));
