@@ -1619,6 +1619,10 @@ private:
   // Fork: a touch screen's fingers (Touchscreen navigation): OCCT's touch
   // navigation, one finger orbiting, two panning and zooming.
   bool touchNavigation(QTouchEvent* event);
+  // Fork: the cube or the axes as Preferences' view navigator says.
+  void applyViewNavigator();
+  // Fork: a fit after a navigator's turn, when Preferences asks for one.
+  void fitAfterNavigator();
   // Whether a press, a drag, a held F4 or a scroll's drag is under way:
   // what a window losing the activation ends (mitcad#1573).
   bool pointerInteractionHeld() const;

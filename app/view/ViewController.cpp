@@ -1624,7 +1624,18 @@ bool ViewController::eventFilter(QObject* watched, QEvent* event) {
       const QList<QLineEdit*> boxes = viewer->findChildren<QLineEdit*>();
       typing = std::any_of(boxes.cbegin(), boxes.cend(), [](const QLineEdit* box) { return box->isVisible(); });
     }
-    if (viewKey && (viewer == nullptr || typing)) {
+    // Fork: Arrow keys move through the Browser off: the Browser's tree
+    // leaves the turn keys to the view.
+    bool browserLeaves = false;
+    if (viewKey && moves && !m_viewer.navigation().arrowKeysBrowser) {
+      for (const QWidget* widget = QApplication::focusWidget(); widget != nullptr; widget = widget->parentWidget()) {
+        if (widget->objectName() == QLatin1String("modelBrowserTree")) {
+          browserLeaves = true;
+          break;
+        }
+      }
+    }
+    if (viewKey && (viewer == nullptr || typing) && !browserLeaves) {
       event->accept();
       return true;
     }
