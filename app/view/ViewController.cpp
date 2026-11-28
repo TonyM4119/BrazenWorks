@@ -363,7 +363,7 @@ const PreferencePage kPreferencePages[] = {
     {"layout", QT_TRANSLATE_NOOP("View", "Layout"),
      "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
      "sub-tab history browser bodies folders dialogs ok cancel toolbar tabs ribbon navigation_bar idle fade",
-     "LOOK", QT_TRANSLATE_NOOP("View", "Where the parts of the window sit."), "toolbar-panel"},
+     "LOOK", QT_TRANSLATE_NOOP("View", "Where the parts of the window sit."), "prefs-layout"},
     // Fork: SolidCraft's Graphics page.
     {"graphics", QT_TRANSLATE_NOOP("View", "Graphics"),
      "graphics preset performance quality curved surfaces smoothness tessellation anti-aliasing antialiasing "
@@ -377,19 +377,19 @@ const PreferencePage kPreferencePages[] = {
      "menu_bar menus hamburger origin_planes origin planes axes size screen model millimetres corner centred "
      "font text_size icon_size interface_size style toolbar_labels selection_color line_width corners dots "
      "drawings small_circles circles boost navigation_bar",
-     "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "appearance"},
+     "LOOK", QT_TRANSLATE_NOOP("View", "Colours, the view, the interface's size and layout."), "prefs-display"},
     // Folders of font files for sketch text (mitcad#473).
     {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
     // Texture folders for Edit Appearances (mitcad#315).
     {"textures", QT_TRANSLATE_NOOP("View", "Textures"),
      "texture folders maps materials appearance images internet online",
-     "LOOK", QT_TRANSLATE_NOOP("View", "Folders of textures for appearances."), "image-reference"},
+     "LOOK", QT_TRANSLATE_NOOP("View", "Folders of textures for appearances."), "prefs-textures"},
     // Fork: SolidCraft's Design page (shown under WORK).
     {"design", QT_TRANSLATE_NOOP("View", "Design"),
      "design units precision decimals parameters kernel check body drawings projection template sheet calibration "
      "orientation z_up y_up import heal export file_name folders origin planes linked assemblies joint trackball paste",
-     "WORK", QT_TRANSLATE_NOOP("View", "What new designs start with."), "component"},
+     "WORK", QT_TRANSLATE_NOOP("View", "What new designs start with."), "prefs-design"},
     // The first dimension scales the sketch (mitcad#860).
     // Click adds to the selection in sketches (mitcad#1403).
     // Esc leaves an unchanged sketch (mitcad#1623).
@@ -399,7 +399,7 @@ const PreferencePage kPreferencePages[] = {
      "sketch dimension first scale proportion drawn size click select selection add ctrl multiple "
      "esc escape leave exit finish unchanged profile profiles shade shading project edges face "
      "hide hidden show shown visible visibility used extrude feature eye",
-     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, snapping and selecting."), "sketch"},
+     "WORK", QT_TRANSLATE_NOOP("View", "Drawing, snapping and selecting."), "prefs-sketch"},
     // Fork: SolidCraft's Tools page.
     {"tools", QT_TRANSLATE_NOOP("View", "Tools"),
      "tools hole extrude target operation arrow isometric distance placed features handles snap command dialogs "
@@ -409,14 +409,14 @@ const PreferencePage kPreferencePages[] = {
     // (mitcad#1856).
     {"assembly", QT_TRANSLATE_NOOP("View", "Assembly"),
      "assembly joint joints rigid_group constraint component active holds picks ask",
-     "WORK", QT_TRANSLATE_NOOP("View", "Joints and the components they hold."), "joint"},
+     "WORK", QT_TRANSLATE_NOOP("View", "Joints and the components they hold."), "prefs-assembly"},
     {"print", QT_TRANSLATE_NOOP("View", "3D Print"), "slicer printing open_in program",
-     "WORK", QT_TRANSLATE_NOOP("View", "The slicer 3D Print opens."), "print-3d"},
+     "WORK", QT_TRANSLATE_NOOP("View", "The slicer 3D Print opens."), "prefs-print"},
     // The suppliers' shops: the region of the product links and the shops
     // the Supplier filters start with (mitcad#950).
     {"suppliers", QT_TRANSLATE_NOOP("View", "Suppliers"),
      "supplier suppliers shop shops region country product link links part number filter buy",
-     "WORK", QT_TRANSLATE_NOOP("View", "The shops of part numbers and their region."), "component"},
+     "WORK", QT_TRANSLATE_NOOP("View", "The shops of part numbers and their region."), "prefs-suppliers"},
     {"navigation", QT_TRANSLATE_NOOP("View", "Navigation"),
      "mouse orbit pan zoom scheme shortcuts bindings custom trackpad 3d_mouse space speed arrow key step "
      "orbit_center cursor constrained reverse smooth transitions scroll",
@@ -649,6 +649,14 @@ void themePreferenceForm(QWidget* page) {
       }
     }
     form->setVerticalSpacing(std::max(form->verticalSpacing(), 10));
+  }
+  // No colon after a row's words anywhere on the page, as SolidCraft's.
+  for (QLabel* label : page->findChildren<QLabel*>()) {
+    const QString text = label->text();
+    if (text.endsWith(QLatin1Char(':')) && !text.contains(QLatin1Char('\n')) && text.size() < 80 &&
+        !text.contains(QLatin1Char('<'))) {
+      label->setText(text.chopped(1));
+    }
   }
   // Drop-downs no wider than their choices need, not across the page.
   for (QComboBox* combo : page->findChildren<QComboBox*>()) {
