@@ -6,6 +6,7 @@
 // again whenever the page's settings are saved.
 #include "MainWindow.hpp"
 
+#include <QCursor>
 #include <QSettings>
 #include <QJsonObject>
 #include <QJsonArray>
@@ -27,6 +28,7 @@
 #include "framework/FloatingLayout.hpp"
 #include "framework/IconSizeStyle.hpp"
 #include "framework/Ribbon.hpp"
+#include "framework/TitleBar.hpp"
 #include "framework/GlassCard.hpp"
 #include "browser/BrowserController.hpp"
 #include "browser/BrowserPanel.hpp"
@@ -100,6 +102,33 @@ NavigationIdle* idleOf(GlassCard* card) {
 } // namespace
 
 void MainWindow::applyLayoutSettings(const LayoutSettings& layout) {
+  // PureCAD: Window › Top bar: Always, or At top edge: hidden until the
+  // pointer comes to the view's top edge, then over the view until it
+  // leaves the bar.
+  if (m_titleRow != nullptr && m_floating != nullptr) {
+    if (layout.topBarAtEdge && m_topBarWatch == nullptr) {
+      m_topBarWatch = new QTimer(this);
+      m_topBarWatch->setInterval(120);
+      connect(m_topBarWatch, &QTimer::timeout, this, [this] {
+        if (m_titleRow == nullptr || m_floating == nullptr || !isActiveWindow()) return;
+        const QPoint at = m_floating->mapFromGlobal(QCursor::pos());
+        const bool inside = m_floating->rect().contains(at);
+        const bool overBar = m_titleRow->isVisible() && m_titleRow->rect().contains(m_titleRow->mapFromGlobal(QCursor::pos()));
+        const bool wanted = inside && (at.y() <= 6 || overBar);
+        if (wanted != m_topBarRevealed) {
+          m_topBarRevealed = wanted;
+          m_floating->setRowHidden(m_titleRow, !wanted, true);
+        }
+      });
+      m_topBarRevealed = false;
+      m_floating->setRowHidden(m_titleRow, true, true);
+      m_topBarWatch->start();
+    } else if (!layout.topBarAtEdge && m_topBarWatch != nullptr) {
+      m_topBarWatch->deleteLater();
+      m_topBarWatch = nullptr;
+      m_floating->setRowHidden(m_titleRow, false);
+    }
+  }
   // Window › Keep on top of other windows. Changing a window's flags hides
   // it; it shows again where it was.
   const bool onTop = windowFlags().testFlag(Qt::WindowStaysOnTopHint);

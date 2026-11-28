@@ -2546,6 +2546,8 @@ private:
   // it and the toolbar panel rows of createFloatingPanels(); in the Docked layout at the window's top
   // with the panel under it (createDockedTopBar).
   TitleBar* m_titleRow = nullptr;
+  QTimer* m_topBarWatch = nullptr; // PureCAD: Layout › Top bar at top edge
+  bool m_topBarRevealed = false;
   // The Docked top bar (createDockedTopBar): the toolbar panel's holder under the title row, hidden
   // over the Start page as the Floating layout hides the panel; the parts as last logged.
   QWidget* m_dockedPanel = nullptr;
