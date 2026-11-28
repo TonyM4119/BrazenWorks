@@ -7909,9 +7909,15 @@ void OcctViewer::placeHomeButton() {
     m_homeButton->hide();
     return;
   }
-  // At the cube's upper left, at the cube's size (mitcad#2071).
-  m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
-                     m_overlayInsets.top() + cubeScaled(9));
+  // At the cube's upper left, at the cube's size (mitcad#2071); fork: with
+  // the Axes navigator, left of its whole area, clear of its axes.
+  if (m_navigation.viewNavigator == ViewNavigator::Axes) {
+    m_homeButton->move(width() - m_overlayInsets.right() - 2 * cubeOffset() - m_homeButton->width() - 2,
+                       m_overlayInsets.top() + cubeScaled(9));
+  } else {
+    m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
+                       m_overlayInsets.top() + cubeScaled(9));
+  }
   m_homeButton->raise();
   const QPoint at = mapTo(window(), m_homeButton->geometry().center());
   qDebug().noquote() << QStringLiteral("View home at %1,%2").arg(at.x()).arg(at.y());
@@ -11018,6 +11024,9 @@ void OcctViewer::applyViewNavigator() {
     if (!m_context->IsDisplayed(m_orientationCube)) {
       m_context->Display(m_orientationCube, 0, 0, false);
     }
+  }
+  if (m_homeButton != nullptr) {
+    placeHomeButton();
   }
   qDebug().noquote() << QStringLiteral("View navigator: %1").arg(axes ? QStringLiteral("axes") : QStringLiteral("cube"));
   requestFrame();
