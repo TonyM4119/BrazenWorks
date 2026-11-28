@@ -4033,6 +4033,16 @@ void MainWindow::cancel() {
     if (stepped) {
       return;
     }
+    // PureCAD: Preferences › Sketch › Esc twice finishes the sketch: a
+    // second Esc within 0.6 s, with nothing left to cancel, finishes it.
+    if (m_selection.isEmpty() && QSettings().value(QStringLiteral("sketchPrefs/doubleEscFinishes"), false).toBool()) {
+      if (m_sketchEscTimer.isValid() && m_sketchEscTimer.elapsed() < 600) {
+        m_sketchEscTimer.invalidate();
+        finishSketch();
+        return;
+      }
+      m_sketchEscTimer.start();
+    }
     if (!m_selection.isEmpty() || !sketch::escLeavesUnchangedSketch()) {
       setSelection({});
       return;

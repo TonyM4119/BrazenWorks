@@ -1604,6 +1604,7 @@ private:
   // PureCAD: Preferences › Layout › Highlight active commands: the running
   // command's toolbar buttons tinted while it runs (empty: none).
   void markActiveCommand(const QString& id);
+  QElapsedTimer m_sketchEscTimer; // PureCAD: Sketch › Esc twice finishes
   // What the panel asks for (paths relative to the project at `root`).
   void createDesignInProject(const QString& root, const QString& path);
   void createFolderInProject(const QString& root, const QString& path);
