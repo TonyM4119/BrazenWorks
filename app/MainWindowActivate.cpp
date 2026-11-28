@@ -23,6 +23,7 @@
 
 #include <exception>
 
+#include <QSettings>
 #include <QCursor>
 #include <QJsonArray>
 #include <QJsonObject>
@@ -48,7 +49,11 @@ bool MainWindow::askToActivatePicked(const SelectionItem& item, const QString& r
   if (m_mcpRequestActive || m_mcpPicking) {
     return false;
   }
-  ActivateQuestion question = activateQuestion(m_snapshot, item, refused, askToActivateComponent());
+  // PureCAD: Preferences › Sketch › Sketching on a part's face makes that
+  // part active: activated without the question.
+  const bool activatesAtOnce = made == QStringLiteral("sketch") &&
+                               QSettings().value(QStringLiteral("sketchPrefs/faceActivatesPart"), false).toBool();
+  ActivateQuestion question = activateQuestion(m_snapshot, item, refused, activatesAtOnce || askToActivateComponent());
   if (!question.ask) {
     return false;
   }
@@ -73,7 +78,12 @@ bool MainWindow::askToActivatePicked(const SelectionItem& item, const QString& r
   qDebug().noquote() << QStringLiteral("Activate component asked: %1 (active %2)")
                             .arg(question.picked, question.active);
   // Placed clear of the pick: the pointer is where the face was clicked.
-  const ActivateAnswer answer = askToActivate(this, question, QCursor::pos());
+  ActivateAnswer answer;
+  if (activatesAtOnce) {
+    answer.activate = true;
+  } else {
+    answer = askToActivate(this, question, QCursor::pos());
+  }
   const QString again = answer.dontAskAgain ? QStringLiteral(", don't ask again") : QString();
   if (answer.activate) {
     qDebug().noquote() << QStringLiteral("Activate component answer: activate %1%2").arg(question.picked, again);
