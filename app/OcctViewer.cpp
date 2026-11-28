@@ -142,6 +142,7 @@
 #include <gp_Pnt2d.hxx>
 #include <Graphic3d_TextureParams.hxx>
 #include <Graphic3d_TransformPers.hxx>
+#include <Graphic3d_Vec2.hxx> // fork: the frame rate's place (Graphic3d_Vec2i)
 #include <Image_PixMap.hxx>
 #include <IntCurvesFace_ShapeIntersector.hxx>
 #include <ShapeAnalysis_Curve.hxx>
