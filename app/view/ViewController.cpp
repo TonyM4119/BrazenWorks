@@ -4369,7 +4369,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   headerRow->addWidget(gear);
   headerRow->addWidget(title);
   headerRow->addStretch(1);
-  search->setMinimumWidth(uiRoomSize(300));
+  search->setMinimumWidth(uiRoomSize(160)); // fork: shrinks in a narrow window rather than leaving it
   // SolidCraft's search: rounded, the magnifier at the left and the
   // shortcut at the right; a search opens the folded sections.
   search->addAction(monochromeIcon(themeIcon(QStringLiteral("search"))), QLineEdit::LeadingPosition);

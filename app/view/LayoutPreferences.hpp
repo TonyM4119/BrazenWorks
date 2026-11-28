@@ -134,7 +134,7 @@ public:
     scroll->setObjectName(QStringLiteral("layoutScroll"));
     scroll->setWidgetResizable(true);
     scroll->setFrameShape(QFrame::NoFrame);
-    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAlwaysOff);
+    scroll->setHorizontalScrollBarPolicy(Qt::ScrollBarAsNeeded); // scrolls rather than cuts off when narrow
     auto* content = new QWidget;
     m_column = new QVBoxLayout(content);
     m_column->setContentsMargins(0, 6, 8, 0);
