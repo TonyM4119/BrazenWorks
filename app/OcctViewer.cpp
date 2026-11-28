@@ -3999,8 +3999,9 @@ void OcctViewer::refreshSketchHighlightLines() {
 }
 
 bool OcctViewer::hasSketchHalo(const SketchEntityLook& look) const {
+  // PureCAD: Preferences › Graphics › Sketch halo: on every background.
   return !look.point && !look.reference && !look.construction && (look.centerline || look.constrained) &&
-         (m_backgroundDark || look.darkFace);
+         (m_backgroundDark || look.darkFace || m_sketchHaloEverywhere);
 }
 
 void OcctViewer::updateSketchHalo(const occ::handle<AIS_Shape>& object, const SketchEntityLook& look) {
@@ -11161,6 +11162,11 @@ void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
                               : Graphic3d_RenderingParams::PerfCounters_FrameRate;
   params.StatsPosition = new Graphic3d_TransformPers(Graphic3d_TMF_2d, Aspect_TOTP_RIGHT_UPPER,
                                                      Graphic3d_Vec2i(cubeAreaSize() + 20, 30));
+  // PureCAD: Sketch halo on every background, the sketch's lines restyled.
+  if (m_sketchHaloEverywhere != settings.sketchHalo) {
+    m_sketchHaloEverywhere = settings.sketchHalo;
+    restyleSketchEntities();
+  }
   // PureCAD: Vertex markers, on the bodies in the view too.
   if (g_vertexMarkers != settings.vertexMarkers) {
     g_vertexMarkers = settings.vertexMarkers;

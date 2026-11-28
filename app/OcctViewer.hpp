@@ -1991,6 +1991,7 @@ private:
   occ::handle<Graphic3d_CLight> m_keyLight;
   occ::handle<Graphic3d_CLight> m_fillLight;
   bool m_fillOn = false;
+  bool m_sketchHaloEverywhere = false; // PureCAD: Graphics › Sketch halo
   occ::handle<V3d_View> m_view;
   occ::handle<AIS_InteractiveContext> m_context;
   occ::handle<AIS_ViewCube> m_orientationCube;
