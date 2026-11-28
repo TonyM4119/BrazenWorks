@@ -138,6 +138,9 @@ struct SnapSettings {
   // Shift or Alt is held).
   QStringList acquired;
   bool extensions = false;
+  // PureCAD: Preferences › Sketch › Center and midpoint guides: lines' and
+  // arcs' midpoints and circles' quadrants to snap to.
+  bool midpoints = true;
 };
 
 // The snapped position for the cursor at `screen`, where `raw` is the
