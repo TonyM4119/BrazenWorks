@@ -88,6 +88,7 @@ class QWheelEvent;
 class QWindow;
 
 namespace mitcad {
+struct GraphicsSettings; // fork: view/GraphicsSettings.hpp
 
 #ifdef __APPLE__
 namespace render {
@@ -1886,6 +1887,10 @@ private:
   void navigationStep();
   // The last button held on the view went up.
   void buttonsReleased();
+  // Fork: Preferences › Graphics: supersampling and the frame rate.
+  void applyGraphicsSettings(const GraphicsSettings& settings);
+  double m_renderScale = 1.0;
+  bool m_supersampleOnlyStill = true;
   // The view's camera and size now; why the rendered image no longer
   // fits the view (its camera or size changed), or nothing.
   ViewPose viewPose() const;

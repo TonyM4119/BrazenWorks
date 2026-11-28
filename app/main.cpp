@@ -15,6 +15,11 @@
 #include <QPalette>
 #include <QScreen>
 #include <QSettings>
+#ifdef _WIN32
+namespace mitcad {
+void applyWindowsGpuPreference(int card); // fork: platform/windows/GpuPreference.cpp
+}
+#endif
 #include <QString>
 #include <QStringList>
 #include <QStyle>
@@ -230,6 +235,11 @@ int runApplication(int argc, char* argv[]) {
   QSurfaceFormat::setDefaultFormat(mitcad::viewportSurfaceFormat());
 
   useStoredSettings();
+#ifdef _WIN32
+  // Fork: Preferences › Graphics › Graphics card (platform/windows/
+  // GpuPreference.cpp): Windows reads it when the program starts.
+  mitcad::applyWindowsGpuPreference(QSettings().value(QStringLiteral("graphics/graphicsCard"), 0).toInt());
+#endif
   // Preferences › Display › Interface size (mitcad#1495): Qt's scale factor
   // for the whole UI, before the application object reads it.
   const mitcad::InterfaceScale interfaceScale = mitcad::applyInterfaceSize();

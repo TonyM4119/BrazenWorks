@@ -2,6 +2,7 @@
 #include "ViewController.hpp"
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
+#include "GraphicsPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
 #include "GridSpacing.hpp"
 #include "DefaultView.hpp"
@@ -352,6 +353,12 @@ const PreferencePage kPreferencePages[] = {
      "layout panel preset window menus notices status_bar top_bar card headers keep_on_top design tabs views "
      "sub-tab history browser bodies folders dialogs ok cancel toolbar tabs ribbon navigation_bar idle fade",
      "LOOK", QT_TRANSLATE_NOOP("View", "Where the parts of the window sit."), "toolbar-panel"},
+    // Fork: SolidCraft's Graphics page.
+    {"graphics", QT_TRANSLATE_NOOP("View", "Graphics"),
+     "graphics preset performance quality curved surfaces smoothness tessellation anti-aliasing antialiasing "
+     "supersampling shadow perspective ambient occlusion visual style field_of_view frame_rate fps vertex "
+     "measurement joint hatch section gpu graphics_card api opengl safe restart",
+     "LOOK", QT_TRANSLATE_NOOP("View", "Trade speed for smoothness."), "visual-style"},
     // Folders of font files for sketch text (mitcad#473).
     {"fonts", QT_TRANSLATE_NOOP("View", "Fonts"), "font folders text ttf otf woff typeface",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of fonts for sketch text."), "text"},
@@ -412,7 +419,7 @@ bool pageFills(const char* id) {
   const QLatin1String page(id);
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
-         page == QLatin1String("layout"); // fork: its own scroll area takes the page's height
+         page == QLatin1String("layout") || page == QLatin1String("graphics"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -849,6 +856,8 @@ ViewController::ViewController(OcctViewer& viewer, CommandRegistry& registry, Do
                                std::function<void()> lookAt, QWidget* window)
     : QObject(window), m_viewer(viewer), m_registry(registry), m_host(host),
       m_lookAt(std::move(lookAt)), m_window(window), m_settings(ViewSettings::load()) {
+  // Fork: the view's renderer, for Preferences › Graphics › This computer.
+  connect(&m_viewer, &OcctViewer::glInitialized, this, [this](const QString& renderer) { m_rendererName = renderer; });
   // Offered when the render worker is installed next to the application
   // (a package without it has no rendered view).
   if (!render::RenderClient::workerPath().isEmpty()) {
@@ -3793,6 +3802,61 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, layoutPage, [layoutPage] { layoutPage->commit(); });
   }
   groups.insert(QStringLiteral("layout"), layoutBox);
+
+  // Fork: Preferences › Graphics (SolidCraft's Graphics page,
+  // view/GraphicsPreferences.hpp). It takes over the Display page's
+  // Smoothness and Anti-aliasing row (hidden there; Graphics commits after
+  // Display, so its choice is the one saved).
+  QWidget* graphicsBox = section(tr("Graphics"));
+  auto* graphicsColumn = new QVBoxLayout(graphicsBox);
+  insetPreferencesGroup(graphicsColumn, window == nullptr);
+  GraphicsPreferences::ViewState graphicsView;
+  graphicsView.grid = m_settings.gridShown;
+  graphicsView.perspective = m_settings.perspective;
+  graphicsView.focalLength = m_settings.focalLength;
+  QList<QAction*> graphicsStyles;
+  for (QAction* style : visualStyleActions()) {
+    if (style == nullptr) continue;
+    graphicsStyles << style;
+    graphicsView.styles << style->text().remove(QLatin1Char('&'));
+    if (style->isChecked()) graphicsView.style = int(graphicsView.styles.size()) - 1;
+  }
+  graphicsView.gpu = m_rendererName;
+  graphicsView.renderer = m_rendererName.isEmpty() ? tr("OpenGL") : tr("OpenGL · GPU renderer");
+  auto* graphicsPage = new GraphicsPreferences(graphicsView);
+  graphicsColumn->addWidget(graphicsPage);
+  graphicsPage->applyView = [this, graphicsStyles](const GraphicsPreferences::ViewState& chosen) {
+    if (chosen.grid != m_settings.gridShown) setGridShown(chosen.grid);
+    if (chosen.perspective != m_settings.perspective) {
+      setProjection(chosen.perspective ? CameraProjection::Perspective : CameraProjection::Orthographic);
+    }
+    if (chosen.focalLength != m_settings.focalLength) {
+      m_settings.focalLength = std::clamp(chosen.focalLength, ViewSettings::kMinFocalLength,
+                                          ViewSettings::kMaxFocalLength);
+      m_settings.save();
+      applyFocalLengths(m_settings.focalLength, m_settings.anaglyphFocalLength);
+    }
+    if (QAction* style = graphicsStyles.value(chosen.style); style != nullptr && !style->isChecked()) {
+      style->trigger();
+    }
+  };
+  graphicsPage->restartRequested = [this] {
+    if (restartRequested) restartRequested();
+  };
+  if (QWidget* smooth = displayBox->findChild<QWidget*>(QStringLiteral("preferencesSmoothness"))) {
+    for (int row = 0; row < display->rowCount(); ++row) {
+      QLayoutItem* field = display->itemAt(row, QFormLayout::FieldRole);
+      if (field != nullptr && field->layout() != nullptr && field->layout()->indexOf(smooth) >= 0) {
+        display->setRowVisible(row, false);
+      }
+    }
+  }
+  if (window != nullptr) {
+    graphicsPage->onChanged = [graphicsPage] { graphicsPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, graphicsPage, [graphicsPage] { graphicsPage->commit(); });
+  }
+  groups.insert(QStringLiteral("graphics"), graphicsBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,

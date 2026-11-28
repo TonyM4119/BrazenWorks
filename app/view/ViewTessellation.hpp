@@ -94,10 +94,19 @@ inline SmallCircles viewSmallCircles() { return static_cast<SmallCircles>(viewSm
 // curved faces; planes do not change. The process starts with Standard, so
 // that the tests' meshes stay the upstream's; the application applies the
 // saved choice at the start (applySavedSmoothness), Smooth by default.
-enum class Smoothness { Standard, Smooth };
+// Fork: Preferences › Graphics › Curved surfaces adds Coarse (twice
+// Standard's angles: fastest) and Ultra (half Smooth's: the slowest); the
+// cards show Coarse, Normal (Standard), Fine (Smooth) and Ultra.
+enum class Smoothness { Standard, Smooth, Coarse, Ultra };
 constexpr double kViewSmoothAngle = 6.0 * 3.14159265358979323846 / 180.0;
 constexpr double kViewSmoothInteriorAngle = 8.0 * 3.14159265358979323846 / 180.0;
 constexpr int kViewSmoothSmallCircleSegments = 24;
+constexpr double kViewCoarseAngle = 24.0 * 3.14159265358979323846 / 180.0;
+constexpr double kViewCoarseInteriorAngle = 24.0 * 3.14159265358979323846 / 180.0;
+constexpr int kViewCoarseSmallCircleSegments = 8;
+constexpr double kViewUltraAngle = 3.0 * 3.14159265358979323846 / 180.0;
+constexpr double kViewUltraInteriorAngle = 4.0 * 3.14159265358979323846 / 180.0;
+constexpr int kViewUltraSmallCircleSegments = 48;
 
 inline std::atomic<int>& viewSmoothnessChoice() {
   static std::atomic<int> choice{static_cast<int>(Smoothness::Standard)};
@@ -107,16 +116,25 @@ inline Smoothness viewSmoothness() { return static_cast<Smoothness>(viewSmoothne
 
 // The view's options with the planes' choice (fast, checked).
 inline io::MeshOptions viewMeshOptionsWith(bool fastPlanes, bool checkPlanes) {
-  const bool smooth = viewSmoothness() == Smoothness::Smooth; // Fork
-  io::MeshOptions options{kViewDeviation, smooth ? kViewSmoothAngle : kViewAngle, false, kViewFaceTriangles,
-                          fastPlanes, checkPlanes};
+  const Smoothness level = viewSmoothness(); // Fork: Curved surfaces
+  const double angle = level == Smoothness::Smooth   ? kViewSmoothAngle
+                       : level == Smoothness::Coarse ? kViewCoarseAngle
+                       : level == Smoothness::Ultra  ? kViewUltraAngle
+                                                     : kViewAngle;
+  const double interior = level == Smoothness::Smooth   ? kViewSmoothInteriorAngle
+                          : level == Smoothness::Coarse ? kViewCoarseInteriorAngle
+                          : level == Smoothness::Ultra  ? kViewUltraInteriorAngle
+                                                        : kViewInteriorAngle;
+  const int circleSegments = level == Smoothness::Smooth   ? kViewSmoothSmallCircleSegments
+                             : level == Smoothness::Coarse ? kViewCoarseSmallCircleSegments
+                             : level == Smoothness::Ultra  ? kViewUltraSmallCircleSegments
+                                                           : kViewSmallCircleSegments;
+  io::MeshOptions options{kViewDeviation, angle, false, kViewFaceTriangles, fastPlanes, checkPlanes};
   options.size_deviation = kViewSizeDeviation;
   options.size_deviation_max = kViewDeviationMax;
-  options.interior_angle = smooth ? kViewSmoothInteriorAngle : kViewInteriorAngle;
+  options.interior_angle = interior;
   options.hold_face_triangles = true;
-  options.small_circle_segments = viewSmallCircles() == SmallCircles::Adaptive
-                                      ? (smooth ? kViewSmoothSmallCircleSegments : kViewSmallCircleSegments)
-                                      : 0;
+  options.small_circle_segments = viewSmallCircles() == SmallCircles::Adaptive ? circleSegments : 0;
   return options;
 }
 

@@ -36,6 +36,7 @@
 #include "view/CameraHeight.hpp"
 #include "view/EasedCameraAnimation.hpp" // Fork: eased glides
 #include "view/ViewQualityPreference.hpp" // Fork: anti-aliasing
+#include "view/GraphicsSettings.hpp"      // Fork: Preferences › Graphics
 #include "framework/Motion.hpp"           // Fork: whether the interface animates
 #include "view/CameraTurn.hpp"
 #include "view/DefaultView.hpp"
@@ -2344,15 +2345,26 @@ OcctViewer::OcctViewer(QWidget* parent) : QOpenGLWidget(parent) {
   m_view->SetImmediateUpdate(false);
   // Fork: Preferences › Display › Anti-aliasing (view/ViewQualityPreference.hpp,
   // 4 samples by default as before), applied at once when it changes.
-  m_view->ChangeRenderingParams().NbMsaaSamples = savedAntialiasing();
-  connect(&ViewQualityNotifier::instance(), &ViewQualityNotifier::antialiasingChanged, this, [this](int samples) {
-    if (!qEnvironmentVariableIsSet("MITCAD_VIEWPORT_AA")) {
+  // Safe graphics mode (Preferences › Graphics, read at the start): none.
+  const bool safeGraphics = GraphicsSettings::load().safeGraphicsMode;
+  m_view->ChangeRenderingParams().NbMsaaSamples = safeGraphics ? 0 : savedAntialiasing();
+  connect(&ViewQualityNotifier::instance(), &ViewQualityNotifier::antialiasingChanged, this, [this, safeGraphics](int samples) {
+    if (!qEnvironmentVariableIsSet("MITCAD_VIEWPORT_AA") && !safeGraphics) {
       m_view->ChangeRenderingParams().NbMsaaSamples = samples;
       m_view->Invalidate();
       requestFrame();
       qDebug().noquote() << QStringLiteral("View anti-aliasing: %1 samples").arg(samples);
     }
   });
+  // Fork: Preferences › Graphics (view/GraphicsSettings.hpp): supersampling
+  // (the render scale) and the frame rate, now and when they change.
+  applyGraphicsSettings(GraphicsSettings::load());
+  {
+    QPointer<OcctViewer> self(this);
+    graphicsSettingsListeners().push_back([self](const GraphicsSettings& settings) {
+      if (self != nullptr) self->applyGraphicsSettings(settings);
+    });
+  }
   // Diagnostic overrides only: retain the normal four-sample policy until
   // physical-display measurements justify changing it (mitcad#552).
   const QString aa = qEnvironmentVariable("MITCAD_VIEWPORT_AA");
@@ -10895,6 +10907,12 @@ void OcctViewer::updateNavigation() {
   if (left > 0) {
     m_navigationTimer->start(left);
   }
+  // Fork: supersampling only while the view is still (Graphics).
+  if (m_renderScale > 1.0 && m_supersampleOnlyStill && change != ViewNavigation::Change::None && !m_view.IsNull()) {
+    m_view->ChangeRenderingParams().RenderResolutionScale =
+        float(change == ViewNavigation::Change::Started ? 1.0 : m_renderScale);
+    m_view->Invalidate();
+  }
   if (change == ViewNavigation::Change::Started) {
     m_navigationFirstFrame = m_framesDrawn;
     m_navigationRepaints = 0;
@@ -11108,6 +11126,30 @@ void OcctViewer::deactivated(const QWidget* active) {
     qDebug().noquote() << QStringLiteral("View interaction cancelled: the window was deactivated");
     cancelPointerInteraction();
   }
+}
+
+void OcctViewer::applyGraphicsSettings(const GraphicsSettings& settings) {
+  if (m_view.IsNull()) {
+    return;
+  }
+  m_renderScale = settings.renderScale();
+  m_supersampleOnlyStill = settings.supersampleOnlyStill;
+  Graphic3d_RenderingParams& params = m_view->ChangeRenderingParams();
+  params.RenderResolutionScale = float(m_renderScale);
+  // The frame rate in the view's corner, with OCCT's counters in its
+  // details.
+  params.ToShowStats = settings.frameRate;
+  params.CollectedStats = settings.frameRateDetails
+                              ? Graphic3d_RenderingParams::PerfCounters_All
+                              : Graphic3d_RenderingParams::PerfCounters_FrameRate;
+  params.StatsPosition = new Graphic3d_TransformPers(Graphic3d_TMF_2d, Aspect_TOTP_RIGHT_UPPER,
+                                                     Graphic3d_Vec2i(cubeAreaSize() + 20, 30));
+  m_view->Invalidate();
+  requestFrame();
+  qDebug().noquote() << QStringLiteral("View graphics: render scale %1%2, frame rate %3")
+                            .arg(m_renderScale)
+                            .arg(m_supersampleOnlyStill ? QStringLiteral(" while still") : QString())
+                            .arg(settings.frameRate ? QStringLiteral("shown") : QStringLiteral("hidden"));
 }
 
 void OcctViewer::buttonsReleased() {
