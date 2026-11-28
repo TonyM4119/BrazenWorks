@@ -3542,6 +3542,25 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
       session->setRepeatSettings(found.value());
     }
   }
+  // PureCAD: Preferences › Tools › New extrusion distance: Fixed (a length
+  // of one's own; 0, the default, starts at zero and waits for one, as
+  // before) or The last used (the last OK's distance).
+  if (editUid.isEmpty() && analysis.isEmpty() && def.id == QLatin1String("solid.extrude") && !remembers &&
+      def.id != m_repeatCommand) {
+    const QSettings store;
+    const int mode = store.value(QStringLiteral("tools/newExtrudeDistance"), 0).toInt();
+    const double fixed = store.value(QStringLiteral("tools/fixedExtrudeDistance"), 0.0).toDouble();
+    PanelSettings start;
+    if (mode == 0 && fixed > 0.0) {
+      start.values.insert(QStringLiteral("distance"), QStringLiteral("%1 mm").arg(fixed));
+    } else if (mode == 1) {
+      if (const auto found = m_repeatSettings.constFind(def.id); found != m_repeatSettings.cend()) {
+        const QString last = found.value().values.value(QStringLiteral("distance"));
+        if (!last.isEmpty()) start.values.insert(QStringLiteral("distance"), last);
+      }
+    }
+    if (!start.values.isEmpty()) session->setRepeatSettings(start);
+  }
   m_repeatCommand.clear();
 #ifdef MITCAD_MACOS_NATIVE_UI
   if (m_nativeWindow) {

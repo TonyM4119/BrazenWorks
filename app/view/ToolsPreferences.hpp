@@ -26,7 +26,7 @@ struct ToolsPrefs {
   bool extrudeIsometric = false;
   bool extrudeReturnView = false;
   int newExtrudeDistance = 0;       // 0 Fixed, 1 The last used, 2 From the profile's size
-  double fixedExtrudeDistance = 10.0; // mm
+  double fixedExtrudeDistance = 0.0; // mm; 0 starts at zero and waits for one, as before
   bool placementHandles = false;
   bool placedSnapPoints = true;
   bool rememberDialogValues = false;
@@ -211,12 +211,14 @@ private:
     auto* distanceRow = new QHBoxLayout;
     auto* distanceKind = new QComboBox;
     distanceKind->setObjectName(name("newExtrudeDistance"));
-    distanceKind->addItems({tr("Fixed (%1)").arg(m_prefs.fixedExtrudeDistance), tr("The last used"),
+    distanceKind->addItems({m_prefs.fixedExtrudeDistance > 0.0 ? tr("Fixed (%1)").arg(m_prefs.fixedExtrudeDistance) : tr("Fixed"), tr("The last used"),
                             tr("From the profile's size")});
     distanceKind->setCurrentIndex(m_prefs.newExtrudeDistance);
     auto* distance = new QDoubleSpinBox;
     distance->setObjectName(name("fixedExtrudeDistance"));
-    distance->setRange(0.001, 100000.0);
+    distance->setRange(0.0, 100000.0);
+    // 0: a new extrusion starts at zero and waits for a distance, as before.
+    distance->setSpecialValueText(tr("Typed or dragged"));
     distance->setDecimals(3);
     distance->setSuffix(tr(" mm"));
     distance->setValue(m_prefs.fixedExtrudeDistance);
