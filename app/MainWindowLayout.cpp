@@ -29,6 +29,7 @@
 #include "browser/BrowserPanel.hpp"
 #include "browser/TimelineWidget.hpp"
 #include "view/LayoutPreferences.hpp"
+#include "view/GraphicsSettings.hpp"
 #include "view/LayoutSettings.hpp"
 #include "view/NavigationBar.hpp"
 
@@ -219,6 +220,13 @@ void MainWindow::followLayoutSettings() {
   layoutSettingsListeners().push_back([self](const LayoutSettings& layout) {
     if (self != nullptr) {
       self->applyLayoutSettings(layout);
+    }
+  });
+  // PureCAD: what Preferences › Graphics draws through the window's own
+  // highlights (joint symbols) drawn again once it is saved.
+  graphicsSettingsListeners().push_back([self](const GraphicsSettings&) {
+    if (self != nullptr && !self->modelBusy()) {
+      self->updateIdleView();
     }
   });
 }
