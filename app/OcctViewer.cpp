@@ -9476,6 +9476,23 @@ void OcctViewer::setHiddenEdgesOf(const std::set<std::string>& bodies) {
   sceneChanged();
 }
 
+void OcctViewer::setOldPlaceGhosts(const std::vector<TopoDS_Shape>& shapes) {
+  for (const occ::handle<AIS_Shape>& ghost : m_oldPlaceGhosts) {
+    m_context->Remove(ghost, false);
+  }
+  m_oldPlaceGhosts.clear();
+  for (const TopoDS_Shape& shape : shapes) {
+    if (shape.IsNull()) continue;
+    occ::handle<AIS_Shape> ghost = new AIS_Shape(shape);
+    ghost->SetColor(Quantity_Color(0.62, 0.66, 0.72, Quantity_TOC_RGB));
+    ghost->SetTransparency(0.8);
+    m_context->Display(ghost, AIS_Shaded, -1, false);
+    m_context->Deactivate(ghost);
+    m_oldPlaceGhosts.push_back(ghost);
+  }
+  sceneChanged();
+}
+
 void OcctViewer::setQuickMeasurement(const QString& text) {
   if (text == m_quickText) return;
   m_quickText = text;

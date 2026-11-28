@@ -3547,6 +3547,16 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
       qDebug().noquote() << QStringLiteral("Joint: Origin B picked first (Preferences)");
     }
   }
+  // PureCAD: Preferences › Tools › Show moved parts' old place as a ghost:
+  // what Move moves, drawn faint where it was while the panel is open.
+  m_oldPlaceGhosts.clear();
+  if (editUid.isEmpty() && def.id == QLatin1String("solid.move") &&
+      QSettings().value(QStringLiteral("tools/movedGhost"), true).toBool()) {
+    for (const SelectionItem& item : preselection) {
+      if (item.kind == SelectKind::Body || item.kind == SelectKind::Component) m_oldPlaceGhosts.append(item);
+    }
+    showOldPlaceGhosts();
+  }
   auto* session = new CommandSession(*used, *this, editUid, m_documentSession);
   if (!analysis.isEmpty()) {
     session->editAnalysis(analysis);
@@ -3914,6 +3924,10 @@ bool MainWindow::chooseInCommand(const QString& command, const QString& input, c
 void MainWindow::onCommandFinished(bool committed) {
   clearNativeCommandContinuation();
   markActiveCommand(QString()); // PureCAD
+  if (!m_oldPlaceGhosts.isEmpty()) { // PureCAD: Tools › old place ghost gone
+    m_oldPlaceGhosts.clear();
+    m_viewer->setOldPlaceGhosts({});
+  }
   if (m_extrudeCamera) { // PureCAD: Tools › Go back to the earlier view
     m_viewer->setCamera(*m_extrudeCamera);
     m_extrudeCamera.reset();
@@ -4133,6 +4147,16 @@ void MainWindow::cancel() {
     return;
   }
   clearSelection();
+}
+
+// PureCAD: the old place ghosts of what Move moves (startFeatureCommand,
+// pickComing).
+void MainWindow::showOldPlaceGhosts() {
+  std::vector<TopoDS_Shape> shapes;
+  for (const SelectionItem& item : std::as_const(m_oldPlaceGhosts)) {
+    shapes.push_back(itemShape(item));
+  }
+  m_viewer->setOldPlaceGhosts(shapes);
 }
 
 // PureCAD: Preferences › Design › Full kernel check. After every step:

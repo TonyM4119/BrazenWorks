@@ -1332,6 +1332,8 @@ private:
   void checkBodies(const std::vector<BodyDisplay>& bodies); // PureCAD: Design › Full kernel check
   QSet<quintptr> m_checkedShapes;
   std::unique_ptr<CommandDef> m_invertedJoint; // PureCAD: Design › Invert joint selection order
+  Selection m_oldPlaceGhosts; // PureCAD: Tools › moved parts' old place
+  void showOldPlaceGhosts();
   // Print Analysis kept in the document (mitcad#620,
   // MainWindowPrintAnalysis.cpp): the shown one's overhangs and thin walls
   // over the bodies, computed again when it, its bodies or the design

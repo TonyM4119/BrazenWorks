@@ -118,6 +118,12 @@ void MainWindow::pickComing(const CommandDef& def, const InputDef& input, const 
   if (!m_session) {
     return;
   }
+  // PureCAD: a part picked into Move gets its old place ghost too.
+  if (def.id == QLatin1String("solid.move") && (item.kind == SelectKind::Body || item.kind == SelectKind::Component) &&
+      !m_oldPlaceGhosts.contains(item) && QSettings().value(QStringLiteral("tools/movedGhost"), true).toBool()) {
+    m_oldPlaceGhosts.append(item);
+    showOldPlaceGhosts();
+  }
   // Joint and the other assembly commands go into the component that
   // holds their picks (mitcad#1856).
   if (holderPickComing(def, input, item)) {

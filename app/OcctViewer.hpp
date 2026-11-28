@@ -785,6 +785,9 @@ public:
   // behind. Logs "View ghosts: ..." when the list changes (`only O1/O4`
   // for an entry of own bodies).
   void setGhosts(const QStringList& occurrences);
+  // PureCAD: Tools › Show moved parts' old place as a ghost: shapes drawn
+  // faint and unpickable where they were; empty takes them away.
+  void setOldPlaceGhosts(const std::vector<TopoDS_Shape>& shapes);
   // What the view draws normally while a component other than the root is
   // active (mitcad#420): the bodies, sketches, profiles and construction
   // items of `occurrences` (the active component's occurrences, paths from
@@ -2489,6 +2492,7 @@ private:
   QPointer<ViewPaintLayer> m_viewAngles; // PureCAD: paintViewAngles
   QPointer<ViewPaintLayer> m_quickLayer; // PureCAD: paintQuickMeasurement
   QString m_quickText;
+  std::vector<occ::handle<AIS_Shape>> m_oldPlaceGhosts; // PureCAD: setOldPlaceGhosts
   std::set<std::string> m_hiddenEdgesShown; // PureCAD: setHiddenEdgesOf
   struct RulerAxis {
     gp_Dir direction;
