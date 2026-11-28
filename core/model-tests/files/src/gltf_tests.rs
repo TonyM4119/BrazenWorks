@@ -221,7 +221,7 @@ fn a_new_design_with_its_empty_component1_takes_a_gltf_file_as_it_is() {
     // New Design's document (the app's Ctrl+N): Component1, empty and
     // active, is no content, so nothing is wrapped and nothing asked.
     let path = written(&testfile::assembly(), "robot new.glb", &Form::Glb);
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     assert!(!doc.has_content());
     assert!(!doc.import_wraps_by_default(&path));
     assert!(!doc.import_wraps_by_default("/models/bracket.step"));

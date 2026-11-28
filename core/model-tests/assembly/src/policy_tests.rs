@@ -116,9 +116,29 @@ fn presets(doc: &mut Document<MockKernel>, owners: &[(&str, &str)]) {
 }
 
 #[test]
-fn a_new_design_has_a_hybrid_root_and_an_active_component1() {
-    // mitcad#421: everything allowed in both.
+fn a_new_design_is_its_hybrid_root_alone_and_active() {
+    // mitcad#421: everything allowed. Fork: no Component1 until the user
+    // makes a component; the first sketch or feature goes into the root.
     let doc = Document::new_design(MockKernel::default());
+    assert!(!doc.is_modified());
+    let policies = query(&doc, json!({"query": "policies"}));
+    assert_eq!(policies[0]["name"], "Root");
+    assert_eq!(policies[0]["policy"]["preset"], "hybrid");
+    assert!(policies.get(1).is_none(), "{policies}");
+    assert!(doc.assembly().components.is_empty());
+    assert!(doc.assembly().occurrences.is_empty());
+    assert!(doc.active_component().is_root());
+    assert_eq!(doc.policy(ComponentUid::ROOT), Policy::GENERAL);
+    // Nothing of it is stored: the file has no policy.
+    let text = doc.to_json();
+    assert!(!text.contains("policy"), "{text}");
+}
+
+#[test]
+fn a_design_saved_with_component1_has_a_hybrid_root_and_an_active_component1() {
+    // mitcad#421: everything allowed in both (a design made before the
+    // fork's root-only new designs).
+    let doc = Document::new_design_with_component1(MockKernel::default());
     assert!(!doc.is_modified());
     let policies = query(&doc, json!({"query": "policies"}));
     assert_eq!(policies[0]["name"], "Root");
@@ -129,14 +149,13 @@ fn a_new_design_has_a_hybrid_root_and_an_active_component1() {
     assert_eq!(doc.assembly().name(part), "Component1");
     assert_eq!(doc.policy(ComponentUid::ROOT), Policy::GENERAL);
     assert_eq!(doc.policy(part), Policy::GENERAL);
-    // Nothing of it is stored: the file has no policy.
     let text = doc.to_json();
     assert!(!text.contains("policy"), "{text}");
 }
 
 #[test]
 fn a_new_design_takes_sketches_components_and_links_without_a_violation() {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     let component1 = doc.active_component();
     *doc.kernel().curves.borrow_mut() = vec![Curve3::Line {
         start: [0.0, 0.0, 5.0],
@@ -194,7 +213,7 @@ fn a_new_design_takes_sketches_components_and_links_without_a_violation() {
 
 #[test]
 fn the_assembly_preset_refuses_sketches_and_features_with_the_reason() {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     presets(&mut doc, &[("Root", "assembly")]);
     // The first sketch and feature go into Component1.
     let part = doc.active_component();
@@ -254,7 +273,7 @@ fn the_assembly_preset_refuses_sketches_and_features_with_the_reason() {
 
 #[test]
 fn the_hybrid_preset_is_the_general_defaults_and_defaults_an_alias() {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     presets(&mut doc, &[("Component1", "part")]);
     for name in ["hybrid", "defaults"] {
         let report = query(
@@ -670,7 +689,7 @@ fn moves_and_pastes_follow_the_destination_policy() {
 
 #[test]
 fn checks_are_off_outside_commands_and_when_suspended() {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     presets(&mut doc, &[("Root", "assembly")]);
     command(
         &mut doc,
@@ -791,7 +810,7 @@ fn new_component_extrude(doc: &mut Document<MockKernel>) -> Value {
 #[test]
 fn a_new_component_refused_by_a_part_goes_beside_it() {
     // mitcad#292: Component1 (a part) placed 100 mm along X in the root.
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     presets(&mut doc, &[("Component1", "part")]);
     let part = doc.active_component();
     command(
@@ -893,7 +912,7 @@ fn a_new_component_goes_into_the_nearest_owner_that_takes_components() {
 
 #[test]
 fn a_new_component_is_refused_when_no_owner_above_takes_components() {
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     set(&mut doc, "Root", json!({"components": false}));
     set(&mut doc, "Component1", json!({"components": false}));
     let extrude = new_component_extrude(&mut doc);
@@ -971,7 +990,7 @@ fn a_part_s_first_sketch_may_attach_to_another_part() {
 
     // A new design's Component1 and Part2 as parts: Part2's first sketch
     // may lie on Component1's faces.
-    let mut doc = Document::new_design(MockKernel::default());
+    let mut doc = Document::new_design_with_component1(MockKernel::default());
     presets(&mut doc, &[("Component1", "part")]);
     block(&mut doc);
     command(
@@ -1047,7 +1066,7 @@ fn an_older_stored_policy_reads_the_first_sketch_settings_as_on() {
 
     // A new design saved before them: the root an Assembly, its component
     // a part.
-    let doc = Document::new_design(MockKernel::default());
+    let doc = Document::new_design_with_component1(MockKernel::default());
     let mut file: Value = serde_json::from_str(&doc.to_json()).unwrap();
     file["root_policy"] = older(false, true);
     file["components"][0]["policy"] = older(true, false);
