@@ -2627,7 +2627,14 @@ QTreeWidgetItem* BrowserPanel::addRow(QTreeWidgetItem* parent, const BrowserNode
                     node.type == BrowserNode::Type::SelectionSets || node.type == BrowserNode::Type::PointClouds ||
                     node.type == BrowserNode::Type::Decals || node.type == BrowserNode::Type::ExplodeViews ||
                     node.type == BrowserNode::Type::ConstructionSet; // mitcad#2514: its new items in sight
-  item->setExpanded(m_expanded.value(key, open));
+  // PureCAD: Preferences › Layout › Browser: components other than the top
+  // one start open or closed, and every row but the top one may start
+  // closed. A row the user opened or closed keeps that (m_expanded).
+  bool startOpen = open;
+  const bool top = node.type == BrowserNode::Type::Component && node.uid == QLatin1String("C0");
+  if (node.type == BrowserNode::Type::Component && !top) startOpen = startOpen && browserOpenDefaults().componentsOpen;
+  if (browserOpenDefaults().rowsClosed && !top) startOpen = false;
+  item->setExpanded(m_expanded.value(key, startOpen));
   return item;
 }
 

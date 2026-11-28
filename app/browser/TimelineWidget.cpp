@@ -1101,6 +1101,42 @@ TimelineWidget::TimelineWidget(const CommandContext& model, QWidget* parent)
   button("forward", QStyle::SP_MediaSeekForward, "forward.fill", tr("Step Forward"),
          [this] { return m_strip->stepAfter(m_strip->marker()); });
   button("end", QStyle::SP_MediaSkipForward, "forward.end.fill", tr("Move to End"), [this] { return m_strip->count(); });
+  // PureCAD: Play (Preferences › Layout › Play History button): the
+  // design rebuilt step by step from the beginning, a step every 0.6 s, to
+  // the end; a second click stops where it is.
+  {
+    m_play = new QToolButton(this);
+    m_play->setObjectName(QStringLiteral("timelinePlay"));
+    m_play->setToolTip(tr("Play the History: steps through the design from its beginning"));
+    m_play->setAutoRaise(true);
+    m_play->setCheckable(true);
+    if (floating) {
+      setFlatCardButton(m_play);
+    }
+    m_play->setFocusPolicy(Qt::NoFocus);
+    m_play->setIcon(style()->standardIcon(QStyle::SP_MediaPlay));
+    layout->insertWidget(layout->indexOf(m_buttons.last().second), m_play);
+    m_playTimer = new QTimer(this);
+    m_playTimer->setInterval(600);
+    connect(m_playTimer, &QTimer::timeout, this, [this] {
+      const int next = m_strip->stepAfter(m_strip->marker());
+      if (next <= m_strip->marker() || m_strip->marker() >= m_strip->count()) {
+        m_playTimer->stop();
+        m_play->setChecked(false);
+        return;
+      }
+      emit markerRequested(next);
+    });
+    connect(m_play, &QToolButton::toggled, this, [this](bool on) {
+      m_play->setIcon(style()->standardIcon(on ? QStyle::SP_MediaPause : QStyle::SP_MediaPlay));
+      if (on) {
+        emit markerRequested(0);
+        m_playTimer->start();
+      } else {
+        m_playTimer->stop();
+      }
+    });
+  }
 
   // The filter (mitcad#98): which components' features are shown. A window
   // starts at the saved choice of all or the active component, Active

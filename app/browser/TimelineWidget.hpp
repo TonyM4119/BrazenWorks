@@ -22,7 +22,8 @@ class QHBoxLayout;
 class QLabel;
 class QLineEdit;
 class QScrollArea;
-class QToolButton;
+#include <QToolButton>
+class QTimer;
 class QTreeWidget;
 class QVBoxLayout;
 class QWheelEvent;
@@ -69,6 +70,10 @@ public:
   // places the widget for it (the bottom bar, or under the Browser).
   enum class Presentation { Strip, List };
   void setPresentation(Presentation presentation);
+  // PureCAD: the Play button (Preferences › Layout › Play History button).
+  void setPlayButtonShown(bool shown) {
+    if (m_play != nullptr) m_play->setVisible(shown);
+  }
   Presentation presentation() const { return m_presentation; }
   // The History list's height for its buttons and all its rows (a Floating
   // card's content height); the strip's height otherwise.
@@ -306,6 +311,8 @@ private:
   DocumentSnapshot m_snapshot; // the last rebuild's
   QSet<QString> m_collapsed;   // folded groups
   QVector<QPair<QString, QToolButton*>> m_buttons; // the playback buttons
+  QToolButton* m_play = nullptr;   // PureCAD: Play
+  QTimer* m_playTimer = nullptr;
   QVector<int> m_buttonIcons; // their QStyle::StandardPixmap
   QStringList m_buttonSymbols; // their SF Symbols in a floating card; empty: the style's
   QString m_loggedColours;

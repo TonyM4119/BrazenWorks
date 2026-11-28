@@ -76,6 +76,10 @@ public:
   // Fork: Preferences › Layout › Navigation bar: smaller buttons, and the
   // commands' names beside their icons.
   void setLook(bool compact, bool labels);
+  // PureCAD: the bar's own buttons in this order, "|" a line between them,
+  // the others hidden (Preferences › Layout › Navigation bar › Items); an
+  // id with no button yet is the registry's command, given one.
+  void setItems(const QStringList& items);
 
   // The commands pinned to the bar (mitcad#1589), saved at once and logged
   // (above). An id is the command's or an alias's; sketch.parameters is
@@ -150,6 +154,7 @@ private:
   QWidget* m_pinSeparator = nullptr;
   QList<QToolButton*> m_pinButtons;
   QList<QToolButton*> m_fixedButtons;
+  QList<QWidget*> m_itemLines; // PureCAD: setItems' lines
   QPointer<QToolButton> m_pinDrag;
   QPoint m_pinDragStart;
   bool m_pinDragging = false;

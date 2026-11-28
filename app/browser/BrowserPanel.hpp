@@ -28,6 +28,17 @@ class QTreeWidgetItem;
 
 namespace mitcad {
 
+// PureCAD: how the Browser's rows start (Preferences › Layout › Browser):
+// components other than the top one open, every row but the top closed.
+struct BrowserOpenDefaults {
+  bool componentsOpen = true;
+  bool rowsClosed = false;
+};
+inline BrowserOpenDefaults& browserOpenDefaults() {
+  static BrowserOpenDefaults defaults;
+  return defaults;
+}
+
 class BrowserTree;
 
 // Where rows dragged in the Browser go on a row (mitcad#2103): onto it
