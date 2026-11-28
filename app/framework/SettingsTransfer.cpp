@@ -82,6 +82,7 @@ const SettingsRule kRules[] = {
     {"documents/openInCurrentWindow", "preferences", PathKind::None},
     {"documents/openDesignsIn", "preferences", PathKind::None},
     {"documents/quitOnLastClose", "preferences", PathKind::None},
+    {"documents/reopenLastDesigns", "preferences", PathKind::None}, // fork
     {"documents/newDesignSave", "preferences", PathKind::None},
     {"interface/language", "preferences", PathKind::None},
     {"components/askActivate", "preferences", PathKind::None},

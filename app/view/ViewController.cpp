@@ -2213,6 +2213,14 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   quitOnLastClose->setChecked(general->quitOnLastClose);
   quitOnLastClose->setToolTip(tr("Off, closing the last design shows the Start page and MitCad stays open"));
   control(generalForm, quitOnLastClose);
+  // Fork: the designs open when PureCAD ended open again at the next start
+  // without a file (main.cpp, WindowManager keeps them).
+  auto* reopenLast = new QCheckBox(tr("Reopen the designs that were open last time"));
+  reopenLast->setObjectName(QStringLiteral("reopenLastDesigns"));
+  reopenLast->setChecked(general->reopenLastDesigns);
+  reopenLast->setToolTip(tr("A start without a file opens the designs that were open when PureCAD ended, "
+                            "instead of Home"));
+  control(generalForm, reopenLast);
   // Save of a design that has no file yet (mitcad#2183): Ask (the question
   // On this computer or To a project, when a remote project is known), or
   // the answer Remember my choice keeps. Save As, Save to Project and a
@@ -2449,6 +2457,8 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     takeRow(autosaveRow);
     takeRow(folderRow);
     QVBoxLayout* column = generalPage->addSection(tr("Start and save"));
+    takeRow(reopenLast);
+    generalPage->adopt(column, reopenLast);
     QFormLayout* rows = generalPage->addForm(column);
     autosave->setText(tr("Every"));
     auto* every = new QHBoxLayout;
@@ -4507,7 +4517,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,
-             quitOnLastClose, newDesignSave,
+             quitOnLastClose, reopenLast, newDesignSave,
              cacheBox, updatesBox, slicerBox, remoteBox, renderWorker,
              renderDevice, debugLog, debugLogApplied, texturesBox, agentsBox, chatBox, fontsBox, layoutChoice,
              layoutApplied, themeChoice, languageChoice] {
@@ -4597,6 +4607,11 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     chosen.openInCurrentWindow = openInCurrent->isChecked();
     chosen.openDesignsIn = openDesignsIn->currentData().toString();
     chosen.quitOnLastClose = quitOnLastClose->isChecked();
+    chosen.reopenLastDesigns = reopenLast->isChecked();
+    if (chosen.reopenLastDesigns != general->reopenLastDesigns) {
+      qDebug().noquote() << QStringLiteral("Preferences: reopen the designs open last time %1")
+                                .arg(chosen.reopenLastDesigns ? QStringLiteral("on") : QStringLiteral("off"));
+    }
     if (chosen.quitOnLastClose != general->quitOnLastClose) {
       qDebug().noquote() << QStringLiteral("Preferences: quit when the last design is closed %1")
                                 .arg(chosen.quitOnLastClose ? QStringLiteral("on") : QStringLiteral("off"));
@@ -4903,6 +4918,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(openInCurrent, &QCheckBox::toggled, host, changed);
     connect(openDesignsIn, &QComboBox::currentIndexChanged, host, changed);
     connect(quitOnLastClose, &QCheckBox::toggled, host, changed);
+    connect(reopenLast, &QCheckBox::toggled, host, changed);
     connect(newDesignSave, &QComboBox::currentIndexChanged, host, changed);
     connect(cacheBox, &CachePreferencesBox::changed, host, changed);
     connect(texturesBox, &TexturePreferencesBox::changed, host, changed);

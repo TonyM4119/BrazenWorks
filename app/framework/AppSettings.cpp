@@ -51,6 +51,7 @@ GeneralSettings GeneralSettings::load() {
     general.openDesignsIn = presentation;
   }
   general.quitOnLastClose = settings.value(QStringLiteral("documents/quitOnLastClose"), false).toBool();
+  general.reopenLastDesigns = settings.value(QStringLiteral("documents/reopenLastDesigns"), false).toBool();
   // Another text (an edited settings file) is the question.
   const QString newDesignSave =
       settings.value(QStringLiteral("documents/newDesignSave"), general.newDesignSave).toString();
@@ -71,6 +72,7 @@ void GeneralSettings::save() const {
   settings.setValue(QStringLiteral("documents/openInCurrentWindow"), openInCurrentWindow);
   settings.setValue(QStringLiteral("documents/openDesignsIn"), openDesignsIn);
   settings.setValue(QStringLiteral("documents/quitOnLastClose"), quitOnLastClose);
+  settings.setValue(QStringLiteral("documents/reopenLastDesigns"), reopenLastDesigns);
   settings.setValue(QStringLiteral("documents/newDesignSave"), newDesignSave);
 }
 
