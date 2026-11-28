@@ -21,8 +21,8 @@ struct ToolsPrefs {
   bool holeMoveByClick = false;
   bool holeSeveralOnFace = false;
   bool holeGroupTogether = false;
-  bool extrudeToTarget = true;
-  bool extrudeArrowStops = true;
+  bool extrudeToTarget = false;   // PureCAD: off keeps Extrude as before
+  bool extrudeArrowStops = false; // PureCAD: off keeps the drag as before
   bool extrudeIsometric = false;
   bool extrudeReturnView = false;
   int newExtrudeDistance = 0;       // 0 Fixed, 1 The last used, 2 From the profile's size

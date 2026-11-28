@@ -643,6 +643,15 @@ ManipulatorOverlay::DragValue ManipulatorOverlay::valueAt(const Handle& handle, 
     // The step fixed when the drag began (mitcad#1431); a value asked
     // for outside a drag at the step it would take now.
     const double step = m_dragStep > 0.0 ? m_dragStep : arrowStep(handle).step;
+    // PureCAD: an arrow's stops (faces it passes) take the value within 8 px.
+    if (!m.stops.empty()) {
+      const double reach = 8.0 * pixelSize(m.origin) / factor;
+      for (const double stop : m.stops) {
+        if (stop >= m.minimum && std::abs(stop - raw) <= reach) {
+          return {stop, raw};
+        }
+      }
+    }
     return {std::max(m.minimum, std::round(raw / step) * step), raw};
   }
   const double angle = ringAngle(handle, position);
