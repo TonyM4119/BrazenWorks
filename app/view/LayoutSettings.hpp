@@ -58,7 +58,7 @@ struct LayoutSettings {
   bool partsLibrary = false;
   bool browserTree = true;
   bool sketchesUnderFeature = false;    // Sketches in History: In order or Under their feature
-  int bodiesFolders = 1;                // 0 Always, 1 Several, 2 Never
+  int bodiesFolders = 0;                // 0 Always (as before), 1 Several, 2 Never
   bool playHistoryButton = true;
   bool foldHistoryGroups = false;
   bool folderIconFromFeatures = false;
