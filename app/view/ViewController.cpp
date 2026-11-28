@@ -3,6 +3,7 @@
 #include "NavigationPreferences.hpp"
 #include "RadialMenu.hpp" // Fork
 #include "AppearancePreferences.hpp"
+#include "DesignPreferences.hpp"
 #include "GraphicsPreferences.hpp"
 #include "SketchPreferences.hpp"
 #include "LayoutPreferences.hpp" // Fork
@@ -373,6 +374,11 @@ const PreferencePage kPreferencePages[] = {
     {"textures", QT_TRANSLATE_NOOP("View", "Textures"),
      "texture folders maps materials appearance images internet online",
      "LOOK", QT_TRANSLATE_NOOP("View", "Folders of textures for appearances."), "image-reference"},
+    // Fork: SolidCraft's Design page (shown under WORK).
+    {"design", QT_TRANSLATE_NOOP("View", "Design"),
+     "design units precision decimals parameters kernel check body drawings projection template sheet calibration "
+     "orientation z_up y_up import heal export file_name folders origin planes linked assemblies joint trackball paste",
+     "WORK", QT_TRANSLATE_NOOP("View", "What new designs start with."), "component"},
     // The first dimension scales the sketch (mitcad#860).
     // Click adds to the selection in sketches (mitcad#1403).
     // Esc leaves an unchanged sketch (mitcad#1623).
@@ -427,7 +433,8 @@ bool pageFills(const char* id) {
   return page == QLatin1String("textures") || page == QLatin1String("agents") || page == QLatin1String("fonts") ||
          page == QLatin1String("navigation") || page == QLatin1String("cloud") ||
          page == QLatin1String("layout") || page == QLatin1String("graphics") ||
-         page == QLatin1String("sketch") || page == QLatin1String("appearance"); // fork: own scroll areas
+         page == QLatin1String("sketch") || page == QLatin1String("appearance") ||
+         page == QLatin1String("design"); // fork: own scroll areas
 }
 
 // A page's keywords as the command search and Preferences' search take
@@ -3958,6 +3965,23 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
     connect(dialog.get(), &QDialog::accepted, appearancePage, [appearancePage] { appearancePage->commit(); });
   }
   groups.insert(QStringLiteral("appearance"), appearanceBox);
+
+  // Fork: Preferences › Design (SolidCraft's, view/DesignPreferences.hpp).
+  // Units of new designs sets the General page's control (its row hidden
+  // there), which keeps its saving.
+  QWidget* designBox = section(tr("Design"));
+  auto* designColumn = new QVBoxLayout(designBox);
+  insetPreferencesGroup(designColumn, window == nullptr);
+  auto* designPage = new DesignPreferences(newDesignUnits->currentText());
+  designColumn->addWidget(designPage);
+  designPage->applyUnits = [newDesignUnits](const QString& units) { newDesignUnits->setCurrentText(units); };
+  generalForm->setRowVisible(newDesignUnits, false);
+  if (window != nullptr) {
+    designPage->onChanged = [designPage] { designPage->commit(); };
+  } else {
+    connect(dialog.get(), &QDialog::accepted, designPage, [designPage] { designPage->commit(); });
+  }
+  groups.insert(QStringLiteral("design"), designBox);
 
   *commit = [this, general, top, bottom, navigation, camera, cubeProjection, background,
              autosave, minutes, importTolerance, newDesignUnits, temperatureUnit, openInCurrent, openDesignsIn,

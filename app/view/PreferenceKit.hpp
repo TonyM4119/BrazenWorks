@@ -299,6 +299,7 @@ protected:
       apply(id);
       changed();
     });
+    row->setMinimumHeight(row->sizeHint().height()); // never squeezed by a row of combo boxes
     return row;
   }
   // A row of picture cards, one of which is chosen.
