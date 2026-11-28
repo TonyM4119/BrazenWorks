@@ -2872,6 +2872,10 @@ private:
     gp_Pnt target;   // where it was dragged to, in the parent's coordinates
     std::vector<BodyDisplay> bodies; // as shown when the drag began
     QString contact; // the contact that stops it now (mitcad#454), if any
+    // PureCAD: Design › Ball joint trackball: the ball's centre (parent's
+    // coordinates) and where the pointer began, when the part turns so.
+    std::optional<gp_Pnt> ballCenter;
+    QPoint pressedAt;
   };
   std::optional<OccurrenceDragState> m_drag;
   QString m_dragHint; // the hover's drag hint shown (mitcad#150)
