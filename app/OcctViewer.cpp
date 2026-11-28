@@ -489,61 +489,82 @@ protected:
     const gp_Dir up = camera->Up();
     const gp_Dir right = dir.Crossed(up);
     const QPointF c(width() / 2.0, height() / 2.0);
-    const double reach = std::min(width(), height()) / 2.0 - 14;
+    // SolidCraft's size: short axes, about two fifths of the area's radius.
+    const double reach = std::min(width(), height()) / 2.0 * 0.42;
     for (int axis = 0; axis < 3; ++axis) {
       for (const bool positive : {true, false}) {
         gp_Vec v(axis == 0 ? 1 : 0, axis == 1 ? 1 : 0, axis == 2 ? 1 : 0);
         if (!positive) v.Reverse();
         const double x = v.Dot(gp_Vec(right));
         const double y = -v.Dot(gp_Vec(up));
-        result.append({c + QPointF(x, y) * reach * (positive ? 1.0 : 0.62), v.Dot(gp_Vec(dir)), axis, positive});
+        result.append({c + QPointF(x, y) * reach, v.Dot(gp_Vec(dir)), axis, positive});
       }
     }
     // The farther first, so that the nearer are drawn over them.
     std::sort(result.begin(), result.end(), [](const End& a, const End& b) { return a.depth > b.depth; });
     return result;
   }
+  // SolidCraft's look: thick axes, a large ball with its letter at each
+  // positive end and a ring at each negative one, the ends that point away
+  // faded, a dark dot in the middle, a faint disc behind while hovered.
+  static constexpr double kBall = 13.0;
+  static constexpr double kRing = 8.5;
   void paintEvent(QPaintEvent*) override {
     QPainter p(this);
     p.setRenderHint(QPainter::Antialiasing);
-    const QColor colours[3] = {QColor(0xc8282a), QColor(0x2e9e3e), QColor(0x1f4fb8)};
+    const QColor colours[3] = {QColor(0xd1342c), QColor(0x2f9a3c), QColor(0x1d5fd6)};
     const char* names[3] = {"X", "Y", "Z"};
     const QPointF c(width() / 2.0, height() / 2.0);
     QColor disc = palette().color(QPalette::WindowText);
-    disc.setAlphaF(m_hover ? 0.10f : 0.05f);
-    p.setPen(Qt::NoPen);
+    disc.setAlphaF(m_hover ? 0.07f : 0.03f);
+    QColor ring = palette().color(QPalette::WindowText);
+    ring.setAlphaF(0.08f);
+    p.setPen(QPen(ring, 1.0));
     p.setBrush(disc);
-    p.drawEllipse(c, width() / 2.0 - 4, height() / 2.0 - 4);
+    p.drawEllipse(c, width() / 2.0 - 6, height() / 2.0 - 6);
     const auto list = ends();
+    const auto faded = [](QColor colour, const End& end) {
+      if (end.depth > 0.05) colour.setAlphaF(0.45f); // pointing away from the eye
+      return colour;
+    };
+    // The axes' lines from the middle, the farther first.
     for (const End& end : list) {
-      const QColor colour = colours[end.axis];
-      p.setPen(QPen(colour, 2.0));
-      p.drawLine(c, end.at);
+      p.setPen(QPen(faded(colours[end.axis], end), 4.0, Qt::SolidLine, Qt::RoundCap));
+      const QPointF towards = end.at - c;
+      const double length = std::hypot(towards.x(), towards.y());
+      const double stop = end.positive ? kBall : kRing;
+      if (length > stop) p.drawLine(c, c + towards * ((length - stop) / length));
     }
+    p.setPen(Qt::NoPen);
+    p.setBrush(QColor(0x1e2328));
+    p.drawEllipse(c, 4.0, 4.0);
     QFont bold = font();
     bold.setBold(true);
-    bold.setPointSizeF(std::max(7.0, bold.pointSizeF() * 0.85));
+    bold.setPointSizeF(std::max(8.0, bold.pointSizeF() * 1.1));
     p.setFont(bold);
     for (const End& end : list) {
-      const QColor colour = colours[end.axis];
+      const QColor colour = faded(colours[end.axis], end);
       const bool lit = m_hoverEnd && m_hoverEnd->first == end.axis && m_hoverEnd->second == end.positive;
       if (end.positive) {
-        p.setPen(lit ? QPen(palette().color(QPalette::WindowText), 1.5) : Qt::NoPen);
+        p.setPen(lit ? QPen(palette().color(QPalette::WindowText), 1.6) : Qt::NoPen);
         p.setBrush(colour);
-        p.drawEllipse(end.at, 10.5, 10.5);
-        p.setPen(Qt::white);
-        p.drawText(QRectF(end.at.x() - 10, end.at.y() - 10, 20, 20), Qt::AlignCenter, QString::fromLatin1(names[end.axis]));
+        p.drawEllipse(end.at, kBall + (lit ? 1.5 : 0.0), kBall + (lit ? 1.5 : 0.0));
+        p.setPen(QColor(255, 255, 255, colour.alpha()));
+        p.drawText(QRectF(end.at.x() - kBall, end.at.y() - kBall, 2 * kBall, 2 * kBall), Qt::AlignCenter,
+                   QString::fromLatin1(names[end.axis]));
       } else {
-        p.setPen(QPen(colour, lit ? 2.6 : 1.8));
-        p.setBrush(palette().color(QPalette::Base));
-        p.drawEllipse(end.at, 6.0, 6.0);
+        p.setPen(QPen(colour, lit ? 3.6 : 3.0));
+        QColor inside = palette().color(QPalette::Base);
+        inside.setAlphaF(0.85f);
+        p.setBrush(inside);
+        p.drawEllipse(end.at, kRing, kRing);
       }
     }
   }
   std::optional<std::pair<int, bool>> endAt(const QPointF& at) const {
     const auto list = ends();
     for (auto it = list.crbegin(); it != list.crend(); ++it) { // the nearest first
-      if (std::hypot(it->at.x() - at.x(), it->at.y() - at.y()) <= (it->positive ? 11.5 : 8.0)) {
+      if (std::hypot(it->at.x() - at.x(), it->at.y() - at.y()) <= (it->positive ? kBall + 1.5 : kRing + 2.0)) {
         return std::pair<int, bool>{it->axis, it->positive};
       }
     }
@@ -7911,13 +7932,9 @@ void OcctViewer::placeHomeButton() {
   }
   // At the cube's upper left, at the cube's size (mitcad#2071); fork: with
   // the Axes navigator, left of its whole area, clear of its axes.
-  if (m_navigation.viewNavigator == ViewNavigator::Axes) {
-    m_homeButton->move(width() - m_overlayInsets.right() - 2 * cubeOffset() - m_homeButton->width() - 2,
-                       m_overlayInsets.top() + cubeScaled(9));
-  } else {
-    m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
-                       m_overlayInsets.top() + cubeScaled(9));
-  }
+  // (The Axes navigator's compact axes leave its corner free too.)
+  m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
+                     m_overlayInsets.top() + cubeScaled(9));
   m_homeButton->raise();
   const QPoint at = mapTo(window(), m_homeButton->geometry().center());
   qDebug().noquote() << QStringLiteral("View home at %1,%2").arg(at.x()).arg(at.y());
@@ -8070,6 +8087,13 @@ void OcctViewer::turnCube(const QString& arrow) {
 }
 
 bool OcctViewer::isOnOrientationCube(const QPointF& position) {
+  // Fork: the Axes navigator's area drags as the cube does (an orbit); its
+  // balls and rings take their clicks before the view sees them.
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    const QPointF middle = QRectF(m_axesNavigator->geometry()).center();
+    const double radius = m_axesNavigator->width() / 2.0 - 6;
+    return std::hypot(position.x() - middle.x(), position.y() - middle.y()) <= radius;
+  }
   if (m_view->Window().IsNull() || !cubeArea().contains(position)) {
     return false;
   }
