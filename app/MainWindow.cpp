@@ -3534,7 +3534,10 @@ void MainWindow::startFeatureCommand(const CommandDef& def, const QString& editU
   }
   // Started by Repeat: the panel starts from the settings of the command's
   // last OK, its selections empty (mitcad#1686).
-  if (editUid.isEmpty() && analysis.isEmpty() && def.id == m_repeatCommand) {
+  // PureCAD: Preferences › Tools › Remember dialog values: every new run of
+  // a command starts from its last OK's settings, as Repeat does.
+  const bool remembers = QSettings().value(QStringLiteral("tools/rememberDialogValues"), false).toBool();
+  if (editUid.isEmpty() && analysis.isEmpty() && (def.id == m_repeatCommand || remembers)) {
     if (const auto found = m_repeatSettings.constFind(def.id); found != m_repeatSettings.cend()) {
       session->setRepeatSettings(found.value());
     }
