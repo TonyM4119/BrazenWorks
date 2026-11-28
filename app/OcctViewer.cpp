@@ -459,6 +459,27 @@ QString overlaySymbol(const QString& id) {
   return {};
 }
 
+// Fork: the U-turn arrow of the Axes navigator's Turn Around button, drawn
+// in black (the button tints it).
+QIcon uTurnIcon() {
+  QPixmap pixmap(64, 64);
+  pixmap.fill(Qt::transparent);
+  QPainter p(&pixmap);
+  p.setRenderHint(QPainter::Antialiasing);
+  QPainterPath path(QPointF(17, 54));
+  path.lineTo(17, 30);
+  path.arcTo(QRectF(17, 12, 30, 36), 180, -180);
+  path.lineTo(47, 40);
+  p.setPen(QPen(Qt::black, 7.0, Qt::SolidLine, Qt::RoundCap, Qt::RoundJoin));
+  p.drawPath(path);
+  QPolygonF head{{35, 38}, {59, 38}, {47, 55}};
+  p.setPen(Qt::NoPen);
+  p.setBrush(Qt::black);
+  p.drawPolygon(head);
+  p.end();
+  return QIcon(pixmap);
+}
+
 // Fork: the Axes view navigator (Preferences › Navigation › View navigator):
 // the model's axes from the camera, a coloured ball with its letter at each
 // positive end and a hollow ring at each negative one, the nearer drawn over
@@ -7718,6 +7739,10 @@ void OcctViewer::sizeCubeButtons() {
   const bool glass = chromeStyle() == ChromeStyle::Floating;
   m_homeButton->setIconSize(QSize(cubeScaledSize(14), cubeScaledSize(14)));
   m_homeButton->setFixedSize(QSize(cubeScaledSize(36), cubeScaledSize(24)));
+  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
+    // Fork: round beside the Axes navigator, as SolidCraft's.
+    m_homeButton->setFixedSize(QSize(cubeScaledSize(26), cubeScaledSize(26)));
+  }
   const int arrow = cubeScaledSize(glass ? 26 : 22);
   const int icon = cubeScaledSize(glass ? 12 : 16);
   for (const auto& [id, button] : m_cubeArrows) {
@@ -7967,16 +7992,51 @@ void OcctViewer::setOverlayInsets(const QMargins& insets) {
 void OcctViewer::placeHomeButton() {
   if (m_nativeControls) {
     m_homeButton->hide();
+    if (m_axesTurnButton != nullptr) {
+      m_axesTurnButton->hide();
+    }
     return;
   }
   // At the cube's upper left, at the cube's size (mitcad#2071); fork: with
   // the Axes navigator, left of its whole area, clear of its axes.
   // (The Axes navigator's compact axes leave its corner free too.)
-  if (m_axesNavigator != nullptr && m_axesNavigator->isVisible()) {
-    // Fork: at the compact Axes navigator's upper left.
+  sizeCubeButtons(); // round with the Axes navigator, a capsule with the cube
+  const bool axes = m_axesNavigator != nullptr && m_axesNavigator->isVisible();
+  if (axes && m_axesTurnButton == nullptr) {
+    m_axesTurnButton = new ViewCubeHomeButton(this);
+    m_axesTurnButton->setObjectName(QStringLiteral("viewAxesTurnAround"));
+    m_axesTurnButton->setIcon(uTurnIcon());
+    m_axesTurnButton->setAutoRaise(true);
+    m_axesTurnButton->setFocusPolicy(Qt::NoFocus);
+    m_axesTurnButton->setDark(m_backgroundDark);
+    m_axesTurnButton->setToolTip(tr("Turn around: look from the other side"));
+    connect(m_axesTurnButton, &QToolButton::clicked, this, [this] {
+      // From any view, not only face on: the view from the other side, the
+      // same way up.
+      qDebug() << "Axes navigator: turn around";
+      runViewOperation(QStringLiteral("axes turn around"), [this] {
+        settleCamera();
+        const occ::handle<Graphic3d_Camera>& camera = m_view->Camera();
+        turnTo(camera->Direction().Reversed(), camera->Up());
+      });
+      fitAfterNavigator();
+    });
+  }
+  if (m_axesTurnButton != nullptr) {
+    m_axesTurnButton->setVisible(axes);
+  }
+  if (axes) {
+    // Fork: round buttons at the compact Axes navigator's upper corners,
+    // Home on the left and Turn Around on the right, as SolidCraft's.
     const int side = cubeScaled(92);
-    m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - side / 2 - m_homeButton->width() / 2,
-                       m_overlayInsets.top() + cubeOffset() - side / 2 - m_homeButton->height() / 3);
+    const QPoint middle(width() - m_overlayInsets.right() - cubeOffset(), m_overlayInsets.top() + cubeOffset());
+    const int reach = side * 2 / 5;
+    m_homeButton->move(middle + QPoint(-reach, -reach) - QPoint(m_homeButton->width() / 2, m_homeButton->height() / 2));
+    m_axesTurnButton->setIconSize(m_homeButton->iconSize());
+    m_axesTurnButton->setFixedSize(m_homeButton->size());
+    m_axesTurnButton->move(middle + QPoint(reach, -reach) -
+                           QPoint(m_axesTurnButton->width() / 2, m_axesTurnButton->height() / 2));
+    m_axesTurnButton->raise();
   } else {
     m_homeButton->move(width() - m_overlayInsets.right() - cubeOffset() - cubeScaled(73),
                        m_overlayInsets.top() + cubeScaled(9));
@@ -9022,6 +9082,9 @@ void OcctViewer::setBackground(const QColor& top, const QColor& bottom, bool gra
     updateOverlayIcons(); // the buttons over the view
     setViewCubeBackdrop(*m_orientationCube, m_backgroundDark); // the cube's glass
     m_homeButton->setDark(m_backgroundDark);
+    if (m_axesTurnButton != nullptr) {
+      m_axesTurnButton->setDark(m_backgroundDark);
+    }
     m_context->Redisplay(m_orientationCube, false);
     restyleSketchEntities();
     // A feature's input lines have a variant for each tone (mitcad#957).

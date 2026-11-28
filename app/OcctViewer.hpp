@@ -2478,6 +2478,8 @@ private:
   ViewCubeHomeButton* m_homeButton = nullptr;
   // Fork: the Axes view navigator, when Preferences shows it.
   QWidget* m_axesNavigator = nullptr;
+  // Fork: the Axes navigator's round Turn Around button, at its upper right.
+  ViewCubeHomeButton* m_axesTurnButton = nullptr;
   bool m_nativeControls = false;
   bool m_backgroundDark = false; // the view's background is dark
   QColor m_backgroundTop = QColor(237, 240, 245);
