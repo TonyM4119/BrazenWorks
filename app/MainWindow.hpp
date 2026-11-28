@@ -611,6 +611,9 @@ public:
 protected:
   void keyPressEvent(QKeyEvent* event) override;
   void closeEvent(QCloseEvent* event) override;
+  // PureCAD: Preferences › Layout › Pause drawing while the window is
+  // dragged (Windows: between the system's start and end of a move or size).
+  bool nativeEvent(const QByteArray& eventType, void* message, qintptr* result) override;
   // Files dropped on the window are opened or imported (U6).
   void dragEnterEvent(QDragEnterEvent* event) override;
   // Each move over the window accepted as the enter was (mitcad#2289): a
@@ -1605,6 +1608,7 @@ private:
   // command's toolbar buttons tinted while it runs (empty: none).
   void markActiveCommand(const QString& id);
   QElapsedTimer m_sketchEscTimer; // PureCAD: Sketch › Esc twice finishes
+  bool m_dragPaused = false;      // PureCAD: Layout › Pause drawing while dragged
   // What the panel asks for (paths relative to the project at `root`).
   void createDesignInProject(const QString& root, const QString& path);
   void createFolderInProject(const QString& root, const QString& path);

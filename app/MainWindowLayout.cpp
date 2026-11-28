@@ -246,4 +246,28 @@ void MainWindow::markActiveCommand(const QString& id) {
   }
 }
 
+bool MainWindow::nativeEvent(const QByteArray& eventType, void* message, qintptr* result) {
+#ifdef Q_OS_WIN
+  if (eventType == "windows_generic_MSG" && message != nullptr && m_viewer != nullptr) {
+    // A MSG starts with its window and its message id (no <windows.h> here).
+    struct MessageHead {
+      void* window;
+      unsigned int id;
+    };
+    constexpr unsigned int kEnterSizeMove = 0x0231; // WM_ENTERSIZEMOVE
+    constexpr unsigned int kExitSizeMove = 0x0232;  // WM_EXITSIZEMOVE
+    const unsigned int id = static_cast<const MessageHead*>(message)->id;
+    if (id == kEnterSizeMove && LayoutSettings::load().pauseDrawingWhileDragged) {
+      m_dragPaused = true;
+      m_viewer->setUpdatesEnabled(false);
+    } else if (id == kExitSizeMove && m_dragPaused) {
+      m_dragPaused = false;
+      m_viewer->setUpdatesEnabled(true);
+      m_viewer->update();
+    }
+  }
+#endif
+  return QMainWindow::nativeEvent(eventType, message, result);
+}
+
 } // namespace mitcad
