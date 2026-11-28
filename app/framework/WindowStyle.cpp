@@ -21,6 +21,7 @@
 #include <QPen>
 #include <QProxyStyle>
 #include <QScrollBar>
+#include <QSettings>
 #include <QSizePolicy>
 #include <QStyle>
 #include <QStyleFactory>
@@ -139,6 +140,17 @@ WindowColors windowColors(const QPalette& palette) {
 #else
   colors.accent = actionColor(palette);
 #endif
+  // PureCAD: Preferences › Appearance › Accent: one of the swatches
+  // (AppearancePrefs::accentColor) in place of the theme's own.
+  {
+    static const QColor swatches[8] = {QColor(0x1f, 0x4f, 0xb8), QColor(0x2e, 0x96, 0x34), QColor(0x1f, 0x8c, 0x7a),
+                                       QColor(0x6a, 0x35, 0xc8), QColor(0xc8, 0x3a, 0x8a), QColor(0xc8, 0x3a, 0x2e),
+                                       QColor(0xe0, 0x6c, 0x1a), QColor(0xd8, 0xa8, 0x22)};
+    const int accent = QSettings().value(QStringLiteral("appearance/accent"), -1).toInt();
+    if (accent >= 0 && accent < 8) {
+      colors.accent = colors.dark ? swatches[accent].lighter(125) : swatches[accent];
+    }
+  }
   // The neutral roles of the role table (mitcad#1041).
   const auto role = [&colors](ColorRole r) { return themeColor(r, colors.dark); };
   colors.window = role(ColorRole::Window);

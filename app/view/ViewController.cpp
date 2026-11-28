@@ -168,6 +168,9 @@
 
 namespace mitcad {
 namespace {
+// PureCAD: Appearance › Accent when Preferences opened (its change restyles).
+int g_accentAtOpen = -1;
+
 
 // Fork: the brand's community links, read through a call so that the checks
 // on it are not constant conditions (MSVC C4127).
@@ -4501,6 +4504,7 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
   appearanceShown.scale = savedInterfaceSize();
   appearanceShown.systemFont = savedFontFamily().isEmpty();
   appearanceShown.family = savedFontFamily();
+  g_accentAtOpen = QSettings().value(QStringLiteral("appearance/accent"), -1).toInt(); // PureCAD
   auto* appearancePage = new AppearancePreferences(appearanceShown);
   appearanceColumn->addWidget(appearancePage);
   appearancePage->apply = [themeChoice, background, top, bottom, interfaceSize, systemFont,
@@ -4835,6 +4839,13 @@ void ViewController::showPreferences(const QString& page, const QString& query) 
       qDebug().noquote() << QStringLiteral("Preferences: theme %1").arg(themeChoiceName(theme));
       applyThemePreference(theme);
     }
+    // PureCAD: Appearance's theme file and accent, once its page has saved.
+    QTimer::singleShot(0, qApp, [accentBefore = g_accentAtOpen] {
+      applyThemeFile();
+      if (QSettings().value(QStringLiteral("appearance/accent"), -1).toInt() != accentBefore) {
+        applyThemePreference(themePreference()); // the window's colors again
+      }
+    });
     // The window's layout (mitcad#419): saved for the next starts; one other
     // than the window's asks whether to restart now, once the dialog is gone.
     if (layoutChoice != nullptr && layoutChoice->currentData().toInt() != *layoutApplied) {

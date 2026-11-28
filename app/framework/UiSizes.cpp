@@ -1,6 +1,9 @@
 // SPDX-License-Identifier: MIT
 #include "framework/UiSizes.hpp"
 
+#include <QHash>
+#include <QGuiApplication>
+#include <QFileInfo>
 #include <QApplication>
 #include <QFont>
 #include <QFontDatabase>
@@ -43,6 +46,23 @@ int savedIconSize(const QSettings& settings) { return uiSizeFromValue(settings.v
 int savedIconSize() { return savedIconSize(QSettings()); }
 
 QString savedFontFamily(const QSettings& settings) {
+  // PureCAD: Preferences › Appearance › Font file: a font of one's own, loaded
+  // once, wins over the family chosen by name.
+  const QString file = settings.value(QStringLiteral("appearance/fontFile")).toString();
+  if (!file.isEmpty() && QGuiApplication::instance() != nullptr) {
+    static QHash<QString, QString> loaded;
+    auto found = loaded.find(file);
+    if (found == loaded.end()) {
+      QString family;
+      if (QFileInfo(file).isReadable()) {
+        const int id = QFontDatabase::addApplicationFont(file);
+        const QStringList families = id >= 0 ? QFontDatabase::applicationFontFamilies(id) : QStringList();
+        if (!families.isEmpty()) family = families.first();
+      }
+      found = loaded.insert(file, family);
+    }
+    if (!found->isEmpty()) return *found;
+  }
   return settings.value(QLatin1String(kFontKey)).toString().trimmed();
 }
 QString savedFontFamily() { return savedFontFamily(QSettings()); }

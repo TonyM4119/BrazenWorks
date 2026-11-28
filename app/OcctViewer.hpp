@@ -2467,6 +2467,7 @@ private:
   gp_Ax3 m_gridPlane;
   bool m_gridHome = true;          // PureCAD: the grid on XY, free to follow the view
   bool m_gridFollowsView = false;  // PureCAD: Graphics › Grid follows the view
+  QString m_backgroundPicture;     // PureCAD: Appearance › Picture, as shown
   Graphic3d_ZLayerId m_gridLayer = Graphic3d_ZLayerId_UNKNOWN;
   int m_gridRebuilds = 0; // updateGrid's rebuilds so far (a 3D mouse motion's log counts them)
   // Fork: the plane ruler (setPlaneRuler): the plane, the grid's plane before

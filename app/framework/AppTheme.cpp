@@ -1,6 +1,7 @@
 // SPDX-License-Identifier: MIT
 #include "AppTheme.hpp"
 
+#include <QFile>
 #include <QApplication>
 #include <QColor>
 #include <QCoreApplication>
@@ -175,10 +176,32 @@ void startThemePreference() {
   }
   // The platform's scheme, as before the preference: nothing asked.
   state().choice = choice;
+  applyThemeFile(); // PureCAD
   qInfo().noquote() << QStringLiteral("Theme: system (%1)").arg(schemeName(isDarkTheme()));
 }
 
-void applyThemePreference(ThemeChoice choice) { apply(choice, false); }
+void applyThemePreference(ThemeChoice choice) {
+  apply(choice, false);
+  applyThemeFile();
+}
+
+// PureCAD: Preferences › Appearance › Import theme file: a Qt style sheet
+// (.qss) over the whole application while "Follow the theme file" is on.
+void applyThemeFile() {
+  static bool ours = false; // the application's style sheet is the file's
+  const QSettings store;
+  const QString file = store.value(QStringLiteral("appearance/themeFile")).toString();
+  QString sheet;
+  if (store.value(QStringLiteral("appearance/followThemeFile"), false).toBool() &&
+      file.endsWith(QStringLiteral(".qss"), Qt::CaseInsensitive)) {
+    QFile read(file);
+    if (read.open(QIODevice::ReadOnly | QIODevice::Text)) sheet = QString::fromUtf8(read.readAll());
+  }
+  if (sheet.isEmpty() && !ours) return;
+  if (qApp->styleSheet() != sheet) qApp->setStyleSheet(sheet);
+  ours = !sheet.isEmpty();
+  qInfo().noquote() << (ours ? QStringLiteral("Theme file applied: %1").arg(file) : QStringLiteral("Theme file off"));
+}
 
 void applyTestColorScheme(bool dark) {
   // Qt's Windows and macOS platform themes follow the request themselves

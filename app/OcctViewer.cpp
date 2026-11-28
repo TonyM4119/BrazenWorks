@@ -71,6 +71,8 @@
 #include <typeinfo>
 #include <utility>
 
+#include <QFileInfo>
+#include <QSettings>
 #include <QApplication>
 #include <QCursor>
 #include <QGuiApplication>
@@ -3170,6 +3172,19 @@ void OcctViewer::applyBackground() {
   } else {
     m_view->SetBgGradientStyle(Aspect_GradientFillMethod_None);
     m_view->SetBackgroundColor(occtColor(m_backgroundTop));
+  }
+  // PureCAD: Preferences › Appearance › Picture: a picture of one's own over
+  // the background, stretched to the view.
+  const QString picture = QSettings().value(QStringLiteral("appearance/picture")).toString();
+  const QString shown = !picture.isEmpty() && QFileInfo(picture).isReadable() ? picture : QString();
+  if (shown != m_backgroundPicture) {
+    m_backgroundPicture = shown;
+    if (shown.isEmpty()) {
+      m_view->SetBackgroundImage(occ::handle<Graphic3d_Texture2D>(), Aspect_FM_NONE, false);
+    } else {
+      m_view->SetBackgroundImage(QFileInfo(shown).absoluteFilePath().toLocal8Bit().constData(), Aspect_FM_STRETCH,
+                                 false);
+    }
   }
 }
 
