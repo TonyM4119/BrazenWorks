@@ -2284,12 +2284,25 @@ void SketchOverlay::paint(QPainter& painter) {
   }
   logInactive();
   if (m_c.showConstraints()) {
+    // PureCAD: Preferences › Sketch › Hide glyphs when zoomed out: a glyph
+    // that would sit on one already drawn (the sketch shrunk on screen) is
+    // left out unless it is selected, hovered or in conflict.
+    const bool thinOut = sketchSwitch("hideGlyphsZoomedOut", true);
+    std::vector<QRectF> drawnGlyphs;
     for (const Glyph& g : glyphs()) {
       const bool selected = g.constraint.isEmpty() ? isSelected(QStringLiteral("fix"), g.entity)
                                                    : isSelected(QStringLiteral("constraint"), g.constraint);
       const bool conflicted = conflictColoring() && !g.constraint.isEmpty() && conflicts.contains(g.constraint);
       const bool hovered = (g.constraint.isEmpty() ? hover == g.entity : hover == g.constraint) ||
                            (conflicted && conflictHovered);
+      if (thinOut && !selected && !hovered && !conflicted) {
+        const QRectF core = g.rect.adjusted(2, 2, -2, -2);
+        if (std::any_of(drawnGlyphs.begin(), drawnGlyphs.end(),
+                        [&core](const QRectF& other) { return other.intersects(core); })) {
+          continue;
+        }
+      }
+      drawnGlyphs.push_back(g.rect);
       const bool dimmed =
           !selected && !hovered && !conflicted &&
           behindBodies(QStringLiteral("glyph %1 %2 %3").arg(g.constraint, g.entity, g.type), g.rect.center());
