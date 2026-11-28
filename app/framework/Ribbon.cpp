@@ -31,6 +31,7 @@
 #include <QKeyEvent>
 #include <QLabel>
 #include <QMargins>
+#include <QSettings>
 #include <QMenu>
 #include <QMouseEvent>
 #include <QPaintEvent>
@@ -359,6 +360,39 @@ void drawChevron(QPainter& painter, const QPointF& center, const QColor& color) 
 // pointer is not on the button, on every platform. The drawn state logged
 // for the UI tests: "Ribbon SKETCH/CREATE/Rectangles after its menu: not
 // hovered" (a split button's place, a group caption's "SKETCH/MODIFY").
+// PureCAD: Preferences › Layout › Panel menus open on hover: a group's ˅
+// opens its menu once the pointer rests on it, read when the pointer comes.
+class HoverOpensMenu : public QObject {
+public:
+  explicit HoverOpensMenu(QToolButton* button) : QObject(button), m_button(button) {
+    m_wait.setSingleShot(true);
+    m_wait.setInterval(250);
+    QObject::connect(&m_wait, &QTimer::timeout, this, [this] {
+      if (m_button->underMouse() && m_button->isEnabled() && QApplication::activePopupWidget() == nullptr) {
+        m_button->showMenu();
+      }
+    });
+    button->installEventFilter(this);
+  }
+
+protected:
+  bool eventFilter(QObject* watched, QEvent* event) override {
+    if (watched == m_button) {
+      if (event->type() == QEvent::Enter &&
+          QSettings().value(QStringLiteral("layout/panelMenusOnHover"), false).toBool()) {
+        m_wait.start();
+      } else if (event->type() == QEvent::Leave) {
+        m_wait.stop();
+      }
+    }
+    return QObject::eventFilter(watched, event);
+  }
+
+private:
+  QToolButton* m_button;
+  QTimer m_wait;
+};
+
 void endHoverAfterMenu(QToolButton* button, QMenu* menu, const QString& place) {
   QObject::connect(menu, &QMenu::aboutToHide, button, [button, place] {
     // After the menu's own hide and the events it sends.
@@ -3786,6 +3820,7 @@ QWidget* Ribbon::finishGroup(QWidget* widget, QWidget* row, QToolButton* menuBut
   menuButton->setFocusPolicy(Qt::NoFocus);
   menuButton->setMenu(menu);
   endHoverAfterMenu(menuButton, menu, key(tab, group));
+  new HoverOpensMenu(menuButton); // PureCAD
   m_groupButtons.insert(key(tab, group), menuButton);
   // Its right-click: the group's own menu of the layout (mitcad#1991), its
   // order among the tab's groups and the buttons the user removed.
