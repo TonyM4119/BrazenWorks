@@ -7563,6 +7563,18 @@ void MainWindow::setSelection(const Selection& items) {
     }
     m_viewer->setHiddenEdgesOf(dashed);
     updateProfileOperations(); // PureCAD
+    // PureCAD: Preferences › Tools › Direct interaction: one face picked on
+    // an idle view brings Press Pull's arrow on it at once, to drag.
+    if (m_mode == Mode::Idle && !m_session && m_selection.size() == 1 &&
+        m_selection.first().kind == SelectKind::Face &&
+        QSettings().value(QStringLiteral("tools/directInteraction"), false).toBool()) {
+      const Selection face = m_selection;
+      QTimer::singleShot(0, this, [this, face] {
+        if (m_mode == Mode::Idle && !m_session && m_selection == face) {
+          startCommand(QStringLiteral("solid.press_pull"), face, nullptr);
+        }
+      });
+    }
   }
   const qint64 viewMs = selectionClock.restart();
   m_sketch->refreshView();
